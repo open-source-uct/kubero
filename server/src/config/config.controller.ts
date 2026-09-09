@@ -14,10 +14,11 @@ import { ReadonlyGuard } from '../common/guards/readonly.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { PodSize } from './podsize/podsize';
+import { CreatePodSizeDto, UpdatePodSizeDto } from './podsize/podsize.dto';
 
 @Controller({ path: 'api/config', version: '1' })
 export class ConfigController {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) { }
 
   @Get('/')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -229,22 +230,18 @@ export class ConfigController {
       },
     },
   })
-  async addPodSize(@Body() body) {
-    const { name, description, resources } = body;
-    if (!name || !description || !resources.limits || !resources.requests) {
-      throw new Error('Invalid pod size data provided');
-    }
+  async addPodSize(@Body() body: CreatePodSizeDto) {
     const podsize = new PodSize({
-      name: name,
-      description: description,
+      name: body.name,
+      description: body.description,
       resources: {
         requests: {
-          memory: resources.requests.memory,
-          cpu: resources.requests.cpu,
+          memory: body.resources.requests.memory,
+          cpu: body.resources.requests.cpu,
         },
         limits: {
-          memory: resources.limits.memory,
-          cpu: resources.limits.cpu,
+          memory: body.resources.limits.memory,
+          cpu: body.resources.limits.cpu,
         },
       },
     });
@@ -312,22 +309,18 @@ export class ConfigController {
       },
     },
   })
-  async updatePodSize(@Param('id') id: string, @Body() body) {
-    const { name, description, resources } = body;
-    if (!name || !description || !resources.limits || !resources.requests) {
-      throw new Error('Invalid pod size data provided');
-    }
+  async updatePodSize(@Param('id') id: string, @Body() body: UpdatePodSizeDto) {
     const podsize = new PodSize({
-      name: name,
-      description: description,
+      name: body.name,
+      description: body.description,
       resources: {
         requests: {
-          memory: resources.requests.memory,
-          cpu: resources.requests.cpu,
+          memory: body.resources.requests.memory,
+          cpu: body.resources.requests.cpu,
         },
         limits: {
-          memory: resources.limits.memory,
-          cpu: resources.limits.cpu,
+          memory: body.resources.limits.memory,
+          cpu: body.resources.limits.cpu,
         },
       },
     });
