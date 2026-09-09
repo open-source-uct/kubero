@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { Logger } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { CustomConsoleLogger } from './logger/logger';
 import { LogLevel } from '@nestjs/common/services/logger.service';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -29,6 +29,7 @@ async function bootstrap() {
     }),
     cors: true,
   });
+  app.useGlobalPipes(new ValidationPipe({ transform: true }));
 
   await DatabaseService.DBinit();
 
