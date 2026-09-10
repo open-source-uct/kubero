@@ -345,7 +345,7 @@ export default defineComponent({
     const availableLanguages = ref([
       { code: 'en', name: 'English' },
       { code: 'de', name: 'Deutsch' },
-      //{ code: 'es', name: 'Español' },
+      { code: 'es', name: 'Español' },
       //{ code: 'fr', name: 'Français' },
       { code: 'de-CH', name: 'Schwizerdütsch' },
       { code: 'ja', name: '日本語' },
