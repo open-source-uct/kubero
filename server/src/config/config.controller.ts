@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 //import { ApiTags } from '@nestjs/swagger';
 import { ConfigService } from './config.service';
 import {
@@ -15,10 +24,11 @@ import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { PodSize } from './podsize/podsize';
 import { CreatePodSizeDto, UpdatePodSizeDto } from './podsize/podsize.dto';
+import { CreateRunpackDto } from './dto/runpack.dto';
 
 @Controller({ path: 'api/config', version: '1' })
 export class ConfigController {
-  constructor(private readonly configService: ConfigService) { }
+  constructor(private readonly configService: ConfigService) {}
 
   @Get('/')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -148,10 +158,9 @@ export class ConfigController {
       // Additional properties for fetch, build, and run phases
     },
   })
-  async addRunpack(@Body() body) {
+  async addRunpack(@Body() body: CreateRunpackDto) {
     return this.configService.createRunpack(body);
   }
-
 
   @Get('/clusterissuer')
   @UseGuards(JwtAuthGuard, PermissionsGuard)

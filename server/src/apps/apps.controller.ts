@@ -27,7 +27,14 @@ import { JwtAuthGuard } from '../auth/strategies/jwt.guard';
 import { ReadonlyGuard } from '../common/guards/readonly.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
-
+import { ExecConsoleDto } from './dto/exec-console.dto';
+import { validate } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
+import { BadRequestException } from '@nestjs/common';
+import {
+  AppValidationDto,
+  flattenValidationErrors,
+} from './dto/app-validation.dto';
 
 @Controller({ path: 'api/apps', version: '1' })
 export class AppsController {
@@ -74,6 +81,13 @@ export class AppsController {
     @Body() app: any,
     @Request() req: any,
   ) {
+    const validationErrors = await validate(
+      plainToInstance(AppValidationDto, app),
+    );
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(flattenValidationErrors(validationErrors));
+    }
+
     if (appName !== 'new') {
       const msg = 'App name does not match the URL';
       Logger.error(msg);
@@ -117,6 +131,13 @@ export class AppsController {
     @Body() app: any,
     @Request() req: any,
   ) {
+    const validationErrors = await validate(
+      plainToInstance(AppValidationDto, app),
+    );
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(flattenValidationErrors(validationErrors));
+    }
+
     if (appName !== app.name) {
       const msg =
         'App name does not match the URL ' + appName + ' != ' + app.name;
@@ -129,7 +150,12 @@ export class AppsController {
       strategy: req.user.strategy,
       username: req.user.username,
     };
-    return this.appsService.updateApp(app, resourceVersion, user, req.user.userGroups);
+    return this.appsService.updateApp(
+      app,
+      resourceVersion,
+      user,
+      req.user.userGroups,
+    );
   }
 
   @Delete('/:pipeline/:phase/:app')
@@ -154,7 +180,13 @@ export class AppsController {
       strategy: req.user.strategy,
       username: req.user.username,
     };
-    return this.appsService.deleteApp(pipeline, phase, app, user, req.user.userGroups);
+    return this.appsService.deleteApp(
+      pipeline,
+      phase,
+      app,
+      user,
+      req.user.userGroups,
+    );
   }
 
   @Post('/pullrequest')
@@ -167,10 +199,7 @@ export class AppsController {
     isArray: false,
   })
   @ApiBearerAuth('bearerAuth')
-  async startPullRequest(
-    @Body() body: any,
-    @Request() req: any,
-  ) {
+  async startPullRequest(@Body() body: any, @Request() req: any) {
     return this.appsService.createPRApp(
       body.branch,
       body.branch,
@@ -196,7 +225,12 @@ export class AppsController {
     @Param('app') app: string,
     @Request() req: any,
   ) {
-    return this.appsService.getTemplate(pipeline, phase, app, req.user.userGroups);
+    return this.appsService.getTemplate(
+      pipeline,
+      phase,
+      app,
+      req.user.userGroups,
+    );
   }
 
   @Get('/:pipeline/:phase/:app/restart')
@@ -222,7 +256,13 @@ export class AppsController {
       username: req.user.username,
     };
 
-    return this.appsService.restartApp(pipeline, phase, app, user, req.user.userGroups);
+    return this.appsService.restartApp(
+      pipeline,
+      phase,
+      app,
+      user,
+      req.user.userGroups,
+    );
   }
 
   @Get('/:pipeline/:phase/:app/pods')
@@ -259,29 +299,12 @@ export class AppsController {
     @Param('pipeline') pipeline: string,
     @Param('phase') phase: string,
     @Param('app') app: string,
-    @Body() body: any,
+    @Body() body: ExecConsoleDto,
     @Request() req: any,
   ) {
     if (process.env.KUBERO_CONSOLE_ENABLED !== 'true') {
       const msg = 'Console is not enabled';
       Logger.warn(msg);
-      throw new HttpException(msg, HttpStatus.BAD_REQUEST);
-    }
-    if (!body.podName || !body.containerName || !body.command) {
-      const msg = 'Missing required fields: podName, containerName, command';
-      Logger.error(msg);
-      throw new HttpException(msg, HttpStatus.BAD_REQUEST);
-    }
-    /*
-    if (!Array.isArray(body.command)) {
-      const msg = 'Command must be an array';
-      Logger.error(msg, body.command);
-      throw new HttpException(msg, HttpStatus.BAD_REQUEST);
-    }
-    */
-    if (body.command.length === 0) {
-      const msg = 'Command array cannot be empty';
-      Logger.error(msg);
       throw new HttpException(msg, HttpStatus.BAD_REQUEST);
     }
 
@@ -291,17 +314,13 @@ export class AppsController {
       username: req.user.username,
     };
 
-    const podName = body.podName;
-    const containerName = body.containerName;
-    const command = body.command;
-
     return this.appsService.execInContainer(
       pipeline,
       phase,
       app,
-      podName,
-      containerName,
-      command,
+      body.podName,
+      body.containerName,
+      body.command,
       user,
       req.user.userGroups,
     );

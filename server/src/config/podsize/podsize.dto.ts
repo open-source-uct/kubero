@@ -8,7 +8,7 @@ import {
 } from 'class-validator';
 import { IsK8sQuantity } from '../../common/validators/k8s-quantity.validator';
 
-class ResourceQuantitiesDto {
+export class ResourceQuantitiesDto {
   @IsK8sQuantity()
   cpu: string;
 
@@ -16,7 +16,7 @@ class ResourceQuantitiesDto {
   memory: string;
 }
 
-class PodSizeResourcesDto {
+export class PodSizeResourcesDto {
   @ValidateNested()
   @Type(() => ResourceQuantitiesDto)
   requests: ResourceQuantitiesDto;
