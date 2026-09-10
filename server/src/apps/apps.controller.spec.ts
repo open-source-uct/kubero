@@ -309,7 +309,7 @@ describe('AppsController', () => {
       const body = {
         podName: 'pod',
         containerName: 'container',
-        command: ['ls'],
+        command: 'ls',
       };
       mockAppsService.execInContainer.mockResolvedValue(mockResult);
 
@@ -328,7 +328,7 @@ describe('AppsController', () => {
         'app',
         'pod',
         'container',
-        ['ls'],
+        'ls',
         mockUser,
         mockUserGroups,
       );
