@@ -41,14 +41,16 @@ class AppPodSizeDto {
 }
 
 class AutoscalingLimitsDto {
-  @IsOptional() @IsInt() @Min(1) minReplicas?: number;
-  @IsOptional() @IsInt() @Min(1) maxReplicas?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) minReplicas?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) maxReplicas?: number;
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(100)
   targetCPUUtilizationPercentage?: number;
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(100)
@@ -61,24 +63,29 @@ class ScalableComponentDto {
   @Type(() => AutoscalingLimitsDto)
   autoscaling?: AutoscalingLimitsDto;
 
-  @IsOptional() @IsInt() @Min(0) replicaCount?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) replicaCount?: number;
 }
 
 class HealthcheckDto {
   @IsOptional() @IsBoolean() enabled?: boolean;
   @IsOptional() @IsString() path?: string;
-  @IsOptional() @IsInt() @Min(0) periodSeconds?: number;
-  @IsOptional() @IsInt() @Min(0) startupSeconds?: number;
-  @IsOptional() @IsInt() @Min(0) timeoutSeconds?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) periodSeconds?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) startupSeconds?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) timeoutSeconds?: number;
 }
 
 class ServiceDto {
-  @IsOptional() @IsInt() @Min(1) @Max(65535) port?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(65535) port?: number;
   @IsOptional() @IsString() type?: string;
 }
 
 class ImageDto {
-  @IsOptional() @IsInt() @Min(1) @Max(65535) containerPort?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  containerPort?: number;
 }
 
 // Nota: esto NO representa el objeto App completo (tiene 137 campos).
@@ -95,7 +102,7 @@ export class AppValidationDto {
   @Type(() => PodSizeResourcesDto)
   resources?: PodSizeResourcesDto;
 
-  @IsOptional() @IsInt() @Min(0) replicaCount?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) replicaCount?: number;
 
   @IsOptional()
   @ValidateNested()
