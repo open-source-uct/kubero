@@ -1,12 +1,12 @@
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
-name: kubero
+name: kubero-uct
 networking:
     ipFamily: ipv4
     apiServerAddress: 127.0.0.1
 nodes:
     - role: control-plane
-      image: kindest/node:v1.28.0
+      image: kindest/node:v1.31.9
       kubeadmConfigPatches:
         - |
           kind: InitConfiguration
@@ -21,10 +21,10 @@ nodes:
           hostPort: 443
           protocol: TCP
 containerdConfigPatches:
-- |-
-  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."kubero-registry.kubero.svc:5000"]
-    endpoint = ["http://kubero-registry.kubero.svc:5000"]
-  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."registry.local.kubero.net"]
-    endpoint = ["http://registry.local.kubero.net"]
-  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."registry.localhost"]
-    endpoint = ["http://registry.localhost"]
+    - |-
+      [plugins."io.containerd.grpc.v1.cri".registry.mirrors."kubero-registry.kubero.svc:5000"]
+        endpoint = ["http://kubero-registry.kubero.svc:5000"]
+      [plugins."io.containerd.grpc.v1.cri".registry.mirrors."registry.local.kubero.net"]
+        endpoint = ["http://registry.local.kubero.net"]
+      [plugins."io.containerd.grpc.v1.cri".registry.mirrors."registry.localhost"]
+        endpoint = ["http://registry.localhost"]

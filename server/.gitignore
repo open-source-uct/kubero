@@ -58,3 +58,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # Jest jUnit test coverage reports
 reports
 /generated/prisma
+
+# config
+kubeconfig
