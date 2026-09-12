@@ -31,10 +31,8 @@ import { ExecConsoleDto } from './dto/exec-console.dto';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { BadRequestException } from '@nestjs/common';
-import {
-  AppValidationDto,
-  flattenValidationErrors,
-} from './dto/app-validation.dto';
+import { AppValidationDto } from './dto/app-validation.dto';
+import { flattenValidationErrors } from '../common/utils/validation.util';
 
 @Controller({ path: 'api/apps', version: '1' })
 export class AppsController {

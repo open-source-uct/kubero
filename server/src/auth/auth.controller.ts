@@ -41,13 +41,7 @@ export class AuthController {
     isArray: false,
   })
   async login(@Body() auth: LoginDTO) {
-    const { username, password } = auth;
-
-    if (!username || !password) {
-      return { message: 'Username and password are required', status: 400 };
-    }
-
-    return await this.authService.login(username, password);
+    return await this.authService.login(auth.username, auth.password);
   }
 
   @Get('logout')

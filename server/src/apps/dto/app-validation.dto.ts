@@ -7,26 +7,8 @@ import {
   Min,
   Max,
   ValidateNested,
-  ValidationError,
 } from 'class-validator';
 import { PodSizeResourcesDto } from '../../config/podsize/podsize.dto';
-
-// class-validator nests errors for fields inside nested objects (e.g.
-// podsize.resources.requests.cpu) under `error.children` instead of putting
-// them on `error.constraints` directly. Flatten recursively so none of the
-// nested messages get silently dropped.
-export function flattenValidationErrors(errors: ValidationError[]): string[] {
-  const messages: string[] = [];
-  for (const error of errors) {
-    if (error.constraints) {
-      messages.push(...Object.values(error.constraints));
-    }
-    if (error.children && error.children.length > 0) {
-      messages.push(...flattenValidationErrors(error.children));
-    }
-  }
-  return messages;
-}
 
 class AppPodSizeDto {
   @IsOptional() @IsString() id?: string;
