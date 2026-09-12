@@ -9,7 +9,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-class CapabilitiesDto {
+export class CapabilitiesDto {
   @IsArray()
   @IsString({ each: true })
   add: string[];
@@ -19,7 +19,7 @@ class CapabilitiesDto {
   drop: string[];
 }
 
-class SecurityContextDto {
+export class SecurityContextDto {
   @IsBoolean()
   readOnlyRootFilesystem: boolean;
 
@@ -40,7 +40,7 @@ class SecurityContextDto {
   capabilities: CapabilitiesDto;
 }
 
-class RunpackPhaseDto {
+export class RunpackPhaseDto {
   @IsString()
   @IsNotEmpty()
   repository: string;

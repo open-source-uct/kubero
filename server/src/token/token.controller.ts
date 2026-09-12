@@ -23,6 +23,7 @@ import { TokenService } from './token.service';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { ReadonlyGuard } from '../common/guards/readonly.guard';
+import { CreateTokenDto } from './dto/create-token.dto';
 
 @Controller({ path: 'api/tokens', version: '1' })
 export class TokenController {
@@ -30,7 +31,7 @@ export class TokenController {
 
   @Get('/')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('token:write','token:read')
+  @Permissions('token:write', 'token:read')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -85,16 +86,7 @@ export class TokenController {
   @ApiOperation({
     summary: 'Create a new Token for the current logged in user',
   })
-  async createToken(@Body() tokenData: any, @Request() req: any) {
-    if (
-      !tokenData ||
-      !tokenData.name ||
-      !tokenData.expiresAt ||
-      !req.user.userId
-    ) {
-      throw new HttpException('Invalid token data', HttpStatus.BAD_REQUEST);
-    }
-
+  async createToken(@Body() tokenData: CreateTokenDto, @Request() req: any) {
     const token = this.tokenService.create(
       tokenData.name,
       tokenData.expiresAt,
