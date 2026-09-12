@@ -10,7 +10,11 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { NotificationsDbService, CreateNotificationDto, UpdateNotificationDto } from './notifications-db.service';
+import { NotificationsDbService } from './notifications-db.service';
+import {
+  CreateNotificationDto,
+  UpdateNotificationDto,
+} from './dto/notification.dto';
 import { INotificationConfig } from './notifications.interface';
 
 export interface ApiResponse<T = any> {
@@ -23,12 +27,15 @@ export interface ApiResponse<T = any> {
 export class NotificationsController {
   private readonly logger = new Logger(NotificationsController.name);
 
-  constructor(private readonly notificationsDbService: NotificationsDbService) {}
+  constructor(
+    private readonly notificationsDbService: NotificationsDbService,
+  ) {}
 
   @Get()
   async findAll(): Promise<ApiResponse<INotificationConfig[]>> {
     try {
-      const notifications = await this.notificationsDbService.getNotificationConfigs();
+      const notifications =
+        await this.notificationsDbService.getNotificationConfigs();
       return {
         success: true,
         data: notifications,
@@ -43,7 +50,9 @@ export class NotificationsController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string): Promise<ApiResponse<INotificationConfig>> {
+  async findOne(
+    @Param('id') id: string,
+  ): Promise<ApiResponse<INotificationConfig>> {
     try {
       const notification = await this.notificationsDbService.findById(id);
       if (!notification) {
@@ -67,29 +76,14 @@ export class NotificationsController {
   }
 
   @Post()
-  async create(@Body() createNotificationDto: CreateNotificationDto): Promise<ApiResponse<INotificationConfig>> {
+  async create(
+    @Body() createNotificationDto: CreateNotificationDto,
+  ): Promise<ApiResponse<INotificationConfig>> {
     try {
-      // Validate required fields
-      if (!createNotificationDto.name || !createNotificationDto.type) {
-        throw new HttpException(
-          'Name and type are required fields',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
+      const notification = await this.notificationsDbService.create(
+        createNotificationDto,
+      );
 
-      // Validate notification type
-      if (!['slack', 'webhook', 'discord'].includes(createNotificationDto.type)) {
-        throw new HttpException(
-          'Invalid notification type. Must be slack, webhook, or discord',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
-      // Validate config based on type
-      this.validateNotificationConfig(createNotificationDto.type, createNotificationDto.config);
-
-      const notification = await this.notificationsDbService.create(createNotificationDto);
-      
       return {
         success: true,
         data: this.notificationsDbService.toNotificationConfig(notification),
@@ -110,30 +104,20 @@ export class NotificationsController {
   @Put(':id')
   async update(
     @Param('id') id: string,
-    @Body() updateNotificationDto: Partial<CreateNotificationDto>,
+    @Body() updateNotificationDto: UpdateNotificationDto,
   ): Promise<ApiResponse<INotificationConfig>> {
     try {
-      // Check if notification exists
-      const existingNotification = await this.notificationsDbService.findById(id);
+      const existingNotification =
+        await this.notificationsDbService.findById(id);
       if (!existingNotification) {
         throw new HttpException('Notification not found', HttpStatus.NOT_FOUND);
       }
 
-      // Validate notification type if provided
-      if (updateNotificationDto.type && !['slack', 'webhook', 'discord'].includes(updateNotificationDto.type)) {
-        throw new HttpException(
-          'Invalid notification type. Must be slack, webhook, or discord',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
+      const notification = await this.notificationsDbService.update(
+        id,
+        updateNotificationDto,
+      );
 
-      // Validate config if provided
-      if (updateNotificationDto.config && updateNotificationDto.type) {
-        this.validateNotificationConfig(updateNotificationDto.type, updateNotificationDto.config);
-      }
-
-      const notification = await this.notificationsDbService.update(id, updateNotificationDto);
-      
       return {
         success: true,
         data: this.notificationsDbService.toNotificationConfig(notification),
@@ -155,7 +139,7 @@ export class NotificationsController {
   async remove(@Param('id') id: string): Promise<ApiResponse> {
     try {
       await this.notificationsDbService.delete(id);
-      
+
       return {
         success: true,
         message: 'Notification deleted successfully',
@@ -169,35 +153,6 @@ export class NotificationsController {
         'Failed to delete notification',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
-    }
-  }
-
-  private validateNotificationConfig(type: string, config: any): void {
-    switch (type) {
-      case 'slack':
-        if (!config.url) {
-          throw new HttpException(
-            'Slack notifications require a webhook URL',
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-        break;
-      case 'webhook':
-        if (!config.url) {
-          throw new HttpException(
-            'Webhook notifications require a URL',
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-        break;
-      case 'discord':
-        if (!config.url) {
-          throw new HttpException(
-            'Discord notifications require a webhook URL',
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-        break;
     }
   }
 }

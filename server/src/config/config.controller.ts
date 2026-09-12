@@ -25,6 +25,13 @@ import { Permissions } from '../auth/permissions.decorator';
 import { PodSize } from './podsize/podsize';
 import { CreatePodSizeDto, UpdatePodSizeDto } from './podsize/podsize.dto';
 import { CreateRunpackDto } from './dto/runpack.dto';
+import { ValidateKubeconfigDto } from './dto/validate-kubeconfig.dto';
+import { UpdateRunningConfigDto } from './dto/update-running-config.dto';
+import { SettingsValidationDto } from './dto/settings-validation.dto';
+import { validate } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
+import { BadRequestException } from '@nestjs/common';
+import { flattenValidationErrors } from '../common/utils/validation.util';
 
 @Controller({ path: 'api/config', version: '1' })
 export class ConfigController {
@@ -56,7 +63,13 @@ export class ConfigController {
     isArray: false,
   })
   //@ApiBody({ type: OKDTO })
-  async updateSettings(@Body() body) {
+  async updateSettings(@Body() body: any) {
+    const validationErrors = await validate(
+      plainToInstance(SettingsValidationDto, body.settings?.kubero),
+    );
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(flattenValidationErrors(validationErrors));
+    }
     return this.configService.updateSettings(body);
   }
 
@@ -376,12 +389,10 @@ export class ConfigController {
       },
     },
   })
-  async validateKubeconfig(@Body() body) {
-    const kubeconfig = body.kubeconfig;
-    const kubeContext = body.context;
+  async validateKubeconfig(@Body() body: ValidateKubeconfigDto) {
     const result = await this.configService.validateKubeconfig(
-      kubeconfig,
-      kubeContext,
+      body.kubeconfig,
+      body.context,
     );
     return result;
   }
@@ -424,7 +435,7 @@ export class ConfigController {
       },
     },
   })
-  async updateRunningConfig(@Body() body) {
+  async updateRunningConfig(@Body() body: UpdateRunningConfigDto) {
     const kubeconfigBase64 = body.KUBECONFIG_BASE64;
     const kubeContext = body.KUBERO_CONTEXT;
     const kuberoNamespace = body.KUBERO_NAMESPACE;

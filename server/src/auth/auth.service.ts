@@ -27,6 +27,11 @@ export class AuthService {
     const user = await this.usersService.findOneFull(username);
 
     if (user) {
+      if (user.isActive === false) {
+        this.logger.warn(`Login blocked: user ${username} is disabled`);
+        return null;
+      }
+
       if (process.env.KUBERO_SESSION_KEY === undefined) {
         this.logger.error('KUBERO_SESSION_KEY is not defined');
         throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
@@ -72,7 +77,7 @@ export class AuthService {
 
     const permissions = await this.rolesService.getPermissions(user.roleId);
     user.permissions = permissions.map((p) => `${p.resource}:${p.action}`);
-    
+
     // Defines the user object to be signed in the JWT
     // Add more fields if needed
     const u = {
