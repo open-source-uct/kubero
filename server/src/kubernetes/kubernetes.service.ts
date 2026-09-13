@@ -189,7 +189,9 @@ export class KubernetesService {
   }
 
   public setCurrentContext(context: string) {
-    this.kc.setCurrentContext(context);
+    if (context) {
+      this.kc.setCurrentContext(context);
+    }
   }
 
   public getCurrentContext() {
@@ -215,20 +217,14 @@ export class KubernetesService {
         'kuberopipelines',
       );
       pipelines = ps.body as IKubectlPipelineList;
-      //return pipelines.body as IKubectlPipelineList;
-    } catch (_error) {
-      //this.logger.debug(error);
-      this.logger.debug('❌ getPipelinesList: error getting pipelines!');
+    } catch (error) {
+      this.logger.error('❌ getPipelinesList: error getting pipelines!');
+      throw error;
     }
     if (pipelines.items.length > 0) {
-      // Filter pipelines based on user groups
-
       pipelines.items = pipelines.items.filter((pipeline) => {
-        if (!pipeline.spec || !pipeline.spec.access) return true; //true=keep, when no access defined for better backward compatibility
-
-        // return all, when user is in admin group
+        if (!pipeline.spec || !pipeline.spec.access) return true;
         if (userGroups.includes('admin')) return true;
-
         const accessGroups = pipeline.spec.access.teams || [];
         return accessGroups.some((group) => userGroups.includes(group));
       });
@@ -251,8 +247,8 @@ export class KubernetesService {
         pipeline,
       )
       .catch((error) => {
-        this.logger.debug('❌ Error creating pipeline: ' + pl.name);
-        //this.logger.debug(error);
+        this.logger.error('❌ Error creating pipeline: ' + pl.name);
+        throw error;
       });
   }
 
@@ -318,7 +314,9 @@ export class KubernetesService {
 
   public async createApp(app: App, context: string) {
     this.logger.debug('create app: ' + app.name);
-    this.kc.setCurrentContext(context);
+    if (context) {
+      this.kc.setCurrentContext(context);
+    }
 
     const appl = new KubectlApp(app);
 
@@ -333,13 +331,16 @@ export class KubernetesService {
         appl,
       )
       .catch((error) => {
-        console.log(error);
+        this.logger.error('❌ Error creating app: ' + app.name);
+        throw error;
       });
   }
 
   public async updateApp(app: App, resourceVersion: string, context: string) {
     this.logger.debug('update app: ' + app.name);
-    this.kc.setCurrentContext(context);
+    if (context) {
+      this.kc.setCurrentContext(context);
+    }
 
     const appl = new KubectlApp(app);
     appl.metadata.resourceVersion = resourceVersion;
@@ -372,7 +373,9 @@ export class KubernetesService {
     this.logger.debug('delete app: ' + appName);
 
     const namespace = pipelineName + '-' + phaseName;
-    this.kc.setCurrentContext(context);
+    if (context) {
+      this.kc.setCurrentContext(context);
+    }
 
     await this.customObjectsApi
       .deleteNamespacedCustomObject(
@@ -394,7 +397,9 @@ export class KubernetesService {
     context: string,
   ): Promise<IKubectlApp> {
     const namespace = pipelineName + '-' + phaseName;
-    this.kc.setCurrentContext(context);
+    if (context) {
+      this.kc.setCurrentContext(context);
+    }
 
     const app = await this.customObjectsApi
       .getNamespacedCustomObject(
@@ -419,7 +424,9 @@ export class KubernetesService {
     namespace: string,
     context: string,
   ): Promise<IKubectlAppList> {
-    this.kc.setCurrentContext(context);
+    if (context) {
+      this.kc.setCurrentContext(context);
+    }
     try {
       const appslist = await this.customObjectsApi.listNamespacedCustomObject(
         'application.kubero.dev',
@@ -438,7 +445,9 @@ export class KubernetesService {
   }
 
   public async getAllAppsList(context: string): Promise<IKubectlAppList> {
-    this.kc.setCurrentContext(context);
+    if (context) {
+      this.kc.setCurrentContext(context);
+    }
     try {
       const appslist = await this.customObjectsApi.listClusterCustomObject(
         'application.kubero.dev',
@@ -463,7 +472,9 @@ export class KubernetesService {
     context: string,
   ) {
     this.logger.debug('restart app: ' + appName);
-    this.kc.setCurrentContext(context);
+    if (context) {
+      this.kc.setCurrentContext(context);
+    }
 
     const namespace = pipelineName + '-' + phaseName;
     const deploymentName = appName + '-kuberoapp-' + workloadType;

@@ -1,21 +1,18 @@
 <template>
   <v-form>
     <v-container>
-
-
-      <v-tabs
-        v-model="tab"
-        style="margin-bottom: 30px;"
-      >
+      <v-tabs v-model="tab" style="margin-bottom: 30px">
         <v-tab value="general">General</v-tab>
         <v-tab value="deployment">Deployment</v-tab>
         <v-tab value="templates">Templates</v-tab>
       </v-tabs>
 
-
       <v-window v-model="tab">
         <v-window-item value="general">
-          <FormGeneral :settings="settings.settings" :secrets="settings.secrets"></FormGeneral>
+          <FormGeneral
+            :settings="settings.settings"
+            :secrets="settings.secrets"
+          ></FormGeneral>
         </v-window-item>
 
         <v-window-item value="deployment">
@@ -30,20 +27,19 @@
       <v-btn
         color="primary"
         @click="saveSettings"
-        style="margin-left: 10px; margin-top: 20px;"
-      >update configuration</v-btn>
-
+        style="margin-left: 10px; margin-top: 20px"
+        >update configuration</v-btn
+      >
     </v-container>
-
   </v-form>
 </template>
 
 <script lang="ts">
 import axios from "axios";
-import { defineComponent } from 'vue'
-import FormGeneral from './form-general.vue'
-import FormDeployment from './form-deployment.vue'
-import FormTemplates from './form-templates.vue'
+import { defineComponent } from "vue";
+import FormGeneral from "./form-general.vue";
+import FormDeployment from "./form-deployment.vue";
+import FormTemplates from "./form-templates.vue";
 
 // types & interfaces
 export interface Secrets {
@@ -61,7 +57,6 @@ export interface Secrets {
   GITHUB_CLIENT_SECRET: string;
   OAUTH2_CLIENT_SECRET: string;
 }
-
 
 export interface Settings {
   settings: Kuberoes;
@@ -83,7 +78,7 @@ export interface Kuberoes {
   affinity: any;
   fullnameOverride: string;
   image: Image;
-  imagePullSecrets?: (null)[] | null;
+  imagePullSecrets?: null[] | null;
   ingress: Ingress;
   kubero: Kubero1;
   nameOverride: string;
@@ -96,7 +91,7 @@ export interface Kuberoes {
   securityContext: any;
   service: Service;
   serviceAccount: ServiceAccount;
-  tolerations?: (null)[] | null;
+  tolerations?: null[] | null;
 }
 
 export interface Image {
@@ -108,12 +103,12 @@ export interface Ingress {
   annotations: any;
   className: string;
   enabled: boolean;
-  hosts?: (HostsEntity)[] | null;
-  tls?: (null)[] | null;
+  hosts?: HostsEntity[] | null;
+  tls?: null[] | null;
 }
 export interface HostsEntity {
   host: string;
-  paths?: (PathsEntity)[] | null;
+  paths?: PathsEntity[] | null;
 }
 export interface PathsEntity {
   path: string;
@@ -130,7 +125,7 @@ export interface Kubero1 {
   webhook_url: string;
 }
 export interface AuditLogs {
-  accessModes?: (string)[] | null;
+  accessModes?: string[] | null;
   enabled: boolean;
   limit: string;
   size: string;
@@ -154,38 +149,38 @@ export interface Oauth2 {
   scopes: string;
 }
 export interface Config {
-  buildpacks?: (Buildpack)[] | null;
+  buildpacks?: Buildpack[] | null;
   clusterissuer: string;
   kubero: Kubero;
-  podSizeList?: (PodSize)[] | null;
+  podSizeList?: PodSize[] | null;
   templates: Templates;
 }
 export type Buildpack = {
-    advanced?: boolean,
-    name: string,
-    language: string,
-    fetch: BuildpackStage,
-    build: BuildpackStage,
-    run: BuildpackStage
-}
+  advanced?: boolean;
+  name: string;
+  language: string;
+  fetch: BuildpackStage;
+  build: BuildpackStage;
+  run: BuildpackStage;
+};
 export type SecurityContext = {
-    runAsUser: number
-    runAsGroup: number
-    runAsNonRoot: boolean
-    readOnlyRootFilesystem: boolean
-    allowPrivilegeEscalation: boolean
-    capabilities: {
-        add: string[]
-        drop: string[]
-    }
-}
+  runAsUser: number;
+  runAsGroup: number;
+  runAsNonRoot: boolean;
+  readOnlyRootFilesystem: boolean;
+  allowPrivilegeEscalation: boolean;
+  capabilities: {
+    add: string[];
+    drop: string[];
+  };
+};
 export type BuildpackStage = {
-    repository: string,
-    tag: string,
-    command: string
-    readOnlyAppStorage: boolean
-    securityContext: SecurityContext
-}
+  repository: string;
+  tag: string;
+  command: string;
+  readOnlyAppStorage: boolean;
+  securityContext: SecurityContext;
+};
 
 export interface Fetch {
   repository: string;
@@ -210,10 +205,10 @@ export interface Kubero {
   banner: Banner;
   console: {
     enabled: boolean;
-  }
+  };
   admin: {
     disabled: boolean;
-  }
+  };
   readonly: boolean;
 }
 export interface Banner {
@@ -223,21 +218,21 @@ export interface Banner {
   show: boolean;
 }
 export type PodSize = {
-    name: string,
-    description: string,
-    editable?: boolean,
-    default?: boolean,
-    resources: {
-        requests: {
-            cpu: string,
-            memory: string,
-        },
-        limits: {
-            cpu: string,
-            memory: string,
-        }
-    }
-}
+  name: string;
+  description: string;
+  editable?: boolean;
+  default?: boolean;
+  resources: {
+    requests: {
+      cpu: string;
+      memory: string;
+    };
+    limits: {
+      cpu: string;
+      memory: string;
+    };
+  };
+};
 
 export interface Resources {
   requests: RequestsOrLimits;
@@ -248,7 +243,7 @@ export interface RequestsOrLimits {
   cpu: string;
 }
 export interface Templates {
-  catalogs?: (CatalogsEntity)[] | null;
+  catalogs?: CatalogsEntity[] | null;
   enabled: boolean;
 }
 export interface CatalogsEntity {
@@ -305,7 +300,7 @@ export interface Oauth2 {
 export interface AuditLogs {
   enabled: boolean;
   storageClassName: string;
-  accessModes?: (string)[] | null;
+  accessModes?: string[] | null;
   size: string;
   limit: string;
 }
@@ -329,205 +324,185 @@ export interface Bitbucket {
 }
 
 export type Catalog = {
-  name: string,
-  description: string,
-  templateBasePath: string,
+  name: string;
+  description: string;
+  templateBasePath: string;
   index: {
-    url: string,
-    format: string
-  }
-}
-
-
-export type INotificationSlack = {
     url: string;
-    channel: string;
-}
-
-export type INotificationWebhook = {
-    url: string;
-    secret: string;
-}
-
-export type INotificationDiscord = {
-    url: string;
-}
-
-export type Notification = {
-  name: string,
-  enabled: boolean,
-  type: 'slack' | 'webhook' | 'discord',
-  events: string[],
-  config: INotificationSlack | INotificationWebhook | INotificationDiscord,
-}
+    format: string;
+  };
+};
 
 export default defineComponent({
-    sockets: {
-    },
-    mounted() {
-      this.loadSettings();
-    },
-    data: () => ({
-      tab: "general",
-      show: false,
+  sockets: {},
+  mounted() {
+    this.loadSettings();
+  },
+  data: () => ({
+    tab: "general",
+    show: false,
+    settings: {
+      secrets: {
+        GITHUB_BASEURL: "",
+        GITHUB_PERSONAL_ACCESS_TOKEN: "",
+        GITEA_PERSONAL_ACCESS_TOKEN: "",
+        GITEA_BASEURL: "",
+        GITLAB_PERSONAL_ACCESS_TOKEN: "",
+        GITLAB_BASEURL: "",
+        GOGS_PERSONAL_ACCESS_TOKEN: "",
+        GOGS_BASEURL: "",
+        BITBUCKET_APP_PASSWORD: "",
+        BITBUCKET_USERNAME: "",
+        KUBERO_WEBHOOK_SECRET: "",
+        GITHUB_CLIENT_SECRET: "",
+        OAUTH2_CLIENT_SECRET: "",
+      } as Secrets,
       settings: {
-        secrets: {
-          GITHUB_BASEURL: '',
-          GITHUB_PERSONAL_ACCESS_TOKEN: '',
-          GITEA_PERSONAL_ACCESS_TOKEN: '',
-          GITEA_BASEURL: '',
-          GITLAB_PERSONAL_ACCESS_TOKEN: '',
-          GITLAB_BASEURL: '',
-          GOGS_PERSONAL_ACCESS_TOKEN: '',
-          GOGS_BASEURL: '',
-          BITBUCKET_APP_PASSWORD: '',
-          BITBUCKET_USERNAME: '',
-          KUBERO_WEBHOOK_SECRET: '',
-          GITHUB_CLIENT_SECRET: '',
-          OAUTH2_CLIENT_SECRET: '',
-        } as Secrets,
-        settings: {
-          affinity: {} as any,
-          fullnameOverride: '' as string,
-          image: {
-            pullPolicy: '',
-            repository: '',
-            tag: '',
-          } as Image,
-          imagePullSecrets: [],
-          ingress: {
-            annotations: {},
-            className: '',
+        affinity: {} as any,
+        fullnameOverride: "" as string,
+        image: {
+          pullPolicy: "",
+          repository: "",
+          tag: "",
+        } as Image,
+        imagePullSecrets: [],
+        ingress: {
+          annotations: {},
+          className: "",
+          enabled: false,
+          hosts: [],
+          tls: [],
+        } as Ingress,
+        kubero: {
+          namespace: "",
+          auditLogs: {
+            accessModes: ["ReadWriteOnce"],
             enabled: false,
-            hosts: [],
-            tls: [],
-          } as Ingress,
-          kubero: {
-            namespace: '',
-            auditLogs: {
-              accessModes: ["ReadWriteOnce"],
+            limit: "1000",
+            size: "0.1Gi",
+            storageClassName: "",
+          } as AuditLogs,
+          auth: {
+            github: {
               enabled: false,
-              limit: '1000',
-              size: '0.1Gi',
-              storageClassName: '',
-            } as AuditLogs,
-            auth: {
-              github: {
+              id: "",
+              secret: "",
+              callbackUrl: "",
+              org: "",
+            } as Github,
+            oauth2: {
+              enabled: false,
+              name: "",
+              id: "",
+              authUrl: "",
+              tokenUrl: "",
+              secret: "",
+              callbackUrl: "",
+              scopes: "",
+            } as Oauth2,
+          } as Auth,
+          config: {
+            buildPacks: [] as Buildpack[],
+            clusterissuer: "" as string,
+            kubero: {
+              banner: {
+                bgcolor: "",
+                fontcolor: "",
+                message: "",
+                show: false,
+              } as Banner,
+              console: {
                 enabled: false,
-                id: '',
-                secret: '',
-                callbackUrl: '',
-                org: '',
-              } as Github,
-              oauth2: {
-                enabled: false,
-                name: '',
-                id: '',
-                authUrl: '',
-                tokenUrl: '',
-                secret: '',
-                callbackUrl: '',
-                scopes: '',
-              } as Oauth2,
-            } as Auth,
-            config: {
-              buildPacks: [] as Buildpack[],
-              clusterissuer: '' as string,
-              notifications: [] as Notification[],
-              kubero: {
-                banner: {
-                  bgcolor: '',
-                  fontcolor: '',
-                  message: '',
-                  show: false,
-                } as Banner,
-                console: {
-                  enabled: false,
-                },
-                admin: {
-                  disabled: false,
-                },
-                readonly: false,
-              } as Kubero,
-              podSizeList: [] as PodSize[],
-              templates: {
-                catalogs: [] as Catalog[],
-                enabled: false,
-              } as Templates,
-            },
+              },
+              admin: {
+                disabled: false,
+              },
+              readonly: false,
+            } as Kubero,
+            podSizeList: [] as PodSize[],
+            templates: {
+              catalogs: [] as Catalog[],
+              enabled: false,
+            } as Templates,
           },
-          nameOverride: '',
-          nodeSelector: {} as any,
-          podAnnotations: {} as any,
-          podSecurityContext: {} as any,
-          registry: {
-            account: {
-              hash: '',
-              password: '',
-              username: '',
-            },
-            create: false,
-            enabled: false,
-            host: '',
-            port: 0,
-            storage: '',
-            storageClassName: null,
-          } as Registry,
-          replicaCount: 0,
-          resources: {} as any,
-          securityContext: {} as any,
-          service: {
-            port: 0,
-            type: '',
-          } as Service,
-          serviceAccount: {
-            annotations: {} as any,
-            create: false,
-            name: '',
-          } as ServiceAccount,
-          tolerations: [] as any,
         },
+        nameOverride: "",
+        nodeSelector: {} as any,
+        podAnnotations: {} as any,
+        podSecurityContext: {} as any,
+        registry: {
+          account: {
+            hash: "",
+            password: "",
+            username: "",
+          },
+          create: false,
+          enabled: false,
+          host: "",
+          port: 0,
+          storage: "",
+          storageClassName: null,
+        } as Registry,
+        replicaCount: 0,
+        resources: {} as any,
+        securityContext: {} as any,
+        service: {
+          port: 0,
+          type: "",
+        } as Service,
+        serviceAccount: {
+          annotations: {} as any,
+          create: false,
+          name: "",
+        } as ServiceAccount,
+        tolerations: [] as any,
       },
-    }),
-    components: {
-      FormGeneral,
-      FormDeployment,
-      FormTemplates,
     },
-    methods: {
-      saveSettings() {
-        const self = this;
+  }),
+  components: {
+    FormGeneral,
+    FormDeployment,
+    FormTemplates,
+  },
+  methods: {
+    saveSettings() {
+      const self = this;
 
-        self.settings.settings.kubero.config.podSizeList.forEach((podSize: PodSize) => {
+      self.settings.settings.kubero.config.podSizeList.forEach(
+        (podSize: PodSize) => {
           delete podSize.editable;
-        });
+        },
+      );
 
-        self.settings.settings.kubero.config.buildPacks.forEach((buildpack: Buildpack) => {
+      self.settings.settings.kubero.config.buildPacks.forEach(
+        (buildpack: Buildpack) => {
           delete buildpack.advanced;
-        });
+        },
+      );
 
-        axios.post(`/api/config`, self.settings)
-        .then(response => {
-          console.log('saveSettings', response);
+      axios
+        .post(`/api/config`, self.settings)
+        .then((response) => {
+          console.log("saveSettings", response);
         })
-        .catch(error => {
-          console.log('saveSettings', error);
+        .catch((error) => {
+          console.log("saveSettings", error);
         });
-      },
-      async loadSettings() {
-        const self = this;
-        axios.get(`/api/config`)
-        .then(response => {
-            self.settings = response.data;
-            console.log('loadSettings', self.settings);
-        })
-        .catch(error => {
-            console.log('loadSettings', error);
-        });
-      }
     },
-})
+    async loadSettings() {
+      const self = this;
+      axios
+        .get(`/api/config`)
+        .then((response) => {
+          self.settings = response.data;
+          console.log("loadSettings", self.settings);
+        })
+        .catch((error) => {
+          console.log("loadSettings", error);
+        });
+    },
+  },
+});
 </script>
 
-<style lang="scss">
-</style>
+<style lang="scss"></style>
