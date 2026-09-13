@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PipelinesService } from '../pipelines/pipelines.service';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -31,7 +31,7 @@ export class AppsService {
     pipelineName: string,
     phaseName: string,
     appName: string,
-    userGroups: string[]
+    userGroups: string[],
   ) {
     this.logger.debug(
       'get App: ' + appName + ' in ' + pipelineName + ' phase: ' + phaseName,
@@ -84,39 +84,49 @@ export class AppsService {
       app.phase,
       userGroups,
     );
-    if (contextName) {
-      await this.kubectl.createApp(app, contextName);
+    if (contextName.startsWith('missing-')) {
+      throw new HttpException(
+        `Pipeline "${app.pipeline}" or phase "${app.phase}" not found`,
+        HttpStatus.NOT_FOUND,
+      );
+    }
 
-      const m = {
-        name: 'newApp',
-        user: user.id,
-        resource: 'app',
-        action: 'create',
-        severity: 'normal',
-        message:
-          'Created new app: ' +
-          app.name +
-          ' in ' +
-          app.pipeline +
-          ' phase: ' +
-          app.phase,
-        pipelineName: app.pipeline,
-        phaseName: app.phase,
-        appName: app.name,
-        data: {
-          app: app,
-        },
-      } as INotification;
-      this.NotificationsService.send(m);
+    await this.kubectl.createApp(app, contextName);
 
-      if (
-        app.deploymentstrategy == 'git' &&
-        (app.buildstrategy == 'dockerfile' ||
-          app.buildstrategy == 'nixpacks' ||
-          app.buildstrategy == 'buildpacks')
-      ) {
-        this.triggerImageBuildDelayed(app.pipeline, app.phase, app.name, userGroups);
-      }
+    const m = {
+      name: 'newApp',
+      user: user.id,
+      resource: 'app',
+      action: 'create',
+      severity: 'normal',
+      message:
+        'Created new app: ' +
+        app.name +
+        ' in ' +
+        app.pipeline +
+        ' phase: ' +
+        app.phase,
+      pipelineName: app.pipeline,
+      phaseName: app.phase,
+      appName: app.name,
+      data: {
+        app: app,
+      },
+    } as INotification;
+    this.NotificationsService.send(m);
+
+    if (
+      app.deploymentstrategy == 'git' &&
+      (app.buildstrategy == 'dockerfile' ||
+        app.buildstrategy == 'nixpacks' ||
+        app.buildstrategy == 'buildpacks')
+    ) {
+      this.triggerImageBuildDelayed(
+        app.pipeline,
+        app.phase,
+        app.name,
+        userGroups,
+      );
     }
   }
 
@@ -124,7 +134,7 @@ export class AppsService {
     pipeline: string,
     phase: string,
     appName: string,
-    userGroups: string[]
+    userGroups: string[],
   ) {
     // delay for 2 seconds to trigger the Image build
     await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -137,7 +147,11 @@ export class AppsService {
     appName: string,
     userGroups: string[],
   ) {
-    const contextName = await this.pipelinesService.getContext(pipeline, phase, userGroups);
+    const contextName = await this.pipelinesService.getContext(
+      pipeline,
+      phase,
+      userGroups,
+    );
     const namespace = pipeline + '-' + phase;
 
     const appresult = await this.getApp(pipeline, phase, appName, userGroups);
@@ -425,7 +439,12 @@ export class AppsService {
   }
 
   // delete a pr app in all pipelines that have review apps enabled and the same ssh_url
-  public async deletePRApp(branch: string, title: string, ssh_url: string, userGroups: string[]) {
+  public async deletePRApp(
+    branch: string,
+    title: string,
+    ssh_url: string,
+    userGroups: string[],
+  ) {
     this.logger.debug('destroyPRApp');
     const websaveTitle = title.toLowerCase().replace(/[^a-z0-9-]/g, '-'); //TODO improve websave title
 
@@ -603,7 +622,12 @@ export class AppsService {
   }
 
   // update an app in a pipeline and phase
-  public async updateApp(app: App, resourceVersion: string, user: IUser, userGroups: string[]) {
+  public async updateApp(
+    app: App,
+    resourceVersion: string,
+    user: IUser,
+    userGroups: string[],
+  ) {
     this.logger.debug(
       'update App: ' +
         app.name +
