@@ -79,16 +79,14 @@
           <template #activator="{ props }">
             <v-list-item v-bind="props" :title="$t('navigation.settings')"></v-list-item>
           </template>
-          <!--
-          <v-list-item 
+          <v-list-item
             link to="/settings"
             :title="$t('navigation.general')"
             prepend-icon="mdi-tune"
             density="compact"
             style="transform: scale(0.9);"
           ></v-list-item>
-          -->
-          <v-list-item 
+          <v-list-item
               link to="/runpacks" 
               v-if="kubero.isAuthenticated && !kubero.adminDisabled"
               prepend-icon="mdi-cube-outline"
