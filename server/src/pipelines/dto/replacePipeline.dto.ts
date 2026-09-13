@@ -32,9 +32,9 @@ class BuildpackDto {
   @Type(() => RunpackPhaseDto)
   run: RunpackPhaseDto;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  tag: string;
+  tag?: string;
 }
 
 class GitLinkDto {
