@@ -97,7 +97,6 @@ const routes = [
       },
     ],
   },
-  /*
   {
     path: '/settings',
     component: () => import('@/layouts/default/Default.vue'),
@@ -109,7 +108,6 @@ const routes = [
       },
     ],
   },
-  */
   {
     path: '/runpacks',
     component: () => import('@/layouts/default/Default.vue'),
