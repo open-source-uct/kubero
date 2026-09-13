@@ -21,7 +21,7 @@ export class Buildpack implements IBuildpack {
     readOnlyAppStorage: boolean;
     securityContext: ISecurityContext;
   };
-  public tag: string;
+  public tag?: string;
 
   constructor(bp: IBuildpack) {
     this.name = bp.name;

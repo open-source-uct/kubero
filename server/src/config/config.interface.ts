@@ -111,7 +111,7 @@ export interface IBuildpack {
     readOnlyAppStorage: boolean;
     securityContext: ISecurityContext;
   };
-  tag: string;
+  tag?: string;
 }
 export interface IRunpack {
   id?: string;
