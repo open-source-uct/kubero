@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 //import { ApiTags } from '@nestjs/swagger';
 import { ConfigService } from './config.service';
 import {
@@ -14,6 +23,15 @@ import { ReadonlyGuard } from '../common/guards/readonly.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { PodSize } from './podsize/podsize';
+import { CreatePodSizeDto, UpdatePodSizeDto } from './podsize/podsize.dto';
+import { CreateRunpackDto } from './dto/runpack.dto';
+import { ValidateKubeconfigDto } from './dto/validate-kubeconfig.dto';
+import { UpdateRunningConfigDto } from './dto/update-running-config.dto';
+import { SettingsValidationDto } from './dto/settings-validation.dto';
+import { validate } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
+import { BadRequestException } from '@nestjs/common';
+import { flattenValidationErrors } from '../common/utils/validation.util';
 
 @Controller({ path: 'api/config', version: '1' })
 export class ConfigController {
@@ -45,7 +63,13 @@ export class ConfigController {
     isArray: false,
   })
   //@ApiBody({ type: OKDTO })
-  async updateSettings(@Body() body) {
+  async updateSettings(@Body() body: any) {
+    const validationErrors = await validate(
+      plainToInstance(SettingsValidationDto, body.settings?.kubero),
+    );
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(flattenValidationErrors(validationErrors));
+    }
     return this.configService.updateSettings(body);
   }
 
@@ -147,10 +171,9 @@ export class ConfigController {
       // Additional properties for fetch, build, and run phases
     },
   })
-  async addRunpack(@Body() body) {
+  async addRunpack(@Body() body: CreateRunpackDto) {
     return this.configService.createRunpack(body);
   }
-
 
   @Get('/clusterissuer')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -229,22 +252,18 @@ export class ConfigController {
       },
     },
   })
-  async addPodSize(@Body() body) {
-    const { name, description, resources } = body;
-    if (!name || !description || !resources.limits || !resources.requests) {
-      throw new Error('Invalid pod size data provided');
-    }
+  async addPodSize(@Body() body: CreatePodSizeDto) {
     const podsize = new PodSize({
-      name: name,
-      description: description,
+      name: body.name,
+      description: body.description,
       resources: {
         requests: {
-          memory: resources.requests.memory,
-          cpu: resources.requests.cpu,
+          memory: body.resources.requests.memory,
+          cpu: body.resources.requests.cpu,
         },
         limits: {
-          memory: resources.limits.memory,
-          cpu: resources.limits.cpu,
+          memory: body.resources.limits.memory,
+          cpu: body.resources.limits.cpu,
         },
       },
     });
@@ -312,22 +331,18 @@ export class ConfigController {
       },
     },
   })
-  async updatePodSize(@Param('id') id: string, @Body() body) {
-    const { name, description, resources } = body;
-    if (!name || !description || !resources.limits || !resources.requests) {
-      throw new Error('Invalid pod size data provided');
-    }
+  async updatePodSize(@Param('id') id: string, @Body() body: UpdatePodSizeDto) {
     const podsize = new PodSize({
-      name: name,
-      description: description,
+      name: body.name,
+      description: body.description,
       resources: {
         requests: {
-          memory: resources.requests.memory,
-          cpu: resources.requests.cpu,
+          memory: body.resources.requests.memory,
+          cpu: body.resources.requests.cpu,
         },
         limits: {
-          memory: resources.limits.memory,
-          cpu: resources.limits.cpu,
+          memory: body.resources.limits.memory,
+          cpu: body.resources.limits.cpu,
         },
       },
     });
@@ -374,12 +389,10 @@ export class ConfigController {
       },
     },
   })
-  async validateKubeconfig(@Body() body) {
-    const kubeconfig = body.kubeconfig;
-    const kubeContext = body.context;
+  async validateKubeconfig(@Body() body: ValidateKubeconfigDto) {
     const result = await this.configService.validateKubeconfig(
-      kubeconfig,
-      kubeContext,
+      body.kubeconfig,
+      body.context,
     );
     return result;
   }
@@ -422,7 +435,7 @@ export class ConfigController {
       },
     },
   })
-  async updateRunningConfig(@Body() body) {
+  async updateRunningConfig(@Body() body: UpdateRunningConfigDto) {
     const kubeconfigBase64 = body.KUBECONFIG_BASE64;
     const kubeContext = body.KUBERO_CONTEXT;
     const kuberoNamespace = body.KUBERO_NAMESPACE;

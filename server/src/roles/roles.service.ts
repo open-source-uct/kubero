@@ -27,20 +27,25 @@ export class RolesService {
     });
   }
 
-  async getPermissions(roleId: string): Promise<any[]> {
+  async getPermissions(roleId: string | null | undefined): Promise<any[]> {
     this.logger.debug(`getPermissions for roleId: ${roleId}`);
-    return this.prisma.role.findUnique({
-      where: { id: roleId },
-      select: {
-        permissions: {
-          select: {
-            id: true,
-            resource: true,
-            action: true,
+    if (!roleId) {
+      return [];
+    }
+    return this.prisma.role
+      .findUnique({
+        where: { id: roleId },
+        select: {
+          permissions: {
+            select: {
+              id: true,
+              resource: true,
+              action: true,
+            },
           },
         },
-      },
-    }).then(role => role?.permissions || []);
+      })
+      .then((role) => role?.permissions || []);
   }
 
   async createRole(roleData: any): Promise<any> {
@@ -71,7 +76,7 @@ export class RolesService {
       where: { id: roleId },
     });
   }
-  
+
   async updateRole(roleId: string, roleData: any): Promise<any> {
     //this.logger.debug(`updateRole with roleId: ${roleId} and data: ${JSON.stringify(roleData)}`);
     if (!roleId) {

@@ -20,6 +20,7 @@ import { GroupsService } from './groups.service';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { ReadonlyGuard } from '../common/guards/readonly.guard';
+import { CreateGroupDto, UpdateGroupDto } from './dto/group.dto';
 
 @Controller({ path: 'api/groups', version: '1' })
 export class GroupsController {
@@ -59,10 +60,7 @@ export class GroupsController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Create a new Group' })
-  async createGroup(@Body() groupData: any) {
-    if (!groupData || !groupData.name || !groupData.description) {
-      throw new Error('Invalid group data provided');
-    }
+  async createGroup(@Body() groupData: CreateGroupDto) {
     return this.groupsService.create(groupData.name, groupData.description);
   }
 
@@ -103,10 +101,10 @@ export class GroupsController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Update a Group by ID' })
-  async updateGroup(@Param('id') id: string, @Body() groupData: any) {
-    if (!id || !groupData || !groupData.name || !groupData.description) {
-      throw new Error('Invalid group data provided');
-    }
+  async updateGroup(
+    @Param('id') id: string,
+    @Body() groupData: UpdateGroupDto,
+  ) {
     return this.groupsService.update(id, groupData);
   }
 }

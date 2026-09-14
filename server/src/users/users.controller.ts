@@ -27,6 +27,9 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { ReadonlyGuard } from '../common/guards/readonly.guard';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdatePasswordDto, UpdateMyPasswordDto } from './dto/password.dto';
 
 @Controller({ path: 'api/users', version: '1' })
 export class UsersController {
@@ -123,7 +126,7 @@ export class UsersController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Update User by ID' })
-  async updateUser(@Param('id') id: string, @Body() body: Partial<User>) {
+  async updateUser(@Param('id') id: string, @Body() body: UpdateUserDto) {
     return this.usersService.update(id, body);
   }
 
@@ -163,18 +166,8 @@ export class UsersController {
   @ApiOperation({ summary: 'Update User password by ID' })
   async updateUserPassword(
     @Param('id') id: string,
-    @Body() body: Partial<User>,
+    @Body() body: UpdatePasswordDto,
   ) {
-    if (
-      !body.password ||
-      typeof body.password !== 'string' ||
-      body.password.length === 0
-    ) {
-      throw new HttpException(
-        'Invalid password provided',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
     return this.usersService.updatePassword(id, body.password);
   }
 
@@ -192,24 +185,22 @@ export class UsersController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Update current User password' })
-  async updateMyPassword(@Request() req: any, @Body() body: { currentPassword: string; newPassword: string }) {
+  async updateMyPassword(
+    @Request() req: any,
+    @Body() body: UpdateMyPasswordDto,
+  ) {
     const user = req.user;
     if (!user || !user.userId) {
-      throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
-    }
-    if (
-      !body.currentPassword ||
-      !body.newPassword ||
-      typeof body.currentPassword !== 'string' ||
-      typeof body.newPassword !== 'string' ||
-      body.newPassword.length < 8
-    ) {
       throw new HttpException(
-        'Invalid password provided. New password must be at least 8 characters.',
-        HttpStatus.BAD_REQUEST,
+        'User not authenticated',
+        HttpStatus.UNAUTHORIZED,
       );
     }
-    return this.usersService.updateMyPassword(user.userId, body.currentPassword, body.newPassword);
+    return this.usersService.updateMyPassword(
+      user.userId,
+      body.currentPassword,
+      body.newPassword,
+    );
   }
 
   @Post('/')
@@ -227,7 +218,7 @@ export class UsersController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Create a new User' })
-  async createUser(@Body() body: User) {
+  async createUser(@Body() body: CreateUserDto) {
     try {
       return this.usersService.create(body);
     } catch (error) {
@@ -271,17 +262,19 @@ export class UsersController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Update current User profile' })
-  async updateProfile(@Request() req: any, @Body() body: Partial<User>) {
+  async updateProfile(@Request() req: any, @Body() body: UpdateUserDto) {
     const user = req.user;
     if (!body || Object.keys(body).length === 0) {
-      throw new HttpException('No data provided to update', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'No data provided to update',
+        HttpStatus.BAD_REQUEST,
+      );
     }
-    // sanitize input
     const data: Partial<User> = {};
     data.firstName = body.firstName;
     data.lastName = body.lastName;
     data.email = body.email;
-    
+
     return this.usersService.update(user.userId, data);
   }
 

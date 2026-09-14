@@ -17,6 +17,7 @@ import {
 import { OKDTO } from '../common/dto/ok.dto';
 import { JwtAuthGuard } from '../auth/strategies/jwt.guard';
 import { ReadonlyGuard } from '../common/guards/readonly.guard';
+import { ConnectRepoDto } from './dto/connect-repo.dto';
 
 @Controller({ path: 'api/repo', version: '1' })
 export class RepoController {
@@ -159,7 +160,10 @@ export class RepoController {
     required: true,
     enum: ['github', 'gitlab', 'bitbucket', 'gitea', 'gogs'],
   })
-  async connectRepo(@Param('provider') provider: string, @Body() body: any) {
+  async connectRepo(
+    @Param('provider') provider: string,
+    @Body() body: ConnectRepoDto,
+  ) {
     return this.repoService.connectRepo(provider, body.gitrepo);
   }
 
@@ -180,7 +184,10 @@ export class RepoController {
     required: true,
     enum: ['github', 'gitlab', 'bitbucket', 'gitea', 'gogs'],
   })
-  async disconnectRepo(@Param('provider') provider: string, @Body() body: any) {
+  async disconnectRepo(
+    @Param('provider') provider: string,
+    @Body() body: ConnectRepoDto,
+  ) {
     return this.repoService.disconnectRepo(provider, body.gitrepo);
   }
 

@@ -20,6 +20,7 @@ import { RolesService } from './roles.service';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { ReadonlyGuard } from '../common/guards/readonly.guard';
+import { CreateRoleDto, UpdateRoleDto } from './dto/role.dto';
 
 @Controller({ path: 'api/roles', version: '1' })
 export class RolesController {
@@ -59,7 +60,7 @@ export class RolesController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Create a new Role' })
-  async createRole(@Body() role: any) {
+  async createRole(@Body() role: CreateRoleDto) {
     return this.rolesService.createRole(role);
   }
 
@@ -99,7 +100,7 @@ export class RolesController {
   @ApiOperation({ summary: 'Update a Role' })
   async updateRole(
     @Param('roleId') roleId: string,
-    @Body() role: any,
+    @Body() role: UpdateRoleDto,
   ) {
     return this.rolesService.updateRole(roleId, role);
   }
