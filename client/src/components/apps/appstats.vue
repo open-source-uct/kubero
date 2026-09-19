@@ -96,7 +96,18 @@
                     </v-row>
                 </div>
                 <div class="mb-5 mt-10">
-                    <h3>{{ $t('app.titles.environmentVariables') }}</h3>
+                    <h3 class="d-flex align-center">
+                        {{ $t('app.titles.environmentVariables') }}
+                        <v-btn
+                            variant="text"
+                            size="small"
+                            class="ml-2"
+                            :prepend-icon="showEnvValues ? 'mdi-eye-off' : 'mdi-eye'"
+                            @click="showEnvValues = !showEnvValues"
+                        >
+                            {{ showEnvValues ? $t('app.form.hideEnvValues') : $t('app.form.showEnvValues') }}
+                        </v-btn>
+                    </h3>
                     <v-table density="compact" style="background:rgb(var(--v-theme-background))">
                         <thead>
                         <tr>
@@ -112,7 +123,7 @@
                         <tr
                             v-for="envVar in appData.spec.envVars" :key="envVar.name">
                             <td>{{ envVar.name }}</td>
-                            <td>{{ envVar.value }}</td>
+                            <td>{{ showEnvValues ? envVar.value : '••••••••' }}</td>
                         </tr>
                         </tbody>
                     </v-table>
@@ -466,6 +477,7 @@ export default defineComponent({
             metricsDisplay: "bars",
             metricsInterval: 0 as any, // can't find the right type for this
             uptimes: {} as any,
+            showEnvValues: false,
         }
     },
     components: {
