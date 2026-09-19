@@ -179,6 +179,8 @@ const messages = {
       envNameTooLong: 'El nombre debe tener menos de 60 caracteres',
       envNameInvalidChars: 'Sólo letras, números y guiones bajos permitidos. Debe comenzar con letra o guion bajo',
       duplicateEnvVar: 'El nombre de la variable de entorno ya existe',
+      showEnvValues: 'Mostrar valores',
+      hideEnvValues: 'Ocultar valores',
     },
     strategy: {
       name: 'Estrategia',

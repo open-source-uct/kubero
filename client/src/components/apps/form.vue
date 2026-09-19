@@ -839,6 +839,18 @@
             }}</v-expansion-panel-title
           >
           <v-expansion-panel-text color="cardBackground">
+            <v-row>
+              <v-col cols="12">
+                <v-btn
+                  variant="text"
+                  size="small"
+                  :prepend-icon="showEnvValues ? 'mdi-eye-off' : 'mdi-eye'"
+                  @click="showEnvValues = !showEnvValues"
+                >
+                  {{ showEnvValues ? $t('app.form.hideEnvValues') : $t('app.form.showEnvValues') }}
+                </v-btn>
+              </v-col>
+            </v-row>
             <v-row v-for="(envvar, index) in envVars" :key="index">
               <v-col cols="12" md="5">
                 <v-text-field
@@ -854,6 +866,8 @@
                 <v-text-field
                   v-model="envvar.value"
                   :label="$t('global.value')"
+                  :type="showEnvValues ? 'text' : 'password'"
+                  autocomplete="new-password"
                 ></v-text-field>
               </v-col>
               <v-col cols="12" md="1">
@@ -1552,6 +1566,7 @@ export default defineComponent({
       envVars: [
         //{ name: '', value: '' },
       ] as EnvVar[],
+      showEnvValues: false,
       sAAnnotations: [
         //{ annotation: '', value: '' },
       ] as SAAnnotations[],

@@ -446,7 +446,18 @@
                   ></v-text-field>
                 </v-col>
               </v-row>
-              <div class="font-weight-bold v-label pa-2 mb-1">Default Environment Variables</div>
+              <div class="d-flex align-center pa-2 mb-1">
+                <div class="font-weight-bold v-label">Default Environment Variables</div>
+                <v-btn
+                  variant="text"
+                  size="small"
+                  class="ml-2"
+                  :prepend-icon="showEnvValues ? 'mdi-eye-off' : 'mdi-eye'"
+                  @click="showEnvValues = !showEnvValues"
+                >
+                  {{ showEnvValues ? $t('app.form.hideEnvValues') : $t('app.form.showEnvValues') }}
+                </v-btn>
+              </div>
               <v-row v-for="(envvar, index) in phase.defaultEnvvars" :key="index">
                 <v-col
                   cols="12"
@@ -469,6 +480,8 @@
                     v-model="envvar.value"
                     :label="$t('global.value')"
                     density="compact"
+                    :type="showEnvValues ? 'text' : 'password'"
+                    autocomplete="new-password"
                   ></v-text-field>
                 </v-col>
                 <v-col
@@ -594,6 +607,7 @@ export default defineComponent({
         teams: [] as string[],
       },
       authStore,
+      showEnvValues: false,
       breadcrumbItems: [
           {
               title: 'Dashboard.Pipelines',

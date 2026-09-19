@@ -180,6 +180,8 @@ const messages = {
           envNameTooLong: 'Name must be less than 60 characters',
           envNameInvalidChars: 'Only letters, numbers and underscores allowed. Must start with letter or underscore',
           duplicateEnvVar: 'Environment variable name already exists',
+          showEnvValues: 'Show values',
+          hideEnvValues: 'Hide values',
         },
         strategy: {
           name: 'Strategy',
