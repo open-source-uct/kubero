@@ -293,6 +293,7 @@ export class AppsService {
 
       if (
         pipeline.reviewapps &&
+        pipeline.buildpack &&
         pipeline.git.repository &&
         pipeline.git.repository.ssh_url === ssh_url
       ) {

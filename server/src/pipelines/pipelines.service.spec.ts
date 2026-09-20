@@ -129,7 +129,10 @@ describe('PipelinesService', () => {
           },
         ],
       });
-      const ctx = await service.getContext('pipe1', 'dev', ['group1', 'group2']);
+      const ctx = await service.getContext('pipe1', 'dev', [
+        'group1',
+        'group2',
+      ]);
       expect(ctx).toBe('ctx1');
     });
 
@@ -137,7 +140,10 @@ describe('PipelinesService', () => {
       service.listPipelines = jest.fn().mockResolvedValue({
         items: [],
       });
-      const ctx = await service.getContext('pipe1', 'dev', ['group1', 'group2']);
+      const ctx = await service.getContext('pipe1', 'dev', [
+        'group1',
+        'group2',
+      ]);
       expect(ctx).toBe('missing-pipe1-dev');
     });
   });
@@ -167,6 +173,16 @@ describe('PipelinesService', () => {
       kubectl.getPipeline.mockRejectedValue(new Error('fail'));
       const result = await service.getPipeline('pipe1');
       expect(result).toBeUndefined();
+    });
+
+    it('should not fail for a pipeline without git or buildpack', async () => {
+      kubectl.getPipeline.mockResolvedValue({
+        spec: { name: 'pipe1' },
+        metadata: { resourceVersion: '5' },
+      });
+      const result = await service.getPipeline('pipe1');
+      expect(result?.name).toBe('pipe1');
+      expect(result?.resourceVersion).toBe('5');
     });
   });
 
@@ -215,6 +231,18 @@ describe('PipelinesService', () => {
       await service.updatePipeline(mockPipeline, '1', user);
       expect(kubectl.updatePipeline).toHaveBeenCalled();
       //expect(notificationsService.send).toHaveBeenCalled();
+    });
+
+    it('should update a pipeline whose current version has no git', async () => {
+      const user = { username: 'test' } as IUser;
+      kubectl.getPipeline.mockResolvedValue({ spec: { name: 'pipe1' } });
+      kubectl.updatePipeline.mockResolvedValue(undefined);
+      await service.updatePipeline(
+        { ...mockPipeline, git: { keys: {}, webhook: {} } },
+        '1',
+        user,
+      );
+      expect(kubectl.updatePipeline).toHaveBeenCalled();
     });
 
     it('should handle error in updatePipeline', async () => {

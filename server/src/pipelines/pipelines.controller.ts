@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -50,9 +51,7 @@ export class PipelinesController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Get all pipelines' })
-  async getPipelines(
-    @Request() req: any
-  ) {
+  async getPipelines(@Request() req: any) {
     return this.pipelinesService.listPipelines(req.user.userGroups);
   }
 
@@ -82,25 +81,14 @@ export class PipelinesController {
       Logger.error(msg);
       throw new HttpException(msg, HttpStatus.BAD_REQUEST);
     }
+    this.assertTeamAccess(pl, req.user);
     const user: IUser = {
       id: req.user.userId,
       strategy: req.user.strategy,
       username: req.user.username,
     };
 
-    const pipeline: IPipeline = {
-      name: pl.pipelineName,
-      domain: pl.domain,
-      phases: pl.phases,
-      buildpack: pl.buildpack,
-      reviewapps: pl.reviewapps,
-      dockerimage: pl.dockerimage,
-      git: pl.git,
-      registry: pl.registry as any,
-      deploymentstrategy: pl.deploymentstrategy,
-      buildstrategy: pl.buildstrategy,
-      access: pl.access,
-    };
+    const pipeline = this.toPipeline(pl);
     return this.pipelinesService.createPipeline(
       pipeline,
       user,
@@ -137,25 +125,14 @@ export class PipelinesController {
     @Request() req: any,
     @Param('pipeline') pipelineName: string,
   ) {
+    this.assertTeamAccess(pl, req.user);
     const user: IUser = {
       id: req.user.userId,
       strategy: req.user.strategy,
       username: req.user.username,
     };
 
-    const pipeline: IPipeline = {
-      name: pl.pipelineName,
-      domain: pl.domain,
-      phases: pl.phases,
-      buildpack: pl.buildpack,
-      reviewapps: pl.reviewapps,
-      dockerimage: pl.dockerimage,
-      git: pl.git,
-      registry: pl.registry as any,
-      deploymentstrategy: pl.deploymentstrategy,
-      buildstrategy: pl.buildstrategy,
-      access: pl.access,
-    };
+    const pipeline = this.toPipeline(pl);
     return this.pipelinesService.updatePipeline(
       pipeline,
       pl.resourceVersion as string,
@@ -199,8 +176,47 @@ export class PipelinesController {
   @ApiOperation({ summary: 'Get all apps for a pipeline' })
   async getPipelineApps(
     @Param('pipeline') pipeline: string,
-    @Request() req: any
+    @Request() req: any,
   ) {
-    return this.pipelinesService.getPipelineWithApps(pipeline, req.user.userGroups);
+    return this.pipelinesService.getPipelineWithApps(
+      pipeline,
+      req.user.userGroups,
+    );
+  }
+
+  // Un pipeline con la lista de equipos vacía solo lo ven los admins (ver
+  // getPipelinesList), así que un usuario no admin se quedaría sin acceso a su propio pipeline.
+  private assertTeamAccess(
+    pl: CreatePipelineDTO,
+    user: { userGroups?: string[] },
+  ) {
+    const isAdmin = user.userGroups?.includes('admin');
+    if (!isAdmin && !pl.access?.teams?.length) {
+      throw new BadRequestException([
+        'access.teams must contain at least one team',
+      ]);
+    }
+  }
+
+  // git y registry son opcionales (solo se usan al construir desde código fuente);
+  // el resto del código asume que existen, así que se completan con valores vacíos.
+  private toPipeline(pl: CreatePipelineDTO): IPipeline {
+    return {
+      name: pl.pipelineName,
+      domain: pl.domain,
+      phases: pl.phases,
+      buildpack: pl.buildpack,
+      reviewapps: pl.reviewapps,
+      dockerimage: pl.dockerimage,
+      git: pl.git ?? { keys: {}, webhook: {}, provider: '' },
+      registry: (pl.registry ?? {
+        host: '',
+        username: '',
+        password: '',
+      }) as any,
+      deploymentstrategy: pl.deploymentstrategy,
+      buildstrategy: pl.buildstrategy,
+      access: pl.access,
+    };
   }
 }
