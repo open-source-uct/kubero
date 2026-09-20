@@ -7,7 +7,7 @@ export interface IPipeline {
   domain: string;
   reviewapps: boolean;
   phases: IPipelinePhase[];
-  buildpack: IBuildpack;
+  buildpack?: IBuildpack;
   git: IgitLink;
   registry: IRegistry;
   dockerimage: string;

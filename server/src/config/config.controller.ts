@@ -77,8 +77,7 @@ export class ConfigController {
   }
 
   @Get('/banner')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:read', 'config:write')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('bearerAuth')
   @ApiOperation({ summary: 'Get the banner informations' })
   @ApiForbiddenResponse({
