@@ -15,7 +15,7 @@ export class LogsService {
     private kubectl: KubernetesService,
     private pipelinesService: PipelinesService,
     private EventsGateway: EventsGateway,
-  ) {}
+  ) { }
 
   private logcolor(str: string) {
     let hash = 0;
@@ -145,44 +145,73 @@ export class LogsService {
     );
     const namespace = pipelineName + '-' + phaseName;
 
+    if (!['web', 'builder', 'fetcher', 'addons'].includes(container)) {
+      console.log('unknown container: ' + container);
+      return [];
+    }
+
+    // Los pods de la app siempre son <app>-kuberoapp-*; todo lo demás que
+    // empiece con <app>- (ej. la base de datos) es de un addon.
+    const appPrefix = appName + '-kuberoapp';
+
     let loglines: ILoglines[] = [];
     if (contextName) {
       const pods = await this.kubectl.getPods(namespace, contextName);
       for (const pod of pods) {
-        if (pod.metadata?.name?.startsWith(appName)) {
-          if (container == 'web') {
-            for (const container of pod.spec?.containers || []) {
-              // only fetch logs for the web container, exclude trivy and build jobs
-              if (!pod.metadata?.labels?.['job-name']) {
-                const ll = await this.fetchLogs(
-                  namespace,
-                  pod.metadata.name,
-                  container.name,
-                  pipelineName,
-                  phaseName,
-                  appName,
-                );
-                loglines = loglines.concat(ll);
-              }
-            }
-          } else if (container == 'builder' || container == 'fetcher') {
+        const podName = pod.metadata?.name;
+        if (!podName) {
+          continue;
+        }
+        const isJob = !!pod.metadata?.labels?.['job-name'];
+
+        if (container == 'web' && podName.startsWith(appPrefix) && !isJob) {
+          // only fetch logs for the web container, exclude trivy and build jobs
+          for (const c of pod.spec?.containers || []) {
             const ll = await this.fetchLogs(
               namespace,
-              pod.metadata.name,
-              'kuberoapp-' + container,
+              podName,
+              c.name,
               pipelineName,
               phaseName,
               appName,
             );
             loglines = loglines.concat(ll);
-          } else {
-            // leace the loglines empty
-            console.log('unknown container: ' + container);
+          }
+        } else if (
+          (container == 'builder' || container == 'fetcher') &&
+          podName.startsWith(appPrefix)
+        ) {
+          const ll = await this.fetchLogs(
+            namespace,
+            podName,
+            'kuberoapp-' + container,
+            pipelineName,
+            phaseName,
+            appName,
+          );
+          loglines = loglines.concat(ll);
+        } else if (
+          container == 'addons' &&
+          podName.startsWith(appName + '-') &&
+          !podName.includes('-kuberoapp-') &&
+          !isJob
+        ) {
+          for (const c of pod.spec?.containers || []) {
+            const ll = await this.fetchLogs(
+              namespace,
+              podName,
+              c.name,
+              pipelineName,
+              phaseName,
+              appName,
+            );
+            loglines = loglines.concat(ll);
           }
         }
       }
     }
-    return loglines;
+    // lo más nuevo primero, igual que las líneas en vivo (unshift en el cliente)
+    return loglines.sort((a, b) => b.time - a.time);
   }
 
   public async fetchLogs(
