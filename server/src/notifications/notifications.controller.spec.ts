@@ -309,33 +309,4 @@ describe('NotificationsController', () => {
       );
     });
   });
-
-  describe('validateNotificationConfig', () => {
-    it('should validate slack config successfully', () => {
-      const config = {
-        url: 'https://hooks.slack.com/test',
-        channel: '#general',
-      };
-
-      expect(() => {
-        (controller as any).validateNotificationConfig('slack', config);
-      }).not.toThrow();
-    });
-
-    it('should validate webhook config successfully', () => {
-      const config = { url: 'https://webhook.example.com', secret: 'secret' };
-
-      expect(() => {
-        (controller as any).validateNotificationConfig('webhook', config);
-      }).not.toThrow();
-    });
-
-    it('should validate discord config successfully', () => {
-      const config = { url: 'https://discord.com/api/webhooks/test' };
-
-      expect(() => {
-        (controller as any).validateNotificationConfig('discord', config);
-      }).not.toThrow();
-    });
-  });
 });

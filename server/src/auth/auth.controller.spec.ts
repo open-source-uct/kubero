@@ -1,5 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { AuthController } from './auth.controller';
+import { LoginDTO } from './auth.dto';
 import { AuthService } from './auth.service';
 
 describe('AuthController', () => {
@@ -28,12 +31,14 @@ describe('AuthController', () => {
   });
 
   describe('login', () => {
-    it('should return error if username or password is missing', async () => {
-      const result = await controller.login({ username: '', password: '' });
-      expect(result).toEqual({
-        message: 'Username and password are required',
-        status: 400,
-      });
+    it('LoginDTO should reject an empty username or password', async () => {
+      const errors = await validate(
+        plainToInstance(LoginDTO, { username: '', password: '' }),
+      );
+      expect(errors.map((e) => e.property).sort()).toEqual([
+        'password',
+        'username',
+      ]);
     });
 
     it('should call authService.login with username and password', async () => {
@@ -108,7 +113,7 @@ describe('AuthController', () => {
       const mockReq = { user: { username: 'user' } };
       const mockRes = { cookie: jest.fn(), redirect: jest.fn() };
       await controller.githubCallback(mockReq as any, mockRes as any);
-      expect(service.loginOAuth2).toHaveBeenCalledWith({"username": "user"});
+      expect(service.loginOAuth2).toHaveBeenCalledWith({ username: 'user' });
       expect(mockRes.cookie).toHaveBeenCalledWith('kubero.JWT_TOKEN', 'token');
       expect(mockRes.redirect).toHaveBeenCalledWith('/');
     });
@@ -120,7 +125,7 @@ describe('AuthController', () => {
       const mockReq = { user: { username: 'user' } };
       const mockRes = { cookie: jest.fn(), redirect: jest.fn() };
       await controller.oauth2Callback(mockReq as any, mockRes as any);
-      expect(service.loginOAuth2).toHaveBeenCalledWith({"username": "user"});
+      expect(service.loginOAuth2).toHaveBeenCalledWith({ username: 'user' });
       expect(mockRes.cookie).toHaveBeenCalledWith('kubero.JWT_TOKEN', 'token');
       expect(mockRes.redirect).toHaveBeenCalledWith('/');
     });

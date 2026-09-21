@@ -147,232 +147,8 @@
             >{{ $t("app.titles.deployment") }}</v-expansion-panel-title
           >
           <v-expansion-panel-text>
-            <v-row>
-              <v-col cols="12" md="7">
-                <v-radio-group
-                  v-model="deploymentstrategy"
-                  row
-                  :label="$t('app.strategy.name')"
-                >
-                  <v-radio
-                    :label="$t('app.strategy.containerImage')"
-                    value="docker"
-                  ></v-radio>
-                  <v-radio
-                    :label="$t('app.strategy.fromSource')"
-                    value="git"
-                  ></v-radio>
-                  <!--
-              <v-radio
-                label="Build"
-                value="build"
-              ></v-radio>
-              -->
-                </v-radio-group>
-              </v-col>
-            </v-row>
-
-            <!-- DEPLOYMENT STRATEGY GIT -->
-            <div v-if="deploymentstrategy == 'git'">
-              <v-row>
-                <v-col cols="12" md="4">
-                  <v-radio-group v-model="buildstrategy">
-                    <v-radio
-                      key="0"
-                      :label="$t('app.strategy.runpacks')"
-                      value="plain"
-                    ></v-radio>
-                    <v-radio
-                      key="2"
-                      :label="$t('app.strategy.externalCICD')"
-                      value="external"
-                    ></v-radio>
-                    <v-radio
-                      key="1"
-                      :label="$t('app.strategy.nixpacks')"
-                      value="nixpacks"
-                      :disabled="!kuberoConfig.buildPipeline"
-                    ></v-radio>
-                    <v-radio
-                      key="1"
-                      :label="$t('app.strategy.buildpacks')"
-                      value="buildpacks"
-                      :disabled="!kuberoConfig.buildPipeline"
-                    ></v-radio>
-                    <v-radio
-                      key="2"
-                      :label="$t('app.strategy.dockerfile')"
-                      value="dockerfile"
-                      :disabled="!kuberoConfig.buildPipeline"
-                    ></v-radio>
-                  </v-radio-group>
-                </v-col>
-                <v-col cols="12" md="8">
-                  <v-alert
-                    variant="tonal"
-                    color="#8560a9"
-                    border="start"
-                    v-if="buildstrategy == 'plain'"
-                  >
-                    <h3>
-                      {{ $t("app.strategy.runpacks") }}
-                    </h3>
-                    <div>{{ $t("app.strategy.runpackExplanation") }}</div>
-                  </v-alert>
-
-                  <v-alert
-                    variant="tonal"
-                    color="#8560a9"
-                    border="start"
-                    v-if="buildstrategy == 'nixpacks'"
-                  >
-                    <h3>
-                      {{ $t("app.strategy.nixpacks") }}
-                    </h3>
-                    <div v-html="$t('app.strategy.nixpacksExplanation')"></div>
-                  </v-alert>
-
-                  <v-alert
-                    variant="tonal"
-                    color="#8560a9"
-                    border="start"
-                    v-if="buildstrategy == 'buildpacks'"
-                  >
-                    <h3>
-                      {{ $t("app.strategy.buildpacks") }}
-                    </h3>
-                    <div
-                      v-html="$t('app.strategy.buildpacksExplanation')"
-                    ></div>
-                  </v-alert>
-
-                  <v-alert
-                    variant="tonal"
-                    color="#8560a9"
-                    border="start"
-                    v-if="buildstrategy == 'dockerfile'"
-                  >
-                    <h3>
-                      {{ $t("app.strategy.dockerfile") }}
-                    </h3>
-                    <div>{{ $t("app.strategy.dockerfileExplanation") }}</div>
-                  </v-alert>
-
-                  <v-alert
-                    variant="tonal"
-                    color="#8560a9"
-                    border="start"
-                    v-if="buildstrategy == 'external'"
-                  >
-                    <h3>
-                      {{ $t("app.strategy.externalCICD") }}
-                    </h3>
-                    <div>{{ $t("app.strategy.externalCICDExplanation") }}</div>
-                  </v-alert>
-
-                  <v-alert
-                    variant="tonal"
-                    type="info"
-                    border="start"
-                    v-if="!kuberoConfig.buildPipeline"
-                    style="margin-top: 20px"
-                  >
-                    <h3>
-                      {{ $t("app.strategy.noBuildPipeline") }}
-                    </h3>
-                    <div>
-                      {{ $t("app.strategy.noBuildPipelineExplanation") }}
-                    </div>
-                  </v-alert>
-                </v-col>
-              </v-row>
-
-              <!-- TODO : make the dockerfile path configurable
-          <div v-if="buildstrategy == 'dockerfile'">
-            <v-row>
-              <v-col
-                cols="12"
-                md="6"
-              >
-                <v-text-field
-                  v-model="dockerfilepath"
-                  label="Dockerfile"
-                ></v-text-field>
-              </v-col>
-            </v-row>
-          </div>
--->
-              <div v-if="buildstrategy != 'external'">
-                <v-row>
-                  <v-col cols="12" md="6">
-                    <v-text-field
-                      v-model="gitrepo.ssh_url"
-                      :rules="repositoryRules"
-                      :label="$t('app.form.repository')"
-                      required
-                    ></v-text-field>
-                  </v-col>
-                </v-row>
-                <v-row>
-                  <v-col cols="12" md="6">
-                    <v-combobox
-                      v-model="branch"
-                      :items="branchesList"
-                      :label="$t('app.form.branch')"
-                      required
-                    ></v-combobox>
-                  </v-col>
-                </v-row>
-                <v-row>
-                  <v-col cols="12" md="6">
-                    <v-switch
-                      v-model="autodeploy"
-                      :label="$t('app.form.autodeploy')"
-                      color="primary"
-                    ></v-switch>
-                  </v-col>
-                </v-row>
-
-                <v-row v-if="buildpack == undefined">
-                  <v-col cols="12" md="6">
-                    <v-select
-                      v-model="buildpack"
-                      :items="buildpacks"
-                      :label="$t('app.form.runpack')"
-                      @update:modelValue="updateBuildpack(buildpack)"
-                    ></v-select>
-                  </v-col>
-                </v-row>
-
-                <v-row
-                  v-if="buildpack != undefined && advanced === true"
-                  class="secondary"
-                >
-                  <v-col cols="12" md="6">
-                    <v-text-field
-                      v-model="buildpack.build.command"
-                      :label="$t('app.form.buildCommand')"
-                    ></v-text-field>
-                  </v-col>
-                </v-row>
-                <v-row
-                  v-if="buildpack != undefined && advanced === true"
-                  class="secondary"
-                >
-                  <v-col cols="12" md="6">
-                    <v-text-field
-                      v-model="buildpack.run.command"
-                      :label="$t('app.form.runCommand')"
-                    ></v-text-field>
-                  </v-col>
-                </v-row>
-              </div>
-              <!-- end of buildstrategy != external -->
-            </div>
-            <!-- end of deploymentstrategy == git -->
-
             <!-- DEPLOYMENT STRATEGY CONTAINER -->
-            <div v-if="deploymentstrategy == 'docker'">
+            <div>
               <v-row>
                 <v-col cols="12" md="6">
                   <v-text-field
@@ -484,17 +260,6 @@
             >{{ $t("app.titles.security") }}</v-expansion-panel-title
           >
           <v-expansion-panel-text color="secondary">
-            <v-row v-if="deploymentstrategy == 'git'">
-              <v-col cols="12" md="6">
-                <v-switch
-                  v-model="buildpack.run.readOnlyAppStorage"
-                  :label="$t('app.form.readOnlyAppStorage')"
-                  color="primary"
-                ></v-switch>
-              </v-col>
-              <v-col cols="12" md="6"> </v-col>
-            </v-row>
-
             <v-row>
               <v-col cols="12" md="6">
                 <v-switch
@@ -839,6 +604,18 @@
             }}</v-expansion-panel-title
           >
           <v-expansion-panel-text color="cardBackground">
+            <v-row>
+              <v-col cols="12">
+                <v-btn
+                  variant="text"
+                  size="small"
+                  :prepend-icon="showEnvValues ? 'mdi-eye-off' : 'mdi-eye'"
+                  @click="showEnvValues = !showEnvValues"
+                >
+                  {{ showEnvValues ? $t('app.form.hideEnvValues') : $t('app.form.showEnvValues') }}
+                </v-btn>
+              </v-col>
+            </v-row>
             <v-row v-for="(envvar, index) in envVars" :key="index">
               <v-col cols="12" md="5">
                 <v-text-field
@@ -854,6 +631,8 @@
                 <v-text-field
                   v-model="envvar.value"
                   :label="$t('global.value')"
+                  :type="showEnvValues ? 'text' : 'password'"
+                  autocomplete="new-password"
                 ></v-text-field>
               </v-col>
               <v-col cols="12" md="1">
@@ -1424,7 +1203,6 @@ export default defineComponent({
       sleep: "disabled",
       sleepEnabled: false,
       envFile: null as File | null,
-      buildpacks: [] as { text: string; value: Buildpack }[],
       basicAuth: {
         enabled: false,
         realm: "Authentication required",
@@ -1541,7 +1319,6 @@ export default defineComponent({
         visibility: "public",
       } as GitRepo,
       branch: "main",
-      branchesList: [] as string[],
       docker: {
         image: "ghcr.io/kubero-dev/idler",
         tag: "latest",
@@ -1552,6 +1329,7 @@ export default defineComponent({
       envVars: [
         //{ name: '', value: '' },
       ] as EnvVar[],
+      showEnvValues: false,
       sAAnnotations: [
         //{ annotation: '', value: '' },
       ] as SAAnnotations[],
@@ -1791,7 +1569,6 @@ export default defineComponent({
         this.loadPipelineAndApp(),
         this.loadStorageClasses(),
         this.loadPodsizeList(),
-        this.loadBuildpacks(),
         this.loadClusterIssuers(),
         this.getDomains(),
       ]);
@@ -1933,17 +1710,14 @@ export default defineComponent({
           this.docker.image = this.pipelineData.dockerimage;
         }
 
-        this.loadBranches();
-        this.buildpack = this.pipelineData.buildpack;
+        if (this.pipelineData.buildpack) {
+          this.buildpack = this.pipelineData.buildpack;
+        }
         this.buildstrategy = this.pipelineData.buildstrategy;
         //this.deploymentstrategy = this.pipelineData.deploymentstrategy;
 
         if (this.app == "new") {
-          if (this.pipelineData.git.repository.clone_url == "") {
-            this.deploymentstrategy = "docker";
-          } else {
-            this.deploymentstrategy = "git";
-          }
+          this.deploymentstrategy = "docker";
 
           // extract domain from pipeline phase
           for (let i = 0; i < this.pipelineData.phases.length; i++) {
@@ -1969,10 +1743,6 @@ export default defineComponent({
           // Open Panel if there is some data to show
           if (this.envVars.length > 0) {
             this.panel.push(6);
-          }
-
-          if (this.pipelineData.git.repository.admin == true) {
-            this.gitrepo = this.pipelineData.git.repository;
           }
 
           /* TODO: auto select/sugest buildpack based on language
@@ -2012,36 +1782,6 @@ export default defineComponent({
         }
       });
     },
-    loadBranches() {
-      // empty if not connected
-      if (!this.pipelineData.git.provider) {
-        return;
-      }
-
-      // encode string to base64 (for ssh url)
-      const gitrepoB64 = btoa(this.pipelineData.git.repository.ssh_url);
-      const gitprovider = this.pipelineData.git.provider;
-
-      axios
-        .get("/api/repo/" + gitprovider + "/" + gitrepoB64 + "/branches")
-        .then((response) => {
-          if (response.data.length === 0) {
-            return;
-          }
-
-          for (let i = 0; i < response.data.length; i++) {
-            this.branchesList.push(response.data[i]);
-          }
-
-          // set default branch based on te repository's default branch
-          let defaultBranch = this.pipelineData.git.repository.default_branch;
-          if (this.branchesList.includes(defaultBranch)) {
-            this.branch = defaultBranch;
-          } else {
-            this.branch = this.branchesList[0];
-          }
-        });
-    },
 
     async loadPodsizeList() {
       return axios.get("/api/config/podsizes").then((response) => {
@@ -2060,21 +1800,6 @@ export default defineComponent({
     updatePodsize(podsize: any) {
       //console.log(podsize);
       //this.podsize = podsize;
-    },
-
-    async loadBuildpacks() {
-      return axios.get("/api/config/runpacks").then((response) => {
-        for (let i = 0; i < response.data.length; i++) {
-          this.buildpacks.push({
-            text: response.data[i].name,
-            value: response.data[i] as Buildpack,
-          });
-        }
-      });
-    },
-    updateBuildpack(buildpack: Buildpack) {
-      //console.log(buildpack);
-      this.buildpack = buildpack;
     },
 
     deleteApp() {
@@ -2297,7 +2022,10 @@ export default defineComponent({
     async updateApp() {
       this.loading = true;
       try {
-        if (this.gitrepo.ssh_url == this.pipelineData.git.repository.ssh_url) {
+        if (
+          this.pipelineData.git?.repository &&
+          this.gitrepo.ssh_url == this.pipelineData.git.repository.ssh_url
+        ) {
           this.gitrepo = this.pipelineData.git.repository;
         }
 
@@ -2417,7 +2145,10 @@ export default defineComponent({
           }
         }
 
-        if (this.gitrepo.ssh_url == this.pipelineData.git.repository.ssh_url) {
+        if (
+          this.pipelineData.git?.repository &&
+          this.gitrepo.ssh_url == this.pipelineData.git.repository.ssh_url
+        ) {
           this.gitrepo = this.pipelineData.git.repository;
         }
 

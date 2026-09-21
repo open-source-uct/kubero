@@ -64,8 +64,11 @@ export class ConfigController {
   })
   //@ApiBody({ type: OKDTO })
   async updateSettings(@Body() body: any) {
+    if (!body?.settings?.kubero) {
+      throw new BadRequestException(['settings.kubero is required']);
+    }
     const validationErrors = await validate(
-      plainToInstance(SettingsValidationDto, body.settings?.kubero),
+      plainToInstance(SettingsValidationDto, body.settings.kubero),
     );
     if (validationErrors.length > 0) {
       throw new BadRequestException(flattenValidationErrors(validationErrors));
@@ -74,8 +77,7 @@ export class ConfigController {
   }
 
   @Get('/banner')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:read', 'config:write')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('bearerAuth')
   @ApiOperation({ summary: 'Get the banner informations' })
   @ApiForbiddenResponse({

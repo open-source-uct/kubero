@@ -102,20 +102,23 @@ export class CreatePipelineDTO {
   @Type(() => PipelinePhaseDto)
   phases: PipelinePhaseDto[];
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @ValidateNested()
   @Type(() => BuildpackDto)
-  buildpack: BuildpackDto;
+  buildpack?: BuildpackDto;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @ValidateNested()
   @Type(() => GitLinkDto)
-  git: GitLinkDto;
+  git?: GitLinkDto;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @ValidateNested()
   @Type(() => RegistryDto)
-  registry: RegistryDto;
+  registry?: RegistryDto;
 
   @ApiProperty()
   @IsString()

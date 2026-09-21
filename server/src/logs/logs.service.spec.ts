@@ -63,7 +63,7 @@ describe('LogsService', () => {
 
     it('should not start logs if already running', async () => {
       pipelinesService.getContext.mockResolvedValue('ctx');
-      (service as any).podLogStreams = ['pod-foo-bar-123-456'];
+      (service as any).podLogStreams = ['pod-foo-bar-123-456/web'];
       const spy = jest.spyOn(kubectl.log, 'log');
       await service.emitLogs(
         'pipe',
@@ -74,6 +74,42 @@ describe('LogsService', () => {
         ['group1', 'group2'],
       );
       expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('should allow restarting logs after the stream closes', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      let stream: any;
+      kubectl.log.log.mockImplementation((_ns, _pod, _container, logStream) => {
+        stream = logStream;
+        return Promise.resolve();
+      });
+      const start = () =>
+        service.emitLogs('pipe', 'phase', 'app', 'pod-foo-bar-123-456', 'web', [
+          'group1',
+        ]);
+
+      await start();
+      await start();
+      expect(kubectl.log.log).toHaveBeenCalledTimes(1);
+
+      stream.destroy();
+      await new Promise((r) => setImmediate(r));
+      await start();
+      expect(kubectl.log.log).toHaveBeenCalledTimes(2);
+    });
+
+    it('should free the stream if starting logs fails', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      kubectl.log.log.mockRejectedValue({ body: { message: 'boom' } });
+      const start = () =>
+        service.emitLogs('pipe', 'phase', 'app', 'pod-foo-bar-123-456', 'web', [
+          'group1',
+        ]);
+
+      await start();
+      await new Promise((r) => setImmediate(r));
+      await start();
+      expect(kubectl.log.log).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -149,6 +185,87 @@ describe('LogsService', () => {
         ['group1', 'group2'],
       );
       expect(result).toEqual([]);
+    });
+    it('should not include addon pods in web logs', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      kubectl.getPods.mockResolvedValue([
+        {
+          metadata: { name: 'app-kuberoapp-web-abc-123', labels: {} },
+          spec: { containers: [{ name: 'kuberoapp-web' }] },
+        },
+        {
+          metadata: { name: 'app-postgres-0', labels: {} },
+          spec: { containers: [{ name: 'postgres' }] },
+        },
+      ]);
+      const spy = jest.spyOn(service, 'fetchLogs').mockResolvedValue([]);
+      await service.getLogsHistory('pipe', 'phase', 'app', 'web', mockUserGroups);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0][1]).toBe('app-kuberoapp-web-abc-123');
+    });
+
+    it('should return only addon pod logs for addons container', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      kubectl.getPods.mockResolvedValue([
+        {
+          metadata: { name: 'app-kuberoapp-web-abc-123', labels: {} },
+          spec: { containers: [{ name: 'kuberoapp-web' }] },
+        },
+        {
+          metadata: { name: 'app-postgres-0', labels: {} },
+          spec: { containers: [{ name: 'postgres' }] },
+        },
+      ]);
+      const spy = jest.spyOn(service, 'fetchLogs').mockResolvedValue([]);
+      await service.getLogsHistory(
+        'pipe',
+        'phase',
+        'app',
+        'addons',
+        mockUserGroups,
+      );
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0][1]).toBe('app-postgres-0');
+      expect(spy.mock.calls[0][2]).toBe('postgres');
+    });
+
+    it('should sort loglines by time descending', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      kubectl.getPods.mockResolvedValue([
+        {
+          metadata: { name: 'app-kuberoapp-web-abc-1', labels: {} },
+          spec: { containers: [{ name: 'kuberoapp-web' }] },
+        },
+        {
+          metadata: { name: 'app-kuberoapp-web-abc-2', labels: {} },
+          spec: { containers: [{ name: 'kuberoapp-web' }] },
+        },
+      ]);
+      const line = (time: number) =>
+        ({
+          id: String(time),
+          time,
+          pipeline: 'pipe',
+          phase: 'phase',
+          app: 'app',
+          pod: 'p',
+          podID: 'x',
+          container: 'kuberoapp-web',
+          color: '#000000',
+          log: 'l',
+        }) as any;
+      jest
+        .spyOn(service, 'fetchLogs')
+        .mockResolvedValueOnce([line(100), line(300)])
+        .mockResolvedValueOnce([line(200)]);
+      const result = await service.getLogsHistory(
+        'pipe',
+        'phase',
+        'app',
+        'web',
+        mockUserGroups,
+      );
+      expect(result.map((l) => l.time)).toEqual([300, 200, 100]);
     });
   });
 

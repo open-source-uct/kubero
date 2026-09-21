@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigController } from './config.controller';
 import { ConfigService } from './config.service';
@@ -39,10 +40,24 @@ describe('ConfigController', () => {
   });
 
   it('should update settings', async () => {
-    await expect(controller.updateSettings({ foo: 'bar' })).resolves.toBe(
-      'updated',
+    const body = { settings: { kubero: { namespace: 'kubero' } }, secrets: {} };
+    await expect(controller.updateSettings(body)).resolves.toBe('updated');
+    expect(service.updateSettings).toHaveBeenCalledWith(body);
+  });
+
+  it('should reject settings without the kubero section', async () => {
+    await expect(controller.updateSettings({ foo: 'bar' })).rejects.toThrow(
+      BadRequestException,
     );
-    expect(service.updateSettings).toHaveBeenCalledWith({ foo: 'bar' });
+    expect(service.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it('should reject settings with an invalid namespace', async () => {
+    const body = { settings: { kubero: { namespace: 'Not Valid!' } } };
+    await expect(controller.updateSettings(body)).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(service.updateSettings).not.toHaveBeenCalled();
   });
 
   it('should get banner', async () => {

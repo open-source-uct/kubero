@@ -2,6 +2,7 @@
     <div class="logs-container">
         <v-tabs class="console-bar" style="position: relative;">
             <v-tab v-if="logType == 'runlogs'" @click="getLogHistory('web')">run</v-tab>
+            <v-tab v-if="logType == 'runlogs' && hasAddons" @click="getLogHistory('addons')">addons</v-tab>
             <v-tab v-if="logType == 'runlogs' && deploymentstrategy == 'git' && buildstrategy=='plain'" @click="getLogHistory('builder')">build</v-tab>
             <v-tab v-if="logType == 'runlogs' && deploymentstrategy == 'git' && buildstrategy=='plain'" @click="getLogHistory('fetcher')">fetch</v-tab>
             <v-tab v-if="logType == 'buildlogs'" @click="getBuildLogHistory('fetch')">fetch</v-tab>
@@ -40,10 +41,14 @@ type LogLine = {
 
 const socket = useKuberoStore().kubero.socket as any;
 const loglines = ref([] as LogLine[]);
+// pestaña activa: las líneas en vivo son de los pods de la app, solo van en "web"
+const currentTab = ref('web');
 
 socket.on('log', (data: LogLine) => {
     //console.log("log", data);
-    loglines.value.unshift(data)
+    if (currentTab.value == 'web') {
+        loglines.value.unshift(data)
+    }
 });
 
 
@@ -51,6 +56,7 @@ export default defineComponent({
     setup() {
         return {
             loglines,
+            currentTab,
             socket,
         }
     },
@@ -63,9 +69,11 @@ export default defineComponent({
             this.getLogHistory('web')
             this.socketJoin()
             this.startLogs()
+            socket.on('connect', this.onSocketConnect)
         }
     },
     unmounted() {
+        socket.off('connect', this.onSocketConnect)
         this.socketLeave()
         this.loglines = []
     },
@@ -102,6 +110,10 @@ export default defineComponent({
         type: String,
         default: "100%"
       },
+      hasAddons: {
+        type: Boolean,
+        default: false
+      },
     },
     data: () => ({
         loglines: [
@@ -133,12 +145,19 @@ export default defineComponent({
                 room: `${this.pipeline}-${this.phase}-${this.app}`,
             });
         },
+        onSocketConnect() {
+            // al reconectar, el socket nuevo no está en la sala: hay que volver a entrar
+            this.socketJoin();
+            this.startLogs();
+            this.getLogHistory(this.currentTab);
+        },
         startLogs() {
             axios.get(`/api/logs/${this.pipeline}/${this.phase}/${this.app}`).then(() => {
                 console.log("logs started");
             });
         },
         getLogHistory(container: string) {
+            this.currentTab = container;
             axios.get(`/api/logs/${this.pipeline}/${this.phase}/${this.app}/${container}/history`).then((response) => {
                 this.loglines = response.data;
             });

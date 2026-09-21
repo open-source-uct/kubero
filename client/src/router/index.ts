@@ -1,5 +1,5 @@
 // Composables
-import { createRouter, createWebHistory } from 'vue-router'    
+import { createRouter, createWebHistory, RouteLocationNormalized } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const routes = [
@@ -170,7 +170,10 @@ const routes = [
       {
         path: '/popup/logs/:pipeline/:phase/:app/:deploymentstrategy/:buildstrategy',
         name: 'Pupup Logs',
-        props: true,
+        props: (route: RouteLocationNormalized) => ({
+          ...route.params,
+          hasAddons: route.query.hasAddons === 'true',
+        }),
         component: () => import('@/components/apps/logs.vue'),
       },
       {
