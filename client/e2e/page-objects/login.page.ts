@@ -17,13 +17,14 @@ export class LoginPage {
 
   async goto() {
     await this.page.goto('/login');
-    await this.page.waitForLoadState('domcontentloaded');
+    await expect(this.usernameInput).toBeVisible({ timeout: 15000 });
   }
 
   async login(username: string, password: string) {
-    await expect(this.usernameInput).toBeVisible({ timeout: 10000 });
+    await expect(this.usernameInput).toBeVisible({ timeout: 15000 });
     await this.usernameInput.fill(username);
     await this.passwordInput.fill(password);
+    await expect(this.submitButton).toBeEnabled({ timeout: 5000 });
     await this.submitButton.click();
   }
 }

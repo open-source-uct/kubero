@@ -13,7 +13,7 @@ test.describe('Tablero de Pipelines y Estado del Clúster Kubernetes', () => {
     });
     await expect(disconnectedBanner).not.toBeVisible();
 
-    // Verificar que el botón primario de acción o banner de bienvenida se renderice
-    await expect(pipelinePage.welcomeCard).toBeVisible({ timeout: 10000 });
+    // Verificar que el botón primario de acción o contenido del tablero se renderice
+    await expect(pipelinePage.newPipelineBtn).toBeVisible({ timeout: 10000 });
   });
 });

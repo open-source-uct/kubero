@@ -3,10 +3,9 @@ import { NavDrawerPage } from '../page-objects/nav-drawer.page';
 
 test.describe('Diálogo Modal de Versión y Diagnóstico', () => {
   test('Debe abrir el modal de versión, verificar los datos del clúster y cerrarse correctamente', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('domcontentloaded');
-
+    await page.goto('/profile');
     const navDrawer = new NavDrawerPage(page);
+    await expect(navDrawer.drawer).toBeVisible({ timeout: 15000 });
 
     // 1. Abrir diálogo de versión
     await navDrawer.openVersionDialog();

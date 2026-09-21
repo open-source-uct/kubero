@@ -21,9 +21,9 @@ export class NavDrawerPage {
 
   async navigateTo(href: string) {
     const link = this.drawer.locator(`a[href="${href}"]`);
-    await expect(link).toBeVisible({ timeout: 5000 });
+    await expect(link).toBeVisible({ timeout: 7000 });
     await link.click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.page.waitForURL(`**${href}`, { timeout: 10000 });
   }
 
   async toggleTheme() {

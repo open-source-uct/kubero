@@ -2,22 +2,20 @@ import { Page, Locator, expect } from '@playwright/test';
 
 export class PipelineBoardPage {
   readonly page: Page;
-  readonly welcomeCard: Locator;
   readonly newPipelineBtn: Locator;
+  readonly boardContent: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.welcomeCard = page.locator('h1, .v-card, .v-sheet, main').filter({
-      hasText: /welcome to kubero|your pipelines/i,
+    this.newPipelineBtn = page.locator('a, button').filter({
+      hasText: /new|create your first pipeline/i,
     }).first();
-    this.newPipelineBtn = page.getByRole('button', {
-      name: /new|create your first pipeline/i,
-    });
+    this.boardContent = page.locator('.row, h1, .v-alert').first();
   }
 
   async goto() {
     await this.page.goto('/');
-    await this.page.waitForLoadState('domcontentloaded');
+    await expect(this.page.locator('.v-navigation-drawer')).toBeVisible({ timeout: 15000 });
   }
 
   async expectLoaded() {

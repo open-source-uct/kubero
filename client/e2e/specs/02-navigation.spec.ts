@@ -101,18 +101,17 @@ test.describe('Navegación Transversal en el Dashboard de Kubero', () => {
       }
 
       await page.goto(route.path);
-      await page.waitForLoadState('domcontentloaded');
+
+      // Verificar reactivamente que el contenedor principal de la aplicación esté renderizado
+      const mainApp = page.locator('.v-application');
+      await expect(mainApp).toBeVisible({ timeout: 15000 });
 
       // Verificar que la URL actual coincida con la ruta
       expect(page.url()).toContain(route.path);
 
-      // Verificar que el contenedor principal de la aplicación esté renderizado
-      const mainApp = page.locator('.v-application');
-      await expect(mainApp).toBeVisible();
-
       // Confirmar que el NavDrawer permanece interactivo
       const navDrawer = new NavDrawerPage(page);
-      await expect(navDrawer.drawer).toBeVisible();
+      await expect(navDrawer.drawer).toBeVisible({ timeout: 15000 });
     });
   }
 });

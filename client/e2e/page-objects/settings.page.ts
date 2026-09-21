@@ -9,7 +9,7 @@ export class SettingsPage {
 
   async gotoAccounts() {
     await this.page.goto('/accounts');
-    await this.page.waitForLoadState('domcontentloaded');
+    await expect(this.page.locator('.v-navigation-drawer')).toBeVisible({ timeout: 15000 });
   }
 
   async expectUsersList() {
@@ -22,7 +22,7 @@ export class SettingsPage {
 
   async gotoPodsizes() {
     await this.page.goto('/podsizes');
-    await this.page.waitForLoadState('domcontentloaded');
+    await expect(this.page.locator('.v-navigation-drawer')).toBeVisible({ timeout: 15000 });
   }
 
   async expectPodsizes() {
