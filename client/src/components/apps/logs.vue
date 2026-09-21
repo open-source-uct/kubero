@@ -69,9 +69,11 @@ export default defineComponent({
             this.getLogHistory('web')
             this.socketJoin()
             this.startLogs()
+            socket.on('connect', this.onSocketConnect)
         }
     },
     unmounted() {
+        socket.off('connect', this.onSocketConnect)
         this.socketLeave()
         this.loglines = []
     },
@@ -142,6 +144,12 @@ export default defineComponent({
             socket.emit("leave", {
                 room: `${this.pipeline}-${this.phase}-${this.app}`,
             });
+        },
+        onSocketConnect() {
+            // al reconectar, el socket nuevo no está en la sala: hay que volver a entrar
+            this.socketJoin();
+            this.startLogs();
+            this.getLogHistory(this.currentTab);
         },
         startLogs() {
             axios.get(`/api/logs/${this.pipeline}/${this.phase}/${this.app}`).then(() => {

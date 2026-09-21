@@ -63,7 +63,7 @@ describe('LogsService', () => {
 
     it('should not start logs if already running', async () => {
       pipelinesService.getContext.mockResolvedValue('ctx');
-      (service as any).podLogStreams = ['pod-foo-bar-123-456'];
+      (service as any).podLogStreams = ['pod-foo-bar-123-456/web'];
       const spy = jest.spyOn(kubectl.log, 'log');
       await service.emitLogs(
         'pipe',
@@ -74,6 +74,42 @@ describe('LogsService', () => {
         ['group1', 'group2'],
       );
       expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('should allow restarting logs after the stream closes', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      let stream: any;
+      kubectl.log.log.mockImplementation((_ns, _pod, _container, logStream) => {
+        stream = logStream;
+        return Promise.resolve();
+      });
+      const start = () =>
+        service.emitLogs('pipe', 'phase', 'app', 'pod-foo-bar-123-456', 'web', [
+          'group1',
+        ]);
+
+      await start();
+      await start();
+      expect(kubectl.log.log).toHaveBeenCalledTimes(1);
+
+      stream.destroy();
+      await new Promise((r) => setImmediate(r));
+      await start();
+      expect(kubectl.log.log).toHaveBeenCalledTimes(2);
+    });
+
+    it('should free the stream if starting logs fails', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      kubectl.log.log.mockRejectedValue({ body: { message: 'boom' } });
+      const start = () =>
+        service.emitLogs('pipe', 'phase', 'app', 'pod-foo-bar-123-456', 'web', [
+          'group1',
+        ]);
+
+      await start();
+      await new Promise((r) => setImmediate(r));
+      await start();
+      expect(kubectl.log.log).toHaveBeenCalledTimes(2);
     });
   });
 
