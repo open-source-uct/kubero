@@ -69,7 +69,20 @@ export class LogsService {
     if (contextName) {
       this.kubectl.setCurrentContext(contextName);
 
-      if (!this.podLogStreams.includes(podName)) {
+      // un pod puede tener varios contenedores, cada uno con su propio stream
+      const streamKey = podName + '/' + container;
+
+      if (!this.podLogStreams.includes(streamKey)) {
+        this.podLogStreams.push(streamKey);
+        // si el stream se corta o falla se libera, para poder abrirlo de nuevo
+        const release = () => {
+          this.podLogStreams = this.podLogStreams.filter(
+            (k) => k !== streamKey,
+          );
+        };
+        logStream.on('close', release);
+        logStream.on('error', release);
+
         this.kubectl.log
           .log(namespace, podName, container, logStream, {
             follow: true,
@@ -79,13 +92,13 @@ export class LogsService {
           })
           .then((_res) => {
             this.logger.debug('logs started for ' + podName + ' ' + container);
-            this.podLogStreams.push(podName);
           })
           .catch((err) => {
+            release();
             this.logger.error(
               'Failed to start logs for ' + podName + ' ' + container,
             );
-            this.logger.error(err.body.message);
+            this.logger.error(err?.body?.message ?? err?.message);
           });
       } else {
         this.logger.debug('logs already running ' + podName + ' ' + container);
