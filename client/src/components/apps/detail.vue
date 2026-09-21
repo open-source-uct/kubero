@@ -77,7 +77,7 @@
                 <Metrics :pipeline="pipeline" :phase="phase" :app="app" :host="appData.spec.ingress.hosts[0].host"/>
             </v-window-item>
             <v-window-item transition="false" reverse-transition="false" class="background">
-                <LogsTab :pipeline="pipeline" :phase="phase" :app="app" :deploymentstrategy="appData.spec.deploymentstrategy" :buildstrategy="appData.spec.buildstrategy"/>
+                <LogsTab :pipeline="pipeline" :phase="phase" :app="app" :deploymentstrategy="appData.spec.deploymentstrategy" :buildstrategy="appData.spec.buildstrategy" :hasAddons="(appData.spec.addons?.length ?? 0) > 0"/>
             </v-window-item>
             <v-window-item transition="false" reverse-transition="false" class="background">
                 <Events :pipeline="pipeline" :phase="phase" :app="app"/>
@@ -149,6 +149,7 @@ export default defineComponent({
                             host: '',
                         }]
                     },
+                    addons: [] as unknown[],
                 }
             }
         }

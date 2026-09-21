@@ -120,8 +120,10 @@ export class PipelinesService {
         pipeline.spec.resourceVersion = pipeline.metadata.resourceVersion;
       }
 
-      delete pipeline.spec.git.keys.priv;
-      delete pipeline.spec.git.keys.pub;
+      if (pipeline.spec.git?.keys) {
+        delete pipeline.spec.git.keys.priv;
+        delete pipeline.spec.git.keys.pub;
+      }
       return pipeline.spec;
     }
   }
@@ -188,8 +190,8 @@ export class PipelinesService {
         this.logger.error(error);
       });
 
-    pipeline.git.keys.priv = currentPL?.spec.git.keys.priv;
-    pipeline.git.keys.pub = currentPL?.spec.git.keys.pub;
+    pipeline.git.keys.priv = currentPL?.spec.git?.keys?.priv;
+    pipeline.git.keys.pub = currentPL?.spec.git?.keys?.pub;
 
     // Create the Pipeline CRD
     await this.kubectl.updatePipeline(pipeline, resourceVersion);

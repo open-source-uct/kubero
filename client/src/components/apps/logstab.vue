@@ -21,7 +21,7 @@
         </v-row>
         <v-row>
             <v-col cols="12" sm="12" md="12" style="height: calc(100vh - 400px);">
-                <Logs :pipeline=pipeline :phase=phase :app=app :deploymentstrategy=deploymentstrategy :buildstrategy=buildstrategy logType="runlogs" height="600px"/>
+                <Logs :pipeline=pipeline :phase=phase :app=app :deploymentstrategy=deploymentstrategy :buildstrategy=buildstrategy :hasAddons=hasAddons logType="runlogs" height="600px"/>
             </v-col>
         </v-row>
 
@@ -54,6 +54,10 @@ export default defineComponent({
         type: String,
         default: "dockerfile"
       },
+      hasAddons: {
+        type: Boolean,
+        default: false
+      },
     },
     data: () => ({
     }),
@@ -62,7 +66,7 @@ export default defineComponent({
     },
     methods: {
         openInWindow() {
-            window.open(`/popup/logs/${this.pipeline}/${this.phase}/${this.app}/${this.deploymentstrategy}/${this.buildstrategy}`, '_blank', 'popup=yes,location=no,height=1000,width=1000,scrollbars=yes,status=no');
+            window.open(`/popup/logs/${this.pipeline}/${this.phase}/${this.app}/${this.deploymentstrategy}/${this.buildstrategy}?hasAddons=${this.hasAddons}`, '_blank', 'popup=yes,location=no,height=1000,width=1000,scrollbars=yes,status=no');
         }
     },
 });

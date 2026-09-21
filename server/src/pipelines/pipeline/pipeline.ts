@@ -15,7 +15,7 @@ export class Pipeline implements IPipeline {
   public dockerimage: string;
   public reviewapps: boolean;
   public phases: IPipelinePhase[];
-  public buildpack: IBuildpack;
+  public buildpack?: IBuildpack;
   public deploymentstrategy: 'git' | 'docker';
   public buildstrategy: 'plain' | 'dockerfile' | 'nixpacks' | 'buildpacks';
   public git: IgitLink;

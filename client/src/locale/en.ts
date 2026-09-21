@@ -60,6 +60,9 @@ const messages = {
             cluster: 'Cluster',
             clusterContext: 'Cluster Context',
           },
+          validation: {
+            teamRequired: 'Select at least one team. Without teams, only admins would be able to see this pipeline.',
+          },
           title:{
             continuousDeployment: 'Continuous Deployment',
             environments: 'Environments',

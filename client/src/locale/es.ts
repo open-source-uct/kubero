@@ -59,6 +59,9 @@ const messages = {
         cluster: 'Clúster',
         clusterContext: 'Contexto del clúster',
       },
+      validation: {
+        teamRequired: 'Selecciona al menos un equipo. Sin equipos, solo los administradores podrían ver este pipeline.',
+      },
       title: {
         continuousDeployment: 'Despliegue Continuo',
         environments: 'Entornos',

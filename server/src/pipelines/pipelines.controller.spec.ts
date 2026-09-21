@@ -1,6 +1,29 @@
+import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { CreatePipelineDTO } from './dto/replacePipeline.dto';
 import { PipelinesController } from './pipelines.controller';
 import { PipelinesService } from './pipelines.service';
+
+const validDockerPipeline = {
+  pipelineName: 'pipeline1',
+  domain: '',
+  access: { teams: ['group1'] },
+  reviewapps: false,
+  phases: [
+    {
+      name: 'production',
+      enabled: true,
+      context: '',
+      domain: '',
+      defaultEnvvars: [],
+    },
+  ],
+  dockerimage: '',
+  deploymentstrategy: 'docker',
+  buildstrategy: 'plain',
+};
 
 const mockUserGroups = ['group1', 'group2'];
 const mockUser = {
@@ -59,6 +82,7 @@ describe('PipelinesController', () => {
     const dto: any = {
       pipelineName: 'pipeline1',
       domain: 'domain',
+      access: { teams: ['group1'] },
       phases: [],
       buildpack: '',
       reviewapps: false,
@@ -73,6 +97,81 @@ describe('PipelinesController', () => {
     const result = await controller.createPipeline('new', dto, req);
     expect(service.createPipeline).toHaveBeenCalled();
     expect(result).toEqual({ ok: true });
+  });
+
+  it('should complete git and registry when creating a pipeline without them', async () => {
+    const dto: any = { ...validDockerPipeline };
+
+    await controller.createPipeline('new', dto, { user: mockJWT });
+
+    expect(service.createPipeline).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'pipeline1',
+        buildpack: undefined,
+        git: { keys: {}, webhook: {}, provider: '' },
+        registry: { host: '', username: '', password: '' },
+      }),
+      expect.anything(),
+    );
+  });
+
+  describe('team access', () => {
+    const adminReq = {
+      user: { ...mockJWT, userGroups: ['admin', 'everyone'] },
+    };
+
+    it('should reject a non admin creating a pipeline without teams', async () => {
+      for (const access of [undefined, { teams: [] }]) {
+        const dto: any = { ...validDockerPipeline, access };
+        await expect(
+          controller.createPipeline('new', dto, { user: mockJWT }),
+        ).rejects.toThrow(BadRequestException);
+      }
+      expect(service.createPipeline).not.toHaveBeenCalled();
+    });
+
+    it('should reject a non admin updating a pipeline without teams', async () => {
+      const dto: any = {
+        ...validDockerPipeline,
+        access: { teams: [] },
+        resourceVersion: '1',
+      };
+      await expect(
+        controller.updatePipeline(dto, { user: mockJWT }, 'pipeline1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(service.updatePipeline).not.toHaveBeenCalled();
+    });
+
+    it('should let a non admin create a pipeline with a team', async () => {
+      const dto: any = { ...validDockerPipeline };
+      await controller.createPipeline('new', dto, { user: mockJWT });
+      expect(service.createPipeline).toHaveBeenCalled();
+    });
+
+    it('should let an admin create a pipeline without teams', async () => {
+      const dto: any = { ...validDockerPipeline, access: { teams: [] } };
+      await controller.createPipeline('new', dto, adminReq);
+      expect(service.createPipeline).toHaveBeenCalled();
+    });
+  });
+
+  describe('CreatePipelineDTO', () => {
+    it('should accept a pipeline without buildpack, git and registry', async () => {
+      const errors = await validate(
+        plainToInstance(CreatePipelineDTO, validDockerPipeline),
+      );
+      expect(errors).toHaveLength(0);
+    });
+
+    it('should still reject an empty buildpack when one is sent', async () => {
+      const errors = await validate(
+        plainToInstance(CreatePipelineDTO, {
+          ...validDockerPipeline,
+          buildpack: {},
+        }),
+      );
+      expect(errors.map((e) => e.property)).toContain('buildpack');
+    });
   });
 
   it('should throw if pipelineName is not "new" in createPipeline', async () => {
@@ -104,6 +203,7 @@ describe('PipelinesController', () => {
     const dto: any = {
       pipelineName: 'pipeline1',
       domain: 'domain',
+      access: { teams: ['group1'] },
       phases: [],
       buildpack: '',
       reviewapps: false,
@@ -133,7 +233,10 @@ describe('PipelinesController', () => {
   it('should get all apps for a pipeline', async () => {
     const req = { user: mockJWT };
     const result = await controller.getPipelineApps('pipeline1', req);
-    expect(service.getPipelineWithApps).toHaveBeenCalledWith('pipeline1', ["group1", "group2"]);
+    expect(service.getPipelineWithApps).toHaveBeenCalledWith('pipeline1', [
+      'group1',
+      'group2',
+    ]);
     expect(result).toEqual([{ name: 'app1' }]);
   });
 });
