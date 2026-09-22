@@ -3,7 +3,7 @@ import { NavDrawerPage } from '../page-objects/nav-drawer.page';
 
 test.describe('Conmutación de Temas Institucionales UCT (Light / Dark)', () => {
   test('Debe alternar entre Modo Claro y Modo Oscuro actualizando las clases de Vuetify y manteniendo la interactividad', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/profile');
     const navDrawer = new NavDrawerPage(page);
     await expect(navDrawer.drawer).toBeVisible({ timeout: 15000 });
     const initialTheme = await navDrawer.getCurrentTheme();

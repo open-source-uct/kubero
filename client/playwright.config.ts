@@ -10,6 +10,7 @@ const isHeadless = process.env.E2E_HEADLESS !== 'false';
 const authFile = path.resolve(__dirname, 'e2e/.auth/user.json');
 
 export default defineConfig({
+  globalTeardown: path.resolve(__dirname, 'e2e/setup/global-teardown.ts'),
   testDir: './e2e',
   /* Ejecución secuencial para no sobrecargar el servidor en vivo ni generar condiciones de carrera */
   fullyParallel: false,
