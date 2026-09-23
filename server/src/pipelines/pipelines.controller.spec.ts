@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
@@ -52,6 +52,7 @@ describe('PipelinesController', () => {
       updatePipeline: jest.fn().mockResolvedValue({ ok: true }),
       deletePipeline: jest.fn().mockResolvedValue({ ok: true }),
       getPipelineWithApps: jest.fn().mockResolvedValue([{ name: 'app1' }]),
+      userHasAccessToPipeline: jest.fn().mockResolvedValue(true),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -194,7 +195,12 @@ describe('PipelinesController', () => {
   });
 
   it('should get a specific pipeline', async () => {
-    const result = await controller.getPipeline('pipeline1');
+    const req = { user: mockJWT };
+    const result = await controller.getPipeline('pipeline1', req);
+    expect(service.userHasAccessToPipeline).toHaveBeenCalledWith(
+      'pipeline1',
+      mockUserGroups,
+    );
     expect(service.getPipeline).toHaveBeenCalledWith('pipeline1');
     expect(result).toEqual({ name: 'pipeline1' });
   });
@@ -238,5 +244,59 @@ describe('PipelinesController', () => {
       'group2',
     ]);
     expect(result).toEqual([{ name: 'app1' }]);
+  });
+
+  describe('pipeline-level access control', () => {
+    // GET/PUT/DELETE por nombre solo revisaban el permiso del rol, no si el
+    // usuario pertenece a algún equipo de la pipeline. Cualquiera con
+    // pipeline:write (por ejemplo un student) podía tocar la pipeline de
+    // otro equipo si sabía o adivinaba su nombre.
+    const req = { user: mockJWT };
+
+    beforeEach(() => {
+      service.userHasAccessToPipeline = jest.fn().mockResolvedValue(false);
+    });
+
+    it('should reject getPipeline when the user has no access', async () => {
+      await expect(controller.getPipeline('pipeline1', req)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(service.getPipeline).not.toHaveBeenCalled();
+    });
+
+    it('should reject updatePipeline when the user has no access', async () => {
+      const dto: any = {
+        ...validDockerPipeline,
+        access: { teams: ['group1'] },
+        resourceVersion: '1',
+      };
+      await expect(
+        controller.updatePipeline(dto, req, 'pipeline1'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(service.updatePipeline).not.toHaveBeenCalled();
+    });
+
+    it('should reject deletePipeline when the user has no access', async () => {
+      await expect(controller.deletePipeline('pipeline1', req)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(service.deletePipeline).not.toHaveBeenCalled();
+    });
+
+    it('should reject getPipelineApps when the user has no access', async () => {
+      await expect(
+        controller.getPipelineApps('pipeline1', req),
+      ).rejects.toThrow(ForbiddenException);
+      expect(service.getPipelineWithApps).not.toHaveBeenCalled();
+    });
+
+    it('should let an admin through regardless of teams', async () => {
+      const adminReq = {
+        user: { ...mockJWT, userGroups: ['admin', 'everyone'] },
+      };
+      service.userHasAccessToPipeline = jest.fn().mockResolvedValue(true);
+      await controller.getPipeline('pipeline1', adminReq);
+      expect(service.getPipeline).toHaveBeenCalledWith('pipeline1');
+    });
   });
 });
