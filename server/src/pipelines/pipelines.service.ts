@@ -124,8 +124,23 @@ export class PipelinesService {
         delete pipeline.spec.git.keys.priv;
         delete pipeline.spec.git.keys.pub;
       }
+      if (pipeline.spec.registry) {
+        pipeline.spec.registry.password = '';
+      }
       return pipeline.spec;
     }
+  }
+
+  // true si el usuario puede ver/editar esta pipeline según sus equipos.
+  // Reutiliza el mismo filtro que ya aplica el listado (equipos + bypass de
+  // admin), así el chequeo puntual queda siempre alineado con lo que el
+  // usuario ve en /api/pipelines.
+  public async userHasAccessToPipeline(
+    pipelineName: string,
+    userGroups: string[] = [],
+  ): Promise<boolean> {
+    const pipelines = await this.listPipelines(userGroups);
+    return pipelines.items.some((p) => p.name === pipelineName);
   }
 
   // delete a pipeline and all its namespaces/phases
