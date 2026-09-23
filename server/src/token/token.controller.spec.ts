@@ -45,9 +45,6 @@ describe('TokenController', () => {
         'token1',
         '2025-01-01',
         'u1',
-        'test',
-        'admin',
-        [],
       );
       expect(result).toEqual({ id: '1', name: 'token1' });
     });

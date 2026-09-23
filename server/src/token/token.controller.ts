@@ -87,13 +87,12 @@ export class TokenController {
     summary: 'Create a new Token for the current logged in user',
   })
   async createToken(@Body() tokenData: CreateTokenDto, @Request() req: any) {
+    // el rol, los equipos y los permisos del token se leen desde la base de
+    // datos dentro de tokenService.create(), no desde la sesión del usuario
     const token = this.tokenService.create(
       tokenData.name,
       tokenData.expiresAt,
       req.user.userId,
-      req.user.username,
-      req.user.role,
-      req.user.userGroups,
     );
     return token;
   }
