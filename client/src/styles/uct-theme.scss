@@ -1,7 +1,7 @@
 /**
  * uct-theme.scss
  * Sistema de Diseño Institucional UCT (Universidad Católica de Temuco)
- * Adaptado para Kubero PaaS (Vue 3 / Vuetify 3)
+ * Adaptado para Kubero (Vue 3 / Vuetify 3)
  */
 
 :root {
@@ -117,4 +117,13 @@ body {
 .v-btn {
   letter-spacing: 0.02em;
   text-transform: none;
+}
+
+/* Prevención de scroll lateral en barra de navegación y listas anidadas */
+.v-navigation-drawer,
+.v-navigation-drawer__content,
+.v-list-group__items {
+  overflow-x: hidden !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }

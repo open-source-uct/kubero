@@ -87,6 +87,8 @@ const messages = {
     cancel: "Abbräche",
     save: "Speichere",
     applyChanges: "Änderige aawände",
+    login: 'Aamälde',
+    faculty: 'Ingenieurfakultät · UCT',
   },
   pipeline: {
     name: 'Pipeline',
@@ -123,6 +125,9 @@ const messages = {
     },
   },
   app: {
+    buttons: {
+      new: 'Neui App',
+    },
     nav: {
       overview: 'Übersicht',
       builds: 'Builds',
@@ -222,6 +227,7 @@ const messages = {
       healthCheckPath: 'Health Check Pfad',
       healthCheckStartupSeconds: 'Startup Sekunde',
       healthCheckTimeoutSeconds: 'Timeout Sekunde',
+      healthcheckTimeoutSeconds: 'Timeout Sekunde',
       healthCheckIntervalSeconds: 'Intervall Sekunde',
       noNewEnvVarsFound: 'Kei neui Umgäbigsvariable id hochladeni Datei gfunde',
       envVarConflicts: 'Umgäbigsvariable-Konflikt',
@@ -331,6 +337,8 @@ const messages = {
     teams: 'Teams',
     provider: 'Provider',
     status: 'Status',
+    githubLogin: 'Mit GitHub witerfahre',
+    oauth2Login: 'Mit Institutionell (OAuth2) aamälde',
     password: 'Passwort',
     changePassword: 'Passwort ändere',
     changePasswordFor: 'Passwort ändere für {user}',
@@ -338,6 +346,7 @@ const messages = {
     newPassword: 'Neus Passwort',
     confirmPassword: 'Passwort bestätige',
     errors: {
+      wrongCredentials: 'Falsche Benutzername oder Passwort',
       passwordMismatch: 'Passwörter stimme nöd überii',
       passwordConfirm: 'Bitte bestätig dis Passwort',
       firstNameRequired: 'Vorname isch erforderlich',
@@ -549,6 +558,7 @@ const messages = {
     },
     errors: {
       loadinPodsize: 'Fehler bim Lade vo de Pod-Grössene',
+      loadingPodsize: 'Fehler bim Lade vo de Pod-Grössene',
     },
   },
   templates: {

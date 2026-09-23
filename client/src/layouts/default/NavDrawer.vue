@@ -13,7 +13,7 @@
           max-height="42"
           max-width="170"
           class="mx-auto"
-          alt="UCT PaaS"
+          alt="UCT"
           contain
         ></v-img>
       </router-link>
@@ -101,27 +101,30 @@
             :title="$t('navigation.general')"
             prepend-icon="mdi-tune"
             density="compact"
-            style="transform: scale(0.9);"
+            class="nav-subitem"
           ></v-list-item>
           <v-list-item
               link to="/runpacks" 
               v-if="kubero.isAuthenticated && !kubero.adminDisabled"
               prepend-icon="mdi-cube-outline"
-              style="transform: scale(0.9);"
+              density="compact"
+              class="nav-subitem"
               :title="$t('navigation.runpacks')">
           </v-list-item>
           <v-list-item 
               link to="/podsizes" 
               v-if="kubero.isAuthenticated && !kubero.adminDisabled"
               prepend-icon="mdi-arrow-expand-vertical"
-              style="transform: scale(0.9);"
+              density="compact"
+              class="nav-subitem"
               :title="$t('navigation.podSizes')">
           </v-list-item>
           <v-list-item 
               link to="/notifications" 
               v-if="kubero.isAuthenticated && !kubero.adminDisabled"
               prepend-icon="mdi-email-fast-outline"
-              style="transform: scale(0.9);"
+              density="compact"
+              class="nav-subitem"
               :title="$t('navigation.notifications')">
           </v-list-item>
         </v-list-group>
@@ -401,10 +404,31 @@ img.image-icon {
 .profile-dark-bg {
   background: rgba(var(--v-theme-secondary), 0.5) !important;
 }
+
+.nav-subitem {
+  font-size: 0.85rem !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
+}
 </style>
 
 <style>
+.v-navigation-drawer,
+.v-navigation-drawer__content {
+  overflow-x: hidden !important;
+}
+
 .v-list-group__items {
-  --indent-padding: inherit;
+  --indent-padding: 0px !important;
+  overflow-x: hidden !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.v-list-group__items .v-list-item {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
 }
 </style>

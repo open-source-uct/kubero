@@ -31,6 +31,8 @@ const messages = {
     cancel: 'Cancelar',
     save: 'Salvar',
     applyChanges: 'Aplicar Alterações',
+    login: 'Entrar',
+    faculty: 'Faculdade de Engenharia · UCT',
   },
   pipeline: {
     name: 'Pipeline',
@@ -67,6 +69,9 @@ const messages = {
     },
   },
   app: {
+    buttons: {
+      new: 'Novo Aplicativo',
+    },
     nav: {
       overview: 'Visão Geral',
       builds: 'Builds',
@@ -165,6 +170,7 @@ const messages = {
       healthCheckPath: 'Caminho da Verificação de Saúde',
       healthCheckStartupSeconds: 'Segundos de Inicialização',
       healthCheckTimeoutSeconds: 'Segundos de Timeout',
+      healthcheckTimeoutSeconds: 'Segundos de Timeout',
       healthCheckIntervalSeconds: 'Segundos de Intervalo',
       noNewEnvVarsFound: 'Nenhuma nova variável de ambiente encontrada no arquivo enviado',
       envVarConflicts: 'Conflitos de Variáveis de Ambiente',
@@ -274,6 +280,8 @@ const messages = {
     teams: 'Equipes',
     provider: 'Provedor',
     status: 'Status',
+    githubLogin: 'Continuar com GitHub',
+    oauth2Login: 'Entrar com Institucional (OAuth2)',
     password: 'Senha',
     changePassword: 'Mudar Senha',
     changePasswordFor: 'Mudar Senha para {user}',
@@ -281,6 +289,7 @@ const messages = {
     newPassword: 'Nova Senha',
     confirmPassword: 'Confirmar Senha',
     errors: {
+      wrongCredentials: 'Nome de usuário ou senha incorretos',
       passwordMismatch: 'As senhas não correspondem',
       passwordConfirm: 'Por favor, confirme sua senha',
       firstNameRequired: 'Primeiro nome é obrigatório',
@@ -407,6 +416,7 @@ const messages = {
     },
     errors: {
       loadinPodsize: 'Erro ao carregar Tamanhos de Pod',
+      loadingPodsize: 'Erro ao carregar tamanhos de Pod',
     },
   },
   runpacks: {

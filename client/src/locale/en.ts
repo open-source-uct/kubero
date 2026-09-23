@@ -32,6 +32,11 @@ const messages = {
         cancel: "Cancel",
         save: "Save",
         applyChanges: "Apply Changes",
+        login: "Login",
+        faculty: "Facultad de Ingeniería · UCT",
+      },
+      setup: {
+        title: "Asistente de Configuración Inicial · Kubero",
       },
       pipeline: {
         name: 'Pipeline',
@@ -71,8 +76,16 @@ const messages = {
             gitrepo: 'When connected, webhooks and deployment keys are stored in the repository. This means that the apps configured in this project can be automatically redeployed with a \'git push\' and opening a PR starts a new instance in the "review" phase.',
           },
         },
+        empty: {
+          title: '👋 Welcome to Kubero!',
+          description: 'Deployment and container management platform for Universidad Católica de Temuco.',
+          createFirst: 'Create your first pipeline',
+        },
       },
       app: {
+        buttons: {
+          new: 'New App',
+        },
         nav: {
           overview: 'Overview',
           builds: 'Builds',
@@ -172,6 +185,7 @@ const messages = {
           healthCheckPath: 'Health Check Path',
           healthCheckStartupSeconds: 'Startup Seconds',
           healthCheckTimeoutSeconds: 'Timeout Seconds',
+          healthcheckTimeoutSeconds: 'Timeout Seconds',
           healthCheckIntervalSeconds: 'Interval Seconds',
           noNewEnvVarsFound: 'No new environment variables found in the uploaded file',
           envVarConflicts: 'Environment Variable Conflicts',
@@ -284,6 +298,8 @@ const messages = {
         teams: 'Teams',
         provider: 'Provider',
         status: 'Status',
+        githubLogin: 'Continue with GitHub',
+        oauth2Login: 'Log in with Institutional (OAuth2)',
         password: 'Password',
         changePassword: 'Change Password',
         changePasswordFor: 'Change Password for {user}',
@@ -291,6 +307,7 @@ const messages = {
         newPassword: 'New Password',
         confirmPassword: 'Confirm Password',
         errors: {
+          wrongCredentials: 'Wrong username or password',
           passwordMismatch: 'Passwords do not match',
           passwordConfirm: 'Please confirm your password',
           firstNameRequired: 'First name is required',
@@ -417,6 +434,7 @@ const messages = {
         },
         errors: {
           loadinPodsize: 'Error loading Pod Sizes',
+          loadingPodsize: 'Error loading Pod Sizes',
         },
       },
       runpacks: {

@@ -87,6 +87,8 @@ const messages = {
     cancel: "取消",
     save: "保存",
     applyChanges: "应用更改",
+    login: '登录',
+    faculty: '工程学院 · UCT',
   },
   pipeline: {
     name: '流水线',
@@ -123,6 +125,9 @@ const messages = {
     },
   },
   app: {
+    buttons: {
+      new: '新建应用',
+    },
     nav: {
       overview: '概览',
       builds: '构建',
@@ -222,6 +227,7 @@ const messages = {
       healthCheckPath: '健康检查路径',
       healthCheckStartupSeconds: '启动秒数',
       healthCheckTimeoutSeconds: '超时时间（秒）',
+      healthcheckTimeoutSeconds: '超时时间（秒）',
       healthCheckIntervalSeconds: '间隔时间（秒）',
       noNewEnvVarsFound: '上传的文件中未找到新的环境变量',
       envVarConflicts: '环境变量冲突',
@@ -331,6 +337,8 @@ const messages = {
     teams: '团队',
     provider: '提供者',
     status: '状态',
+    githubLogin: '使用 GitHub 继续',
+    oauth2Login: '使用机构账号 (OAuth2) 登录',
     password: '密码',
     changePassword: '更改密码',
     changePasswordFor: '为{user}更改密码',
@@ -338,6 +346,7 @@ const messages = {
     newPassword: '新密码',
     confirmPassword: '确认密码',
     errors: {
+      wrongCredentials: '用户名或密码错误',
       passwordMismatch: '密码不匹配',
       passwordConfirm: '请确认您的密码',
       firstNameRequired: '名字是必需的',
@@ -549,6 +558,7 @@ const messages = {
     },
     errors: {
       loadinPodsize: '加载Pod大小时出错',
+      loadingPodsize: '加载 Pod 大小出错',
     },
   },
   templates: {

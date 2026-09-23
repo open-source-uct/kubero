@@ -12,6 +12,8 @@ const messages = {
     cancel: "Abbrechen",
     save: "Speichern",
     applyChanges: "Änderungen anwenden",
+    login: 'Anmelden',
+    faculty: 'Ingenieurfakultät · UCT',
   },
   navigation: {
     pipelines: 'Pipelines',
@@ -124,6 +126,9 @@ const messages = {
     },
   },
   app: {
+    buttons: {
+      new: 'Neue App',
+    },
     nav: {
       overview: 'Übersicht',
       builds: 'Builds',
@@ -223,6 +228,7 @@ const messages = {
       healthCheckPath: 'Health Check Pfad',
       healthCheckStartupSeconds: 'Startup Sekunden',
       healthCheckTimeoutSeconds: 'Timeout Sekunden',
+      healthcheckTimeoutSeconds: 'Timeout Sekunden',
       healthCheckIntervalSeconds: 'Interval Sekunden',
       noNewEnvVarsFound: 'Keine neuen Umgebungsvariablen in der hochgeladenen Datei gefunden',
       envVarConflicts: 'Umgebungsvariablen-Konflikte',
@@ -333,6 +339,8 @@ const messages = {
     teams: 'Teams',
     provider: 'Provider',
     status: 'Status',
+    githubLogin: 'Mit GitHub fortfahren',
+    oauth2Login: 'Mit Institutionell (OAuth2) anmelden',
     password: 'Passwort',
     changePassword: 'Password ändern',
     changePasswordFor: 'Passwort für {user} ändern',
@@ -340,6 +348,7 @@ const messages = {
     newPassword: 'Neues Passwort',
     confirmPassword: 'Passwort bestätigen',
     errors: {
+      wrongCredentials: 'Falscher Benutzername oder Passwort',
       passwordMismatch: 'Passwörter stimmen nicht überein',
       passwordConfirm: 'Bitte bestätige dein Passwort',
       firstNameRequired: 'Vorname ist erforderlich',
@@ -551,6 +560,7 @@ const messages = {
     },
     errors: {
       loadinPodsize: 'Fehler beim Laden der Pod-Größen',
+      loadingPodsize: 'Fehler beim Laden der Pod-Größen',
     },
   },
   templates: {

@@ -8,8 +8,8 @@
         class="mx-auto mb-2"
         alt="Universidad Católica de Temuco"
       ></v-img>
-      <div class="uct-section-title">Asistente de Configuración Inicial · Kubero</div>
-      <div class="text-caption text-medium-emphasis">Facultad de Ingeniería · UCT</div>
+      <div class="uct-section-title">{{ $t('setup.title') }}</div>
+      <div class="text-caption text-medium-emphasis">{{ $t('global.faculty') }}</div>
     </div>
     <v-row
         align="center"

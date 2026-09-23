@@ -88,6 +88,8 @@ const messages = {
     cancel: "キャンセル",
     save: "保存",
     applyChanges: "変更を適用",
+    login: 'ログイン',
+    faculty: '工学部 · UCT',
   },
   pipeline: {
     name: 'パイプライン',
@@ -124,6 +126,9 @@ const messages = {
     },
   },
   app: {
+    buttons: {
+      new: '新規アプリ',
+    },
     nav: {
       overview: '概要',
       builds: 'ビルド',
@@ -223,6 +228,7 @@ const messages = {
       healthCheckPath: 'ヘルスチェックパス',
       healthCheckStartupSeconds: '起動秒数',
       healthCheckTimeoutSeconds: 'タイムアウト秒数',
+      healthcheckTimeoutSeconds: 'タイムアウト秒数',
       healthCheckIntervalSeconds: 'インターバル秒数',
       noNewEnvVarsFound: 'アップロードされたファイルに新しい環境変数が見つかりませんでした',
       envVarConflicts: '環境変数の競合',
@@ -332,6 +338,8 @@ const messages = {
     teams: 'チーム',
     provider: 'プロバイダー',
     status: 'ステータス',
+    githubLogin: 'GitHub で続ける',
+    oauth2Login: '機関アカウント (OAuth2) でログイン',
     password: 'パスワード',
     changePassword: 'パスワードを変更',
     changePasswordFor: '{user}のパスワードを変更',
@@ -339,6 +347,7 @@ const messages = {
     newPassword: '新しいパスワード',
     confirmPassword: 'パスワードを確認',
     errors: {
+      wrongCredentials: 'ユーザー名またはパスワードが正しくありません',
       passwordMismatch: 'パスワードが一致しません',
       passwordConfirm: 'パスワードを確認してください',
       firstNameRequired: '名が必要です',
@@ -550,6 +559,7 @@ const messages = {
     },
     errors: {
       loadinPodsize: 'Podサイズの読み込みエラー',
+      loadingPodsize: 'ポッドサイズの読み込みエラー',
     },
   },
   templates: {

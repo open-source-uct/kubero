@@ -51,7 +51,7 @@
                                 size="small"
                                 class="w-100"
                             >
-                                {{ $t('app.buttons.new') || 'Nueva App' }}
+                                {{ $t('app.buttons.new') }}
                             </v-btn>
                         </div>
                     </v-col>

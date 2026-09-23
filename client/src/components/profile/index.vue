@@ -232,7 +232,7 @@
               :disabled="!authStore.hasPermission('token:ok') && !authStore.hasPermission('token:write')"
             >
               <v-icon start>mdi-plus</v-icon>
-              {{ $t('profile.token.create') || 'Nuevo Token' }}
+              {{ $t('profile.token.create') }}
             </v-btn>
           </div>
           <v-table density="compact" class="profile-table">

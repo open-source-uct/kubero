@@ -15,8 +15,8 @@
                     class="mx-auto mb-3"
                     alt="Universidad Católica de Temuco"
                 ></v-img>
-                <div class="uct-section-title mb-1">Kubero </div>
-                <div class="text-caption text-medium-emphasis">Facultad de Ingeniería · UCT</div>
+                <div class="uct-section-title mb-1">Kubero</div>
+                <div class="text-caption text-medium-emphasis">{{ $t('global.faculty') }}</div>
             </div>
 
             <!-- Show info panel if domain is demo.kubero.dev -->
@@ -39,13 +39,13 @@
                     class="mb-4"
                     :class="{ 'shaking': errorshake }"
                 >
-                    {{ $t('user.errors.wrongCredentials') || 'Usuario o contraseña incorrectos' }}
+                    {{ $t('user.errors.wrongCredentials') }}
                 </v-alert>
 
                 <form v-on:submit="login">
                     <v-text-field
                         v-model="username"
-                        :label="$t('user.username') || 'Usuario'"
+                        :label="$t('user.username')"
                         name="username"
                         variant="outlined"
                         density="comfortable"
@@ -57,7 +57,7 @@
 
                     <v-text-field
                         v-model="password"
-                        :label="$t('user.password') || 'Contraseña'"
+                        :label="$t('user.password')"
                         type="password"
                         name="password"
                         variant="outlined"
@@ -76,7 +76,7 @@
                         elevation="1"
                         class="font-weight-bold"
                     >
-                        {{ $t('global.login') || 'Iniciar Sesión' }}
+                        {{ $t('global.login') }}
                     </v-btn>
                 </form>
             </div>
@@ -91,7 +91,7 @@
                     prepend-icon="mdi-github"
                     class="text-none"
                 >
-                    Continuar con GitHub
+                    {{ $t('user.githubLogin') }}
                 </v-btn>
             </template>
 
@@ -105,7 +105,7 @@
                     prepend-icon="mdi-shield-key-outline"
                     class="text-none"
                 >
-                    Iniciar con Institucional (OAuth2)
+                    {{ $t('user.oauth2Login') }}
                 </v-btn>
             </template>
         </v-card>

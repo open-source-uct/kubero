@@ -12,24 +12,36 @@ test.describe('Validación Visual y Funcional de Todas las Vistas al Estilo UCT'
     await expect(logoImg).toBeVisible();
 
     // Verificar título y subtítulo institucional
-    await expect(page.locator('.uct-section-title')).toContainText('Kubero PaaS');
+    await expect(page.locator('.uct-section-title')).toContainText('Kubero');
     await expect(page.locator('text=Facultad de Ingeniería · UCT')).toBeVisible();
 
     // Verificar campos de texto estilizados
     await expect(page.locator('input[name="username"]')).toBeVisible();
     await expect(page.locator('input[name="password"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: /login|iniciar sesión/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /log\s*in|iniciar sesión/i })).toBeVisible();
   });
 
-  test('Shell y Navegación Institucional UCT: Logo en NavDrawer y Conmutación de Temas', async ({ page }) => {
+  test('Shell y Navegación Institucional UCT: Logo en NavDrawer, Ausencia de Scroll Lateral y Conmutación de Temas', async ({ page }) => {
     await page.goto('/profile');
     const navDrawer = new NavDrawerPage(page);
     await expect(navDrawer.drawer).toBeVisible({ timeout: 15000 });
 
     // Verificar que el branding de la UCT esté en el Drawer
-    const drawerLogo = navDrawer.drawer.locator('img[alt="UCT PaaS"]');
+    const drawerLogo = navDrawer.drawer.locator('img[alt="UCT"]');
     if (await drawerLogo.isVisible()) {
       await expect(drawerLogo).toBeVisible();
+    }
+
+    // Verificar que al desplegar Settings no haya scroll lateral
+    const settingsItem = navDrawer.drawer.locator('.v-list-item').filter({ hasText: /settings|configuración/i }).first();
+    if (await settingsItem.isVisible()) {
+      await settingsItem.click();
+      await page.waitForTimeout(400);
+      const hasHorizontalScroll = await navDrawer.drawer.evaluate((el) => {
+        const content = el.querySelector('.v-navigation-drawer__content') || el;
+        return content.scrollWidth > content.clientWidth;
+      });
+      expect(hasHorizontalScroll, 'No debe haber scroll lateral en NavDrawer al desplegar settings').toBe(false);
     }
 
     // Verificar conmutación entre Modo Claro y Oscuro
@@ -71,7 +83,7 @@ test.describe('Validación Visual y Funcional de Todas las Vistas al Estilo UCT'
     await page.goto('/setup');
     const uctLogo = page.locator('img[alt="Universidad Católica de Temuco"]');
     await expect(uctLogo).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('.uct-section-title')).toContainText('Asistente de Configuración');
+    await expect(page.locator('.uct-section-title')).toContainText(/Asistente de Configuración|Initial Setup Wizard/i);
   });
 
 });

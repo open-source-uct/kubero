@@ -51,9 +51,9 @@
           "
         />
 
-        <h1 style="font-size: 2.25rem" class="font-weight-bold mb-2">👋 ¡Bienvenido a Kubero PaaS UCT!</h1>
+        <h1 style="font-size: 2.25rem" class="font-weight-bold mb-2">{{ $t('pipeline.empty.title') }}</h1>
         <p class="text-body-1 text-medium-emphasis">
-          Plataforma de despliegues y gestión de contenedores de la Universidad Católica de Temuco.
+          {{ $t('pipeline.empty.description') }}
         </p>
         <br />
 
@@ -63,7 +63,7 @@
           size="large"
           class="font-weight-bold"
           :to="{ name: 'Pipeline Form', params: { pipeline: 'new' } }"
-          >Crear primer pipeline</v-btn
+          >{{ $t('pipeline.empty.createFirst') }}</v-btn
         >
       </v-col>
     </v-row>
