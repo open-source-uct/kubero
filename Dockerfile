@@ -1,21 +1,30 @@
 FROM node:22-alpine AS build
 ENV NODE_ENV=development
 
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
+
 WORKDIR /build
+
+## Server deps (capa cacheada mientras no cambien package.json/pnpm-lock.yaml/prisma)
+COPY server/package.json server/pnpm-lock.yaml server/pnpm-workspace.yaml ./server/
+COPY server/prisma ./server/prisma
+RUN cd /build/server && \
+    pnpm install --frozen-lockfile
+
+## Client deps (capa cacheada mientras no cambien package.json/pnpm-lock.yaml)
+COPY client/package.json client/pnpm-lock.yaml client/pnpm-workspace.yaml ./client/
+RUN cd /build/client && \
+    pnpm install --frozen-lockfile
 
 ## Server
 COPY server ./server
 RUN cd /build/server && \
-    yarn install
-RUN cd /build/server && \
-    yarn build
+    pnpm run build
 
 ## Client
 COPY client ./client
 RUN cd /build/client && \
-    yarn install
-RUN cd /build/client && \
-    yarn build 
+    pnpm run build
 
 FROM node:22-alpine AS release
 ARG VERSION=unknown

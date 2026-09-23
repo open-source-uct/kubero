@@ -5,40 +5,40 @@ This is Kubero server part of the Kubero project. It is a NestJS application tha
 ## Project setup
 
 ```bash
-$ yarn install
+$ pnpm install
 ```
 
 ## Compile and run the project
 
 ```bash
 # development
-$ yarn run start
+$ pnpm run start
 
 # watch mode
-$ yarn run start:dev
+$ pnpm run start:dev
 
 # production mode
-$ yarn run start:prod
+$ pnpm run start:prod
 ```
 
 ## Administration Commands
 
 ```bash
 # Reset admin account (creates or updates with new password)
-$ yarn cli:reset-admin
+$ pnpm run cli:reset-admin
 ```
 
 ## Run tests
 
 ```bash
 # unit tests
-$ yarn run test
+$ pnpm run test
 
 # e2e tests
-$ yarn run test:e2e
+$ pnpm run test:e2e
 
 # test coverage
-$ yarn run test:cov
+$ pnpm run test:cov
 ```
 
 ## Resources
