@@ -9,7 +9,8 @@
     v-if="deleted === false"
     >
 
-    <template slot="progress">
+    <!-- @vue-expect-error el slot "progress" existe en runtime (viene del mixin de loading de Vuetify), pero no está tipado en VCard -->
+    <template v-slot:progress>
       <v-progress-linear
         color="primary"
         height="2"

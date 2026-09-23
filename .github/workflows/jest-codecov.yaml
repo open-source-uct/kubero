@@ -12,10 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4         # checkout the repo
+      - uses: pnpm/action-setup@v4        # install pnpm (versión leída de package.json)
+        with:
+          package_json_file: server/package.json
       - name: Install dependencies        # install dependencies
-        run: yarn install --frozen-lockfile
-      - run: yarn build                   # install packages
-      - run: yarn test                    # run tests (configured to use jest-junit reporter)
+        run: pnpm install --frozen-lockfile
+      - run: pnpm run build                # install packages
+      - run: pnpm run test                 # run tests (configured to use jest-junit reporter)
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:

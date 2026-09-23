@@ -80,15 +80,15 @@ mv .env.template .env
 
 Install the dependencies, and start the server:
 ```bash
-yarn install
-yarn dev
+pnpm install
+pnpm run dev
 ```
 
 Next, set up the client JavaScript part:
 ```bash
 cd client
-yarn install
-yarn watch
+pnpm install
+pnpm run dev
 ```
 
 You should now be able to access your local development instance at http://localhost:2000 

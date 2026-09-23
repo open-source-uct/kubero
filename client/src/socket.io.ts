@@ -1,7 +1,7 @@
 import io from 'socket.io-client';
 
 export const useSocketIO = (token: string) => {
-    let socketOptions = {
+    const socketOptions = {
         autoConnect: true,
         auth: {}
     };

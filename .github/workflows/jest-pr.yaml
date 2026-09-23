@@ -12,10 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4         # checkout the repo
+      - uses: pnpm/action-setup@v4        # install pnpm (versión leída de package.json)
+        with:
+          package_json_file: server/package.json
       - name: Install dependencies        # install dependencies
-        run: yarn install --frozen-lockfile
-      - run: yarn build                   # install packages
-      - run: yarn test:ci                 # run tests (configured to use jest-junit reporter)
+        run: pnpm install --frozen-lockfile
+      - run: pnpm run build                # install packages
+      - run: pnpm run test:ci              # run tests (configured to use jest-junit reporter)
       - name: Jest Coverage Comment
         uses: MishaKav/jest-coverage-comment@main
         with:
