@@ -103,16 +103,10 @@
             })
           "
         >
-          <img
-            :src="
-              item.git?.repository?.admin == true
-                ? '/img/icons/hexagon3.svg'
-                : '/img/icons/hexagon3-empty-bold-tp.svg'
-            "
-            alt="Pipeline"
-            width="40"
-            height="40"
-          />
+          <v-icon
+            size="38"
+            color="primary"
+          >{{ item.git?.repository?.admin == true ? 'mdi-source-fork' : 'mdi-source-branch' }}</v-icon>
         </v-col>
         <v-col
           cols="12"
@@ -318,9 +312,9 @@ export default defineComponent({
         text: "Do you want to delete this pipeline? This action cannot be undone. It will delete all the apps and data associated with this pipeline.",
         icon: "question",
         showCancelButton: true,
-        confirmButtonText: "Delete",
-        cancelButtonText: "Cancel",
-        confirmButtonColor: "rgb(var(--v-theme-kubero))",
+        confirmButtonText: this.$t('global.delete'),
+        cancelButtonText: this.$t('global.cancel'),
+        confirmButtonColor: "rgb(var(--v-theme-primary))",
         background: "rgb(var(--v-theme-cardBackground))",
         /*background: "rgb(var(--v-theme-on-surface-variant))",*/
         color:

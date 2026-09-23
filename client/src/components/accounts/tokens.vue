@@ -48,39 +48,6 @@
       </template>
     </v-data-table>
 
-    <!-- Button to add a token 
-    <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
-      <v-btn
-        fab
-        color="primary"
-        style="margin-right: 6px;"
-        @click="openCreateDialog"
-      >
-        <v-icon>mdi-plus</v-icon>
-        <span class="sr-only">Create Token</span>
-      </v-btn>
-    </div>
-
-    <!-- Dialog for a new Token 
-    <v-dialog v-model="createDialog" max-width="500px">
-      <v-card>
-        <v-card-title>Create Token</v-card-title>
-        <v-card-text>
-          <v-text-field v-model="newToken.name" label="Name"></v-text-field>
-          <v-text-field
-            v-model="newToken.expiresAt"
-            label="Expires At (ISO)"
-            type="datetime-local"
-          ></v-text-field>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn text @click="createDialog = false">Abort</v-btn>
-          <v-btn color="primary" @click="saveCreate">Create</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-  -->
   </v-container>
 </template>
 
@@ -142,21 +109,6 @@ export default defineComponent({
       }
     }
 
-    const openCreateDialog = () => {
-      newToken.value = { token: '', name: '', expiresAt: '', userId: '' }
-      createDialog.value = true
-    }
-
-    const saveCreate = async () => {
-      try {
-        await axios.post('/api/tokens', newToken.value)
-        await loadTokens()
-        createDialog.value = false
-      } catch (e) {
-        console.error('Error creating token:', e)
-      }
-    }
-
     onMounted(() => {
       loadTokens()
     })
@@ -166,11 +118,7 @@ export default defineComponent({
       headers,
       loading,
       search,
-      createDialog,
-      newToken,
       deleteToken,
-      openCreateDialog,
-      saveCreate,
       writeUserPermission,
     }
   },

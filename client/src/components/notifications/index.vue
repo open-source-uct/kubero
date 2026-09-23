@@ -142,8 +142,8 @@
 
     <!-- Edit Dialog -->
     <v-dialog v-model="editDialog" max-width="800px">
-      <v-card>
-        <v-card-title>{{$t('notifications.actions.edit')}}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{$t('notifications.actions.edit')}}</v-card-title>
         <v-card-text v-if="editedNotification">
           <v-form ref="editForm">
             <v-row>
@@ -243,8 +243,8 @@
 
     <!-- Create Dialog -->
     <v-dialog v-model="createDialog" max-width="800px">
-      <v-card>
-        <v-card-title>{{$t('notifications.actions.create')}}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{$t('notifications.actions.create')}}</v-card-title>
         <v-card-text>
           <v-form ref="createForm">
             <v-row>

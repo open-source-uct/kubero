@@ -101,8 +101,8 @@
       </v-btn>
     </div>
     <v-dialog v-model="editDialog" max-width="600px">
-      <v-card>
-        <v-card-title>{{ $t('podsizes.actions.edit') }}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{ $t('podsizes.actions.edit') }}</v-card-title>
         <v-card-text v-if="editedPodsize">
           <v-text-field v-model="editedPodsize.name" :label="$t('podsizes.form.name')"></v-text-field>
           <v-text-field v-model="editedPodsize.description" :label="$t('podsizes.form.description')"></v-text-field>
@@ -124,11 +124,11 @@
       </v-card>
     </v-dialog>
     <v-dialog v-model="createDialog" max-width="600px">
-      <v-card>
-        <v-card-title>{{ $t('podsizes.actions.create') }}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{ $t('podsizes.actions.create') }}</v-card-title>
         <v-card-text>
           <v-text-field v-model="newPodsize.name" :label="$t('podsizes.form.name')"></v-text-field>
-          <v-text-field v-model="newPodsize.description" :label="$t('podsizes.form.name')"></v-text-field>
+          <v-text-field v-model="newPodsize.description" :label="$t('podsizes.form.description')"></v-text-field>
           <v-text-field v-model="newPodsize.resources.requests.cpu" :label="$t('podsizes.form.cpuRequest')"></v-text-field>
           <v-text-field v-model="newPodsize.resources.requests.memory" :label="$t('podsizes.form.memoryRequest')"></v-text-field>
           <v-text-field v-model="newPodsize.resources.limits.cpu" :label="$t('podsizes.form.cpuLimit')"></v-text-field>

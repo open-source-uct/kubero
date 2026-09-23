@@ -201,8 +201,10 @@
     >
       <v-card
         min-width="400"
+        color="cardBackground"
+        class="uct-card"
         prepend-icon="mdi-information-outline"
-        title="Version and Features"
+        :title="$t('navigation.aboutKubero')"
       >
         <v-card-text>
             <v-row dense>
@@ -270,7 +272,7 @@
         <template v-slot:actions>
           <v-btn
             class="ms-auto"
-            text="Ok"
+            :text="$t('global.close')"
             @click="debugDialog = false"
           ></v-btn>
         </template>

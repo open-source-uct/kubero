@@ -1,10 +1,5 @@
 import { createI18n } from 'vue-i18n'
 import en from '../locale/en'
-import ja from '../locale/ja'
-import de from '../locale/de'
-import zhHans from '../locale/zhHans'
-import deCH from '../locale/de-CH'
-import pt from '../locale/pt'
 import es from '../locale/es'
 
 // Get saved locale from localStorage or default to 'de'
@@ -16,11 +11,6 @@ const i18n = createI18n({
   fallbackLocale: 'en',
   messages: {
     en: en,
-    ja: ja,
-    de: de,
-    zhHans: zhHans,
-    'de-CH': deCH,
-    pt: pt,
     es: es,
   },
 })

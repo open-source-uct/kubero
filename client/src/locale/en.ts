@@ -3,6 +3,7 @@ import { en } from 'vuetify/locale'
 
 const messages = {
       navigation: {
+    aboutKubero: 'About Kubero',
         pipelines: 'Pipelines',
         templates: 'Templates',
         activity: 'Activity',
@@ -289,6 +290,7 @@ const messages = {
         },
       },
       user: {
+    active: 'Active',
         name: 'User',
         email: 'E-Mail',
         username: 'Username',

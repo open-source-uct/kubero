@@ -25,20 +25,18 @@
             <div v-if="showButtons">
               <v-divider class="my-3"></v-divider>
               <v-btn
-                depressed
                 variant="text"
                 color="primary"
                 @click="editAddon(addon)"
               >
-                edit
+                {{ $t('global.edit') }}
               </v-btn>
               <v-btn
-                depressed
                 variant="text"
-                color="red"
+                color="error"
                 @click="deleteAddon(addon)"
               >
-                delete
+                {{ $t('global.delete') }}
               </v-btn>
             </div>
           </div>
@@ -72,9 +70,9 @@
           <span class="text-subtitle-1 font-weight-medium mt-2 text-primary">Add Addon</span>
         </v-card>
       </template>
-      <v-card>
+      <v-card color="cardBackground" class="uct-card">
         <v-card-title v-if="mode==='create'">
-          <span class="text-h5">Addon</span>
+          <span class="text-h6 font-weight-bold">Addon</span>
         </v-card-title>
         <v-card-title v-if="mode==='edit'">
           <v-container class="pb-0">
@@ -190,19 +188,18 @@
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn
-            color="blue darken-1"
             variant="text"
             @click="dialog = false; selectedAddon = {} as Addon"
           >
-            Close
+            {{ $t('global.close') }}
           </v-btn>
           <v-btn
-            color="blue darken-1"
-            variant="text"
+            color="primary"
+            variant="flat"
             :disabled="!valid"
             @click="submitForm"
           >
-            Save
+            {{ $t('global.save') }}
           </v-btn>
         </v-card-actions>
       </v-card>

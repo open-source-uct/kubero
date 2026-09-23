@@ -68,33 +68,33 @@
             v-model="dialog"
             max-width="890"
             >
-            <v-card>
+            <v-card color="cardBackground" class="uct-card">
                 <v-card-item>
-                    <v-card-title class="text-h5">
+                    <v-card-title class="text-h6 font-weight-bold">
                         {{clickedAddon.displayName}} ({{clickedAddon.kind}})
                     </v-card-title>
                     <v-card-text>
                         <v-container>
                         {{clickedAddon.description}}
                         <br/>
-                        <h3>Maintainers</h3>
+                        <h3 class="mt-3">Maintainers</h3>
                         <ul>
                             <li v-for="maintainer in clickedAddon.maintainers" :key="maintainer.name">{{ maintainer.name }} <a :href="maintainer.url">{{ maintainer.url }}</a></li>
                         </ul>
                         <br/>
-                        <h3>Links</h3>
+                        <h3 class="mt-3">Links</h3>
                         <ul>
                             <li v-for="link in clickedAddon.links" :key="link.url"><a :href="link.url">{{ link.name }}</a></li>
                         </ul>
                         </v-container>
                     </v-card-text>
                     <v-card-text>
-                        <pre>{{clickedAddon.install}}</pre>
+                        <pre >{{clickedAddon.install}}</pre>
                         <v-btn
                             color="primary"
                             @click="copyInstall(clickedAddon.install)"
                             >
-                            copy
+                            {{ $t('global.copy') }}
                             <v-icon
                                 right
                                 color="white"
@@ -105,6 +105,15 @@
 
                     </v-card-text>
                 </v-card-item>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn
+                        variant="text"
+                        @click="dialog = false"
+                    >
+                        {{ $t('global.close') }}
+                    </v-btn>
+                </v-card-actions>
             </v-card>
         </v-dialog>
 

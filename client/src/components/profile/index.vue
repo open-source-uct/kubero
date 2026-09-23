@@ -41,8 +41,8 @@
             ></v-select>
           </div>
           <v-dialog v-model="editAvatarDialog" max-width="400px">
-            <v-card>
-              <v-card-title>{{ $t('profile.avatar.edit') }}</v-card-title>
+            <v-card color="cardBackground" class="uct-card">
+              <v-card-title class="text-h6 font-weight-bold">{{ $t('profile.avatar.edit') }}</v-card-title>
               <v-card-text>
                 <v-alert type="warning" density="compact" class="mb-2">
                   {{ $t('profile.avatar.limitMessage') }}
@@ -130,8 +130,8 @@
             </tbody>
           </v-table>
           <v-dialog v-model="editProfileDialog" max-width="500px">
-            <v-card>
-              <v-card-title>{{ $t('profile.actions.editProfile') }}</v-card-title>
+            <v-card color="cardBackground" class="uct-card">
+              <v-card-title class="text-h6 font-weight-bold">{{ $t('profile.actions.editProfile') }}</v-card-title>
               <v-card-text>
                 <v-alert
                   v-show="profileError"
@@ -170,8 +170,8 @@
             </v-card>
           </v-dialog>
           <v-dialog v-model="changePasswordDialog" max-width="500px">
-            <v-card>
-              <v-card-title>{{ $t('user.changePassword') }}</v-card-title>
+            <v-card color="cardBackground" class="uct-card">
+              <v-card-title class="text-h6 font-weight-bold">{{ $t('user.changePassword') }}</v-card-title>
               <v-card-text>
                 <v-alert
                   v-show="passwordError"
@@ -268,8 +268,8 @@
             </tbody>
           </v-table>
           <v-dialog v-model="createDialog" max-width="500px">
-            <v-card>
-              <v-card-title>{{ $t('profile.token.create') }}</v-card-title>
+            <v-card color="cardBackground" class="uct-card">
+              <v-card-title class="text-h6 font-weight-bold">{{ $t('profile.token.create') }}</v-card-title>
               <v-card-text>
                 <v-text-field v-model="newToken.name" :label="$t('global.name')"></v-text-field>
                 <v-text-field
@@ -286,8 +286,8 @@
             </v-card>
           </v-dialog>
           <v-dialog v-model="tokenDialog" max-width="500px">
-            <v-card>
-              <v-card-title>{{ $t('profile.token.details') }}</v-card-title>
+            <v-card color="cardBackground" class="uct-card">
+              <v-card-title class="text-h6 font-weight-bold">{{ $t('profile.token.details') }}</v-card-title>
               <v-card-text>
                 <v-alert type="warning" density="compact" class="mb-2" v-html="$t('profile.token.warningMessage')">
                 </v-alert>
@@ -344,13 +344,7 @@ export default defineComponent({
     
     const availableLanguages = ref([
       { code: 'en', name: 'English' },
-      { code: 'de', name: 'Deutsch' },
       { code: 'es', name: 'Español' },
-      //{ code: 'fr', name: 'Français' },
-      { code: 'de-CH', name: 'Schwizerdütsch' },
-      { code: 'ja', name: '日本語' },
-      { code: 'zhHans', name: '简体中文' },
-      { code: 'pt', name: 'Português' },
     ])
     
     const user = ref<any>({

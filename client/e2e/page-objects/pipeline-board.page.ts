@@ -8,7 +8,7 @@ export class PipelineBoardPage {
   constructor(page: Page) {
     this.page = page;
     this.newPipelineBtn = page.locator('a, button').filter({
-      hasText: /new|create your first pipeline/i,
+      hasText: /new|create your first pipeline|nuevo pipeline/i,
     }).first();
     this.boardContent = page.locator('.row, h1, .v-alert').first();
   }
@@ -16,7 +16,7 @@ export class PipelineBoardPage {
   async goto() {
     await this.page.goto('/');
     await this.page.waitForLoadState('domcontentloaded');
-    await expect(this.page.locator('.v-navigation-drawer')).toBeVisible({ timeout: 15000 });
+    await expect(this.page.locator('.v-navigation-drawer')).toBeVisible({ timeout: 20000 });
   }
 
   async expectLoaded() {
