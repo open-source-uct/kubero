@@ -1,13 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaClient, User as PrismaUser } from '@prisma/client';
 import { AuthService } from '../auth/auth.service';
+import { UsersService } from '../users/users.service';
+import { RolesService } from '../roles/roles.service';
 
 @Injectable()
 export class TokenService {
   private readonly prisma = new PrismaClient();
   private logger = new Logger(TokenService.name);
 
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private usersService: UsersService,
+    private rolesService: RolesService,
+  ) {}
   async findAll(): Promise<any[]> {
     return this.prisma.token.findMany({
       select: {
@@ -32,9 +38,6 @@ export class TokenService {
     name: string,
     expiresAt: string,
     userId: string,
-    username: string,
-    role: string,
-    userGroups: any,
   ): Promise<{
     name: string;
     token: string;
@@ -43,19 +46,41 @@ export class TokenService {
     if (!name || !expiresAt || !userId) {
       throw new Error('Invalid token data');
     }
+
+    // se leen el rol, los equipos y los permisos actuales del usuario desde
+    // la base de datos, en vez de confiar en los datos de su sesión (que
+    // pueden estar desactualizados si su rol o sus equipos cambiaron después
+    // de haber iniciado sesión)
+    // se castea a any porque findById() incluye relaciones (role, userGroups)
+    // que el tipo Partial<PrismaUser> no declara
+    const user = (await this.usersService.findById(userId)) as any;
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const role = user.role?.name || 'guest';
+    const userGroups = user.userGroups || [];
+    const permissions = await this.rolesService.getPermissions(user.role?.id);
+    const permissionStrings = permissions.map(
+      (p: any) => `${p.resource}:${p.action}`,
+    );
+
     //create a new JWT Token
     const token = await this.authService.generateToken(
       userId,
-      username,
+      user.username,
       role,
-      userGroups,
+      userGroups.map((group: any) => group.name),
+      permissionStrings,
+      expiresAt,
     );
 
-    // transoform userGroups to a string 
-    const userGroupsString = userGroups.map((group: any) => group.name).join(',');
+    const userGroupsString = userGroups
+      .map((group: any) => group.name)
+      .join(',');
     const newToken = {
       name: name || '', // Optional name field
-      role: role || 'guest', // Default to 'user' if not provided
+      role: role,
       groups: userGroupsString || '', // Store user groups as a string
       expiresAt: new Date(expiresAt),
       user: {

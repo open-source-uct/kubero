@@ -66,7 +66,7 @@
             v-model="access.teams"
             :label="$t('pipeline.form.label.teamAccess')"
             hint="Select teams that have access to this pipeline"
-            :items="authStore.userGroups"
+            :items="isAdmin ? allTeams : authStore.userGroups"
             :rules="teamRules"
           ></v-combobox>
         </v-col>
@@ -280,6 +280,9 @@ export default defineComponent({
       access: {
         teams: [] as string[],
       },
+      // todos los equipos que existen (para que un admin pueda asignar
+      // cualquiera, no solo los suyos); solo se carga si es admin
+      allTeams: [] as string[],
       authStore,
       showEnvValues: false,
       breadcrumbItems: [
@@ -380,11 +383,22 @@ export default defineComponent({
     mounted() {
       this.getContextList();
       this.loadPipeline();
+      if (this.isAdmin) {
+        this.loadTeams();
+      }
     },
     components: {
         Breadcrumbs,
     },
     methods: {
+      loadTeams() {
+        axios.get('/api/groups').then((response) => {
+          this.allTeams = response.data.map((group: any) => group.name);
+        }).catch(() => {
+          // si falla, el combobox queda igual que antes (solo los equipos propios)
+          this.allTeams = [];
+        });
+      },
       getContextList() {
         axios.get('/api/kubernetes/contexts').then(response => {
           for (let i = 0; i < response.data.length; i++) {
