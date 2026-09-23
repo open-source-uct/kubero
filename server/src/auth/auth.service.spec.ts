@@ -167,6 +167,47 @@ describe('AuthService', () => {
     });
   });
 
+  describe('generateToken', () => {
+    it('should embed the given permissions instead of an empty array', async () => {
+      await service.generateToken('1', 'test', 'student', ['students'], [
+        'app:write',
+      ]);
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        {
+          userId: '1',
+          username: 'test',
+          role: 'student',
+          userGroups: ['students'],
+          permissions: ['app:write'],
+          strategy: 'token',
+        },
+        expect.objectContaining({ expiresIn: 36000 }),
+      );
+    });
+
+    it('should set expiresIn based on the given expiresAt date instead of the default session length', async () => {
+      const expiresAt = new Date(Date.now() + 60_000).toISOString(); // 1 minuto
+      await service.generateToken(
+        '1',
+        'test',
+        'student',
+        ['students'],
+        [],
+        expiresAt,
+      );
+      const options = jwtService.sign.mock.calls[0][1];
+      expect(options.expiresIn).toBeGreaterThan(0);
+      expect(options.expiresIn).toBeLessThanOrEqual(60);
+    });
+
+    it('should reject an expiresAt date in the past', async () => {
+      const expiresAt = new Date(Date.now() - 60_000).toISOString();
+      await expect(
+        service.generateToken('1', 'test', 'student', [], [], expiresAt),
+      ).rejects.toThrow(HttpException);
+    });
+  });
+
   describe('getSession', () => {
     it('should return session info', async () => {
       const result = await service.getSession(true);
