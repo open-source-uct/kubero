@@ -43,7 +43,7 @@
       <template v-slot:expanded-row="{ columns, item }">
         <tr>
           <td :colspan="columns.length" style="padding:0;">
-            <v-card class="ma-2 pa-2" outlined color="cardBackground">
+            <v-card class="ma-2 pa-2 uct-card" color="cardBackground">
               <v-row>
                 <v-col cols="12" md="6">
                   <v-list density="compact" style="background: inherit;">

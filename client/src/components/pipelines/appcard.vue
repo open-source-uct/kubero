@@ -1,9 +1,8 @@
 <template>
 <v-card
     :loading="loadingState"
-    class="mt-5 mx-1"
-    outlined
-    elevation="2"
+    class="mt-4 mx-1 uct-card"
+    elevation="1"
     color="cardBackground"
     style="max-width: 600px;"
     v-if="deleted === false"
@@ -17,38 +16,47 @@
       ></v-progress-linear>
     </template>
 
-    <v-card-title class="d-flex align-center">
-      <img
-        :src="(app.deploymentstrategy != 'docker') ? '/img/icons/hexagon1.svg' : '/img/icons/hexagon1-empty-bold-tp.svg'"
-        alt="app icon"
-        style="width: 35px; height: 35px; margin-right: 10px;"
-      >
-      <router-link :to="{ name: 'App Dashboard', params: { pipeline: pipeline, phase: phase, app: app.name }}">{{ app.name }}</router-link>
+    <v-card-title class="d-flex align-center py-3">
+      <v-icon
+        start
+        size="default"
+        :color="(app.deploymentstrategy != 'docker') ? 'primary' : 'info'"
+        class="mr-2"
+      >{{ (app.deploymentstrategy != 'docker') ? 'mdi-git' : 'mdi-docker' }}</v-icon>
+      <router-link
+        class="font-weight-bold"
+        :to="{ name: 'App Dashboard', params: { pipeline: pipeline, phase: phase, app: app.name }}"
+      >{{ app.name }}</router-link>
     </v-card-title>
 
-    <v-card-text>
+    <v-card-text class="pt-0">
         <v-row
             v-if="app.deploymentstrategy != 'docker'"
-            class="mx-0 my-1"
+            class="mx-0 my-1 align-center"
         >
-            <v-icon start style="vertical-align:baseline" color="kubero">mdi-git</v-icon>
-            <div class="grey--text text-subtitle-1">
+            <v-icon start size="small" color="primary">mdi-source-branch</v-icon>
+            <div class="text-caption text-medium-emphasis text-truncate" style="max-width: 90%;">
                 {{ app.gitrepo.ssh_url }}
             </div>
         </v-row>
         <v-row
             v-if="app.deploymentstrategy == 'docker'"
-            class="mx-0 my-1"
+            class="mx-0 my-1 align-center"
         >
-            <v-icon start x-small color="kubero">mdi-docker</v-icon>
-            <div class="grey--text text-subtitle-1">
+            <v-icon start size="small" color="info">mdi-docker</v-icon>
+            <div class="text-caption text-medium-emphasis text-truncate" style="max-width: 90%;">
                 {{ app.image.repository }}:{{ app.image.tag }}
             </div>
         </v-row>
-        <p></p>
-        <v-chip label class="mr-1" v-if="app.deploymentstrategy != 'docker'"><span v-if="autodeploy">Autodeploy | </span>{{ app.branch }}</v-chip>
-        <v-chip label class="mr-1" v-if="app.deploymentstrategy != 'docker' && app.commithash">{{ app.commithash }}</v-chip>
 
+        <div class="d-flex flex-wrap align-center mt-2">
+            <v-chip size="small" label variant="tonal" color="primary" class="mr-1" v-if="app.deploymentstrategy != 'docker'">
+                <span v-if="autodeploy">Autodeploy | </span>{{ app.branch }}
+            </v-chip>
+            <v-chip size="small" label variant="tonal" color="secondary" class="mr-1 uct-code" v-if="app.deploymentstrategy != 'docker' && app.commithash">
+                {{ app.commithash }}
+            </v-chip>
+        </div>
     </v-card-text>
 
     <table style="width: 100%;" v-if="vulnSummary.unknown != undefined">
@@ -65,37 +73,37 @@
     </table>
 
     <v-divider></v-divider>
-    <v-card-text v-if="metricsDisplay == 'bars'">
+    <v-card-text v-if="metricsDisplay == 'bars'" class="py-2">
       <v-row>
-        <v-col cols="6" class="pb-0 text-left text-caption font-weight-light">{{ $t('app.cpu') }}</v-col>
-        <v-col cols="6" class="pb-0 text-right text-caption font-weight-light">{{ $t('app.memory') }}</v-col>
+        <v-col cols="6" class="pb-1 text-left uct-label">{{ $t('app.cpu') }}</v-col>
+        <v-col cols="6" class="pb-1 text-right uct-label">{{ $t('app.memory') }}</v-col>
       </v-row>
-      <v-row v-for="metric in metrics" :key="metric.name" style="height:20px">
-        <v-col cols="6" class="text-left"><v-progress-linear :value="metric.cpu.percentage" color="#8560A9" class="mr-6 float-left"></v-progress-linear></v-col>
-        <v-col cols="6" class="text-right"><v-progress-linear :value="metric.memory.percentage" color="#8560A9" class="float-left" ></v-progress-linear></v-col>
+      <v-row v-for="metric in metrics" :key="metric.name" style="height:20px" class="my-1">
+        <v-col cols="6" class="text-left py-0"><v-progress-linear :value="metric.cpu.percentage" color="primary" class="mr-2 float-left" rounded></v-progress-linear></v-col>
+        <v-col cols="6" class="text-right py-0"><v-progress-linear :value="metric.memory.percentage" color="accent" class="float-left" rounded></v-progress-linear></v-col>
       </v-row>
     </v-card-text>
-    <v-card-text v-if="metricsDisplay == 'table'">
+    <v-card-text v-if="metricsDisplay == 'table'" class="py-2">
       <v-row>
-        <v-col cols="8" class="pb-0 text-left text-caption font-weight-light">{{ $t('app.pod') }}</v-col>
-        <v-col cols="2" class="pb-0 text-left text-caption font-weight-light">{{ $t('app.cpu') }}</v-col>
-        <v-col cols="2" class="pb-0 text-right text-caption font-weight-light">{{ $t('app.memory') }}</v-col>
+        <v-col cols="8" class="pb-1 text-left uct-label">{{ $t('app.pod') }}</v-col>
+        <v-col cols="2" class="pb-1 text-left uct-label">{{ $t('app.cpu') }}</v-col>
+        <v-col cols="2" class="pb-1 text-right uct-label">{{ $t('app.memory') }}</v-col>
       </v-row>
       <v-row v-for="metric in metrics" :key="metric.name" id="metrics">
-        <v-col cols="8" class="py-0 text-left">{{metric.name}}</v-col>
-        <v-col cols="2" class="py-0 text-left"><span style="white-space: nowrap;">{{metric.cpu.usage}}{{metric.cpu.unit}}</span></v-col>
-        <v-col cols="2" class="py-0 text-right"><span style="white-space: nowrap;">{{metric.memory.usage}}{{metric.memory.unit}}</span></v-col>
+        <v-col cols="8" class="py-1 text-left uct-code">{{metric.name}}</v-col>
+        <v-col cols="2" class="py-1 text-left uct-code"><span style="white-space: nowrap;">{{metric.cpu.usage}}{{metric.cpu.unit}}</span></v-col>
+        <v-col cols="2" class="py-1 text-right uct-code"><span style="white-space: nowrap;">{{metric.memory.usage}}{{metric.memory.unit}}</span></v-col>
       </v-row>
     </v-card-text>
     <v-divider></v-divider>
 
     <span v-if="app.addons.length > 0">
-    <v-card-text>
+    <v-card-text class="py-2">
       <v-avatar
-        rounded
+        rounded="sm"
         v-for="addon in app.addons" :key="addon.id"
-        class="pa-2"
-        color="gray lighten-5"
+        class="pa-1 mr-1"
+        color="secondary"
         :image="addon.icon"
         :alt="addon.displayName">
       </v-avatar>
@@ -104,11 +112,12 @@
     </span>
 
 
-    <v-card-actions class="ml-2">
+    <v-card-actions class="px-3 py-2">
         <v-btn
             title="Restart App"
-            color="deep-purple lighten-2"
+            color="primary"
             variant="text"
+            size="small"
             :disabled="!authStore.hasPermission('reboot:ok')"
             @click="restartApp()"
         >
@@ -116,8 +125,9 @@
         </v-btn>
         <v-btn
             title="Details"
-            color="deep-purple lighten-2"
+            color="primary"
             variant="text"
+            size="small"
             :disabled="!authStore.hasPermission('app:read') && !authStore.hasPermission('app:write')"
             :to="{ name: 'App Dashboard', params: { pipeline: pipeline, phase: phase, app: app.name }}"
         >
@@ -125,8 +135,9 @@
         </v-btn>
         <v-btn
             title="Edit"
-            color="deep-purple lighten-2"
+            color="primary"
             variant="text"
+            size="small"
             :disabled="!authStore.hasPermission('app:write')"
             :to="{ name: 'App Form', params: { pipeline: pipeline, phase: phase, app: app.name }}"
         >
@@ -135,8 +146,9 @@
         <v-btn
             title="Open App"
             v-if="app.ingress.hosts.length > 0"
-            color="deep-purple lighten-2"
+            color="primary"
             variant="text"
+            size="small"
             :href="'//'+app.ingress?.hosts[0].host" target="_blank"
         >
             <v-icon>mdi-open-in-new</v-icon>
@@ -144,8 +156,9 @@
         <v-spacer></v-spacer>
         <v-btn
             title="Delete App"
-            depressed
-            color="deep-purple lighten-2"
+            variant="text"
+            color="error"
+            size="small"
             :disabled="!authStore.hasPermission('app:write')"
             @click="deleteApp()"
         >
@@ -357,17 +370,17 @@ export default defineComponent({
 }
 
 #metrics:nth-child(even) {
-  background-color: rgba(133, 96, 169, .1);
+  background-color: rgba(var(--v-theme-primary), .04);
 }
 #metrics:nth-child(odd) {
-  background-color: rgba(133, 96, 169, .2);
+  background-color: rgba(var(--v-theme-primary), .08);
 }
 
 .theme--light#metrics:nth-child(odd) {
-  background-color: rgba(133, 96, 169, .2);
+  background-color: rgba(var(--v-theme-primary), .08);
 }
 .theme--dark#metrics:nth-child(odd) {
-  background-color: rgba(133, 96, 169, .2);
+  background-color: rgba(var(--v-theme-primary), .12);
 }
 </style>
 

@@ -5,6 +5,21 @@
       permanent
       :rail="rail"
   >
+    <!-- Cabecera Institucional UCT -->
+    <div class="nav-brand-header py-3 px-2 text-center">
+      <router-link to="/" class="d-block">
+        <v-img
+          src="@/assets/logouct-header.png"
+          max-height="42"
+          max-width="170"
+          class="mx-auto"
+          alt="UCT PaaS"
+          contain
+        ></v-img>
+      </router-link>
+    </div>
+    <v-divider></v-divider>
+
     <v-list class="profile-dark-bg">
       <v-list-item
         link to="/profile"
@@ -41,7 +56,7 @@
 
     <v-divider></v-divider>
 
-    <v-list nav density="compact">
+    <v-list nav density="compact" active-color="primary">
         <v-list-item 
             link to="/"
             prepend-icon="mdi-server"

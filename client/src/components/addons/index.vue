@@ -12,7 +12,8 @@
                 <v-card
                     :disabled="!addon.enabled"
                     style="padding-bottom: 40px;"
-                    color="cardBackground">
+                    color="cardBackground"
+                    class="uct-card">
                     <v-list-item class="justify-center">
                         <div  class="d-flex justify-center" style="margin-top: 20px;">
                             <v-avatar

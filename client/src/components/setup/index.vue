@@ -1,13 +1,25 @@
 <template>
-  <v-row
-      align="center"
-      justify="space-around"
-  >
+  <v-container class="py-8">
+    <div class="text-center mb-6">
+      <v-img
+        src="@/assets/logouct-header.png"
+        max-height="60"
+        max-width="240"
+        class="mx-auto mb-2"
+        alt="Universidad Católica de Temuco"
+      ></v-img>
+      <div class="uct-section-title">Asistente de Configuración Inicial · Kubero</div>
+      <div class="text-caption text-medium-emphasis">Facultad de Ingeniería · UCT</div>
+    </div>
+    <v-row
+        align="center"
+        justify="space-around"
+    >
         <v-stepper 
           v-model="step"
-          elevation="10"
-          class="ma-10"
-          width="800px">
+          elevation="3"
+          class="ma-2 uct-card"
+          width="850px">
 
 
           <template v-slot:default="{ prev, next }" >
@@ -316,7 +328,8 @@
           </template>
 
         </v-stepper>
-  </v-row>
+    </v-row>
+  </v-container>
 </template>
 
 <script lang="ts">

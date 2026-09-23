@@ -413,9 +413,9 @@ export default defineComponent({
 
     const getTypeColor = (type: string) => {
       switch (type) {
-        case 'slack': return 'purple'
-        case 'discord': return 'indigo'
-        case 'webhook': return 'blue'
+        case 'slack': return 'primary'
+        case 'discord': return 'info'
+        case 'webhook': return 'secondary'
         default: return 'grey'
       }
     }

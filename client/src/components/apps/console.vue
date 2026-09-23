@@ -63,6 +63,14 @@ let termOptions = {
     rows: 40,
     cursorBlink: true,
     cursorInactiveStyle: 'underline',
+    fontFamily: '"Fira Code", SFMono-Regular, Menlo, Consolas, monospace',
+    fontSize: 13,
+    theme: {
+        background: '#0B1119',
+        foreground: '#E2E8F0',
+        cursor: '#0090DC',
+        selectionBackground: 'rgba(0, 144, 220, 0.3)',
+    }
 } as ITerminalOptions;
 
 const term = new Terminal(termOptions);

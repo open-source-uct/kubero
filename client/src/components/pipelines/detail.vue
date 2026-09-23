@@ -15,18 +15,21 @@
     <v-container :fluid="true">
         <!--<h1>{{ pipeline }}</h1>-->
         <v-layout>
-                <v-row>
-                    <v-col v-for="phase in activePhases" :key="phase.name">
-                        <h4 class="text-uppercase ml-1">{{ $t(`pipeline.phases.${phase.name}`) }}</h4>
-                        <v-chip
-                            class="ma-1"
-                            label
-                            size="small"
+                <v-row class="pipeline-board-row flex-nowrap" style="overflow-x: auto;">
+                    <v-col v-for="phase in activePhases" :key="phase.name" class="pipeline-phase-column" style="min-width: 360px; max-width: 420px;">
+                        <div class="d-flex align-center justify-space-between mb-2">
+                            <span class="uct-section-title">{{ $t(`pipeline.phases.${phase.name}`) }}</span>
+                            <v-chip
+                                class="ma-0"
+                                label
+                                size="x-small"
+                                color="primary"
+                                variant="tonal"
                             >
-                            <v-icon icon="mdi-kubernetes" start></v-icon>
-                            {{phase.context}}
-                        </v-chip>
-
+                                <v-icon icon="mdi-kubernetes" start size="small"></v-icon>
+                                {{ phase.context }}
+                            </v-chip>
+                        </div>
 
                         <Appcard v-for="app in phase.apps" :key="app.name"
                             :pipeline="pipeline"
@@ -38,20 +41,20 @@
                                 :pipeline="pipeline"
                                 :pullrequest="pr" />
                         </span>
-                        <div>
+                        <div class="mt-4 text-center">
                             <v-btn
-                            elevation="2"
-                            icon="mdi-plus"
-                            :to="{ name: 'App Form', params: { phase: phase.name, pipeline: pipeline, app: 'new'}}"
-                            class="mt-5 navBG"
-                            color="secondary"
-                            size="small"
-                            style="margin-bottom: 5px;"
+                                elevation="0"
+                                variant="tonal"
+                                prepend-icon="mdi-plus"
+                                :to="{ name: 'App Form', params: { phase: phase.name, pipeline: pipeline, app: 'new'}}"
+                                color="primary"
+                                size="small"
+                                class="w-100"
                             >
+                                {{ $t('app.buttons.new') || 'Nueva App' }}
                             </v-btn>
                         </div>
                     </v-col>
-
                 </v-row>
         </v-layout>
     </v-container>

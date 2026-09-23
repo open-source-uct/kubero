@@ -46,24 +46,24 @@
           class="empty"
           width="100%"
           style="
-            max-width: 500px;
-            filter: invert(39%) sepia(47%) saturate(584%) hue-rotate(228deg)
-              brightness(95%) contrast(80%);
+            max-width: 480px;
+            filter: brightness(0) saturate(100%) invert(32%) sepia(90%) saturate(1450%) hue-rotate(180deg) brightness(92%) contrast(101%);
           "
         />
 
-        <h1 style="font-size: 3em">👋 Welcome to Kubero!</h1>
-        <p>
-          Congratulations on successfully installing Kubero! We're glad to have
-          you on board.
+        <h1 style="font-size: 2.25rem" class="font-weight-bold mb-2">👋 ¡Bienvenido a Kubero PaaS UCT!</h1>
+        <p class="text-body-1 text-medium-emphasis">
+          Plataforma de despliegues y gestión de contenedores de la Universidad Católica de Temuco.
         </p>
         <br />
 
         <v-btn
-          elevation="2"
+          elevation="1"
           color="primary"
+          size="large"
+          class="font-weight-bold"
           :to="{ name: 'Pipeline Form', params: { pipeline: 'new' } }"
-          >Create your first pipeline</v-btn
+          >Crear primer pipeline</v-btn
         >
       </v-col>
     </v-row>
@@ -369,16 +369,14 @@ export default defineComponent({
 }
 .v-card a {
   text-decoration: none;
-  color: #8560a9 !important;
+  color: rgb(var(--v-theme-primary)) !important;
 }
 
 .connected {
   background-image: url("./../../../public/img/icons/connected.svg");
   background-size: contain;
   background-repeat: no-repeat;
-  filter: invert(39%) sepia(47%) saturate(584%) hue-rotate(228deg)
-    brightness(95%) contrast(80%);
-  /*filter: invert(93%) sepia(49%) saturate(7411%) hue-rotate(184deg) brightness(87%) contrast(90%);*/
+  filter: brightness(0) saturate(100%) invert(32%) sepia(90%) saturate(1450%) hue-rotate(180deg) brightness(92%) contrast(101%);
 }
 
 .connected::before {
@@ -396,9 +394,7 @@ export default defineComponent({
   background-image: url("./../../../public/img/icons/disconnected.svg");
   background-size: contain;
   background-repeat: no-repeat;
-  filter: invert(39%) sepia(47%) saturate(584%) hue-rotate(228deg)
-    brightness(95%) contrast(80%);
-  /*filter: invert(93%) sepia(49%) saturate(7411%) hue-rotate(184deg) brightness(87%) contrast(90%);*/
+  filter: brightness(0) saturate(100%) invert(60%) sepia(5%) saturate(300%) hue-rotate(180deg) brightness(90%) contrast(85%);
 }
 
 .disconnected::before {

@@ -64,7 +64,7 @@
         </v-container>
       </v-col>
       <v-col cols="12" md="6" lg="8">
-        <v-card color="cardBackground" class="pa-4">
+        <v-card color="cardBackground" class="pa-4 uct-card">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <h3>{{ $t('profile.titles.profileDetails') }}</h3>
             <div>
@@ -221,18 +221,18 @@
     </v-row>
     <v-row class="mt-6" >
       <v-col cols="12">
-        <v-card color="cardBackground" class="pa-4">
+        <v-card color="cardBackground" class="pa-4 uct-card">
           <h3 class="mb-4">API Tokens</h3>
           <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
             <v-btn
-              fab
+              variant="tonal"
               color="primary"
               style="margin-right: 6px;"
               @click="openCreateDialog"
               :disabled="!authStore.hasPermission('token:ok') && !authStore.hasPermission('token:write')"
             >
-              <v-icon>mdi-plus</v-icon>
-              <span class="sr-only">{{ $t('profile.token.create') }}</span>
+              <v-icon start>mdi-plus</v-icon>
+              {{ $t('profile.token.create') || 'Nuevo Token' }}
             </v-btn>
           </div>
           <v-table density="compact" class="profile-table">

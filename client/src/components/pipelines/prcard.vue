@@ -1,9 +1,8 @@
 <template>
 <v-card
     :loading="loadingState"
-    class="mt-5 ml-1 pullrequest"
-    outlined
-    elevation="0"
+    class="mt-4 ml-1 pullrequest uct-card"
+    elevation="1"
     color="cardBackground"
     v-if="deleted === false"
     style="max-width: 600px;"
@@ -16,54 +15,53 @@
       ></v-progress-linear>
     </template>
 
-    <v-card-text>
+    <v-card-text class="pt-3 pb-1">
       <v-list :prepend-avatar="pullrequest.user.avatar_url" bg-color="cardBackground">
-        <v-list-item>
-          <v-list-item-subtitle>{{ pullrequest.user.login }}</v-list-item-subtitle>
-          <v-list-item-title style="white-space: inherit; min-width: 250px;"><a :href="pullrequest.html_url" target="_blank">{{ pullrequest.title }}</a></v-list-item-title>
-          <!--
-          <v-list-item-subtitle><v-icon small>mdi-source-pull</v-icon>{{ this.pullrequest.updated_at }}</v-list-item-subtitle>
-          <v-list-item-subtitle><v-icon small>mdi-source-commit-start</v-icon>{{ this.pullrequest.created_at }}</v-list-item-subtitle>
-          -->
+        <v-list-item class="px-0">
+          <v-list-item-subtitle class="uct-label">{{ pullrequest.user.login }}</v-list-item-subtitle>
+          <v-list-item-title class="font-weight-bold" style="white-space: inherit; min-width: 250px;">
+            <a :href="pullrequest.html_url" target="_blank">{{ pullrequest.title }}</a>
+          </v-list-item-title>
         </v-list-item>
       </v-list>
     </v-card-text>
-    <v-card-subtitle class="pr-data mb-5">
-        <v-row>
-            <v-col>
-                <v-chip label class="mr-1"><span v-if="pullrequest.autodeploy">Autodeploy | </span>{{ pullrequest.branch }}</v-chip>
+    <v-card-subtitle class="pr-data mb-3 px-4">
+        <v-row align="center">
+            <v-col cols="12" sm="6">
+                <v-chip label size="small" variant="tonal" color="primary" class="mr-1">
+                  <span v-if="pullrequest.autodeploy">Autodeploy | </span>{{ pullrequest.branch }}
+                </v-chip>
             </v-col>
-            <v-col>
-                <v-icon small>mdi-source-commit-start</v-icon> {{ formatDate(pullrequest.created_at) }}<br>
-                <v-icon small>mdi-source-pull</v-icon> {{ formatDate(pullrequest.updated_at)}}
+            <v-col cols="12" sm="6" class="text-caption text-medium-emphasis">
+                <div><v-icon size="small" color="primary">mdi-source-commit-start</v-icon> {{ formatDate(pullrequest.created_at) }}</div>
+                <div><v-icon size="small" color="primary">mdi-source-pull</v-icon> {{ formatDate(pullrequest.updated_at)}}</div>
             </v-col>
         </v-row>
     </v-card-subtitle>
     <v-divider></v-divider>
     
-    <v-card-actions>
-
+    <v-card-actions class="px-3 py-1">
         <v-btn
             title="Start Review App"
             @click="startReviewApp()"
-            color="deep-purple lighten-2"
+            color="primary"
             variant="text"
+            size="small"
             v-if="!pullrequest.locked"
         >
-            <v-icon
-                >mdi-play-box-outline
-            </v-icon>
+            <v-icon start>mdi-play-box-outline</v-icon>
+            Lanzar Review App
         </v-btn>
         <v-btn
-            title="Start Review App"
-            color="deep-purple lighten-2"
+            title="Review App Bloqueada"
+            color="secondary"
             variant="text"
+            size="small"
             disabled
             v-if="pullrequest.locked"
         >
-            <v-icon
-                >mdi-play-box-lock-outline
-            </v-icon>
+            <v-icon start>mdi-play-box-lock-outline</v-icon>
+            Bloqueado
         </v-btn>
     </v-card-actions>
 </v-card>

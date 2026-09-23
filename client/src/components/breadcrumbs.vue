@@ -32,15 +32,22 @@ export default defineComponent({
 <style scoped>
   .v-breadcrumbs {
     padding-left: 0;
-  }
-  .breadcrumText {
-    font-size: large;
-    text-transform: lowercase;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
   }
   .breadcrumTitle {
     text-transform: uppercase;
-    font-size: x-small;
-    margin-bottom: -10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: rgb(var(--v-theme-primary));
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+  .breadcrumText {
+    font-size: 1.15rem;
+    font-weight: 600;
+    line-height: 1.2;
   }
   .v-breadcrumbs-item--link {
     text-decoration: none !important;

@@ -7,12 +7,11 @@
           cols="12"
           md="1"
         >
-          <v-img
-            src="/img/icons/hexagon3-empty-bold-tp.svg"
-            max-width="50"
-            max-height="50"
+          <v-icon
+            size="44"
+            color="primary"
             class="mr-2"
-          ></v-img>
+          >mdi-source-fork</v-icon>
         </v-col>
         <v-col cols="12" sm="11" md="11" lg="11" xl="11">
 

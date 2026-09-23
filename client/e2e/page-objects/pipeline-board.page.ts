@@ -15,6 +15,7 @@ export class PipelineBoardPage {
 
   async goto() {
     await this.page.goto('/');
+    await this.page.waitForLoadState('domcontentloaded');
     await expect(this.page.locator('.v-navigation-drawer')).toBeVisible({ timeout: 15000 });
   }
 
