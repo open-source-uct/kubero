@@ -84,6 +84,6 @@ kubectl apply -f https://raw.githubusercontent.com/OT-CONTAINER-KIT/redis-operat
 
   constructor(availableOperators: any) {
     super();
-    super.init(availableOperators);
+    void super.init(availableOperators);
   }
 }

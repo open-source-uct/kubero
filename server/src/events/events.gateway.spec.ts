@@ -12,7 +12,6 @@ describe('EventsGateway', () => {
       to: jest.fn().mockReturnThis(),
     };
     gateway = new EventsGateway();
-    // @ts-ignore
     gateway.server = mockServer as Server;
 
     mockSocket = {
@@ -25,15 +24,15 @@ describe('EventsGateway', () => {
     expect(gateway).toBeDefined();
   });
 
-  it('should join a room on handleJoin', () => {
+  it('should join a room on handleJoin', async () => {
     const data = { room: 'room1' };
-    gateway.handleJoin(data, mockSocket as Socket);
+    await gateway.handleJoin(data, mockSocket as Socket);
     expect(mockSocket.join).toHaveBeenCalledWith('room1');
   });
 
-  it('should leave a room on handleLeave', () => {
+  it('should leave a room on handleLeave', async () => {
     const data = { room: 'room1' };
-    gateway.handleLeave(data, mockSocket as Socket);
+    await gateway.handleLeave(data, mockSocket as Socket);
     expect(mockSocket.leave).toHaveBeenCalledWith('room1');
   });
 

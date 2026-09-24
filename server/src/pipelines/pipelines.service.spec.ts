@@ -220,7 +220,7 @@ describe('PipelinesService', () => {
       process.env.KUBERO_READONLY = 'true';
       const user = { username: 'test' } as IUser;
       const spy = jest.spyOn(console, 'log').mockImplementation(() => {});
-      service.deletePipeline('pipe1', user);
+      await service.deletePipeline('pipe1', user);
       expect(spy).toHaveBeenCalledWith(
         'KUBERO_READONLY is set to true, not deleting pipeline pipe1',
       );
@@ -234,7 +234,16 @@ describe('PipelinesService', () => {
       const user = { username: 'test' } as IUser;
       await service.deletePipeline('pipe1', user);
       expect(kubectl.deletePipeline).toHaveBeenCalledWith('pipe1');
-      //expect(notificationsService.send).toHaveBeenCalled();
+      expect(notificationsService.send).toHaveBeenCalled();
+    });
+
+    it('should propagate errors when deleting fails', async () => {
+      kubectl.getPipeline.mockResolvedValue({ name: 'pipe1' });
+      kubectl.deletePipeline.mockRejectedValue(new Error('boom'));
+      const user = { username: 'test' } as IUser;
+      await expect(service.deletePipeline('pipe1', user)).rejects.toThrow(
+        'boom',
+      );
     });
   });
 

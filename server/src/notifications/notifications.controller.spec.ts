@@ -2,10 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsDbService } from './notifications-db.service';
-import {
-  CreateNotificationDto,
-  UpdateNotificationDto,
-} from './dto/notification.dto';
+import { CreateNotificationDto } from './dto/notification.dto';
 import { INotificationConfig } from './notifications.interface';
 
 describe('NotificationsController', () => {

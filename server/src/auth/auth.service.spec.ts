@@ -1,8 +1,8 @@
+import * as crypto from 'crypto';
 import { AuthService } from './auth.service';
 import { ConfigService } from '../config/config.service';
 import * as bcrypt from 'bcrypt';
-import { HttpException, HttpStatus } from '@nestjs/common';
-import { Strategy } from 'passport-oauth2';
+import { HttpException } from '@nestjs/common';
 
 jest.mock('bcrypt');
 
@@ -74,9 +74,8 @@ describe('AuthService', () => {
         password: 'hashed',
       });
       // Simulates SHA256 Hash
-      const crypto = require('crypto');
       const hash = crypto
-        .createHmac('sha256', process.env.KUBERO_SESSION_KEY)
+        .createHmac('sha256', process.env.KUBERO_SESSION_KEY as string)
         .update('pass')
         .digest('hex');
       usersService.findOneFull.mockResolvedValueOnce({

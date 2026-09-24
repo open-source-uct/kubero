@@ -56,10 +56,9 @@ export class DatabaseService {
 
     try {
       Logger.debug('Running Prisma migrations...', 'DatabaseService');
-      // @ts-ignore
-      await prisma.$executeRawUnsafe?.('PRAGMA foreign_keys=OFF;'); // For SQLite, optional
+      await prisma.$executeRawUnsafe('PRAGMA foreign_keys=OFF;'); // For SQLite, optional
       // Use CLI for migrations
-      await execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+      execSync('npx prisma migrate deploy', { stdio: 'inherit' });
       //execSync('npx prisma migrate deploy', {});
       Logger.log('Prisma migrations completed.', 'DatabaseService');
       //await prisma.$disconnect();
@@ -410,7 +409,7 @@ export class DatabaseService {
       });
 
     // Ensure the 'everyone' user group exists
-    prisma.userGroup
+    await prisma.userGroup
       .upsert({
         where: { name: 'everyone' },
         update: {},

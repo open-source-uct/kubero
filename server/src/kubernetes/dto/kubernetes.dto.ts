@@ -63,17 +63,17 @@ export class GetEventsDTO {
       apiVersion: string;
       fieldsType: string;
       fieldsV1: {
-        'f:count': {};
-        'f:firstTimestamp': {};
-        'f:involvedObject': {};
-        'f:lastTimestamp': {};
-        'f:message': {};
-        'f:reason': {};
+        'f:count': object;
+        'f:firstTimestamp': object;
+        'f:involvedObject': object;
+        'f:lastTimestamp': object;
+        'f:message': object;
+        'f:reason': object;
         'f:source': {
-          'f:component': {};
+          'f:component': object;
         };
-        'f:type': {};
-        'f:reportingComponent'?: {};
+        'f:type': object;
+        'f:reportingComponent'?: object;
       };
       manager: string;
       operation: string;

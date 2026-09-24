@@ -1,6 +1,6 @@
 import { UsersService } from './users.service';
-import { PrismaClient, User as PrismaUser } from '@prisma/client';
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { User as PrismaUser } from '@prisma/client';
+import { HttpException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import axios from 'axios';
 
@@ -65,7 +65,7 @@ describe('UsersService', () => {
     );
 
     service = new UsersService();
-    // @ts-ignore
+    // @ts-expect-error prisma es privado; se reemplaza por un mock
     service['prisma'] = prismaMock;
   });
 

@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { IKuberoBuildjob } from './deployments.interface';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
-import { IKubectlApp } from '../kubernetes/kubernetes.interface';
 import { NotificationsService } from '../notifications/notifications.service';
 import { INotification } from '../notifications/notifications.interface';
 import { IUser } from '../auth/auth.interface';
@@ -39,14 +38,7 @@ export class DeploymentsService {
   ): Promise<any> {
     const namespace = pipelineName + '-' + phaseName;
     const jobs = (await this.kubectl.getJobs(namespace)) as V1JobList;
-    const appresult = await this.appsService.getApp(
-      pipelineName,
-      phaseName,
-      appName,
-      userGroups,
-    );
-
-    const app = appresult as IKubectlApp;
+    await this.appsService.getApp(pipelineName, phaseName, appName, userGroups);
 
     if (!jobs) {
       this.logger.log('No deployments found');
@@ -175,7 +167,7 @@ export class DeploymentsService {
         pipeline: pipeline,
       },
     } as INotification;
-    this.notificationService.send(m);
+    void this.notificationService.send(m);
 
     return {
       message: 'Build started',
@@ -216,7 +208,7 @@ export class DeploymentsService {
         pipeline: pipeline,
       },
     } as INotification;
-    this.notificationService.send(m);
+    void this.notificationService.send(m);
 
     return {
       message: 'Deployment deleted',
@@ -304,7 +296,7 @@ export class DeploymentsService {
         appName: appName,
         data: {},
       } as INotification;
-      this.notificationService.send(m);
+      void this.notificationService.send(m);
     }
   }
 }

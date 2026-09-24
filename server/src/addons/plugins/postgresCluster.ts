@@ -189,6 +189,6 @@ kubectl apply --server-side -k github.com/CrunchyData/postgres-operator-examples
 
   constructor(availableOperators: any) {
     super();
-    super.init(availableOperators);
+    void super.init(availableOperators);
   }
 }

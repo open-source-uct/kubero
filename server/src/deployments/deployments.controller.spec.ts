@@ -1,13 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeploymentsController } from './deployments.controller';
 import { DeploymentsService } from './deployments.service';
-import { mock } from 'node:test';
-
-const mockUser = {
-  id: 1,
-  strategy: 'local',
-  username: 'admin',
-};
 
 const mockUserGroups = ['group1', 'group2'];
 
@@ -135,7 +128,7 @@ describe('DeploymentsController', () => {
 
   it('should deploy tag', async () => {
     // Add deployApp mock to the service
-    service.deployApp = jest.fn();
+    service.deployApp = jest.fn().mockResolvedValue(undefined);
 
     const result = await controller.deployTag(
       'pipe',
@@ -158,5 +151,13 @@ describe('DeploymentsController', () => {
         'Deployment triggered for app in pipe phase phase with tag v1.0.0',
       status: 'success',
     });
+  });
+
+  it('should not reject when the deploy fails after being triggered', async () => {
+    service.deployApp = jest.fn().mockRejectedValue(new Error('boom'));
+
+    await expect(
+      controller.deployTag('pipe', 'phase', 'app', 'v1.0.0', mockReq),
+    ).resolves.toEqual(expect.objectContaining({ status: 'success' }));
   });
 });

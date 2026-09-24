@@ -20,7 +20,7 @@ async function bootstrap() {
     'debug',
     'verbose',
   ];
-  Logger.log(`Log levels: ${logLevels}`, 'Bootstrap');
+  Logger.log(`Log levels: ${logLevels.join(',')}`, 'Bootstrap');
 
   const app = await NestFactory.create(AppModule, {
     logger: new CustomConsoleLogger({
@@ -109,4 +109,4 @@ async function bootstrap() {
 
   //app.enableShutdownHooks();
 }
-bootstrap();
+void bootstrap();

@@ -46,7 +46,7 @@ export class AuditService {
 
   public logDelayed(entry: AuditEntry, delay: number = 1000) {
     setTimeout(() => {
-      this.log(entry);
+      void this.log(entry); // log maneja sus propios errores
     }, delay);
   }
 

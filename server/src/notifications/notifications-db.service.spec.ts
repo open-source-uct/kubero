@@ -5,7 +5,6 @@ import {
 } from './notifications-db.service';
 import { CreateNotificationDto } from './dto/notification.dto';
 import { INotificationConfig } from './notifications.interface';
-import { PrismaClient } from '@prisma/client';
 
 // Mock PrismaClient
 const mockPrismaClient = {

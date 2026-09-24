@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { INotificationConfig } from './notifications.interface';
-import {
-  CreateNotificationDto,
-  UpdateNotificationDto,
-} from './dto/notification.dto';
+import { CreateNotificationDto } from './dto/notification.dto';
 
 // Define our own types since Prisma client isn't generated yet
 export interface NotificationDb {

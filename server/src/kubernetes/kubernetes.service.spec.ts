@@ -193,6 +193,12 @@ describe('KubernetesService', () => {
     await expect(service.getPods('ns', 'ctx')).resolves.toBeDefined();
   });
 
+  it('should switch context before getting pods', async () => {
+    // antes no cambiaba de contexto y siempre leía del último usado
+    await service.getPods('ns', 'ctx');
+    expect((service as any).kc.setCurrentContext).toHaveBeenCalledWith('ctx');
+  });
+
   it('should createEvent', async () => {
     await expect(
       service.createEvent('Normal', 'reason', 'event', 'msg'),

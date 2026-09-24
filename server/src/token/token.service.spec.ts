@@ -48,7 +48,7 @@ describe('TokenService', () => {
     }).compile();
 
     service = module.get<TokenService>(TokenService);
-    // @ts-ignore
+    // @ts-expect-error prisma es privado; se reemplaza por un mock
     service['prisma'] = mockPrisma;
     jest.clearAllMocks();
     mockUsersService.findById.mockResolvedValue({

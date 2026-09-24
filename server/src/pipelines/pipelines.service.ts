@@ -1,9 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  IPipelineList,
-  IPipeline,
-  IKubectlPipelineList,
-} from './pipelines.interface';
+import { IPipelineList, IPipeline } from './pipelines.interface';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { Buildpack } from '../config/buildpack/buildpack';
 import { IUser } from '../auth/auth.interface';
@@ -41,9 +37,7 @@ export class PipelinesService {
   ): Promise<IPipeline | undefined> {
     this.logger.debug('listApps in ' + pipelineName);
 
-    await this.kubectl.setCurrentContext(
-      process.env.KUBERO_CONTEXT || 'default',
-    );
+    this.kubectl.setCurrentContext(process.env.KUBERO_CONTEXT || 'default');
     const kpipeline = await this.kubectl.getPipeline(pipelineName);
 
     if (!kpipeline.spec || !kpipeline.spec.git || !kpipeline.spec.git.keys) {
@@ -157,7 +151,7 @@ export class PipelinesService {
   }
 
   // delete a pipeline and all its namespaces/phases
-  public deletePipeline(pipelineName: string, user: IUser) {
+  public async deletePipeline(pipelineName: string, user: IUser) {
     this.logger.debug('deletePipeline: ' + pipelineName);
 
     if (process.env.KUBERO_READONLY == 'true') {
@@ -167,36 +161,35 @@ export class PipelinesService {
       return;
     }
 
-    this.kubectl
-      .getPipeline(pipelineName)
-      .then(async (pipeline) => {
-        if (pipeline) {
-          await this.kubectl.deletePipeline(pipelineName);
+    // antes esto era fire-and-forget: el controller respondía OK aunque el
+    // borrado fallara. Ahora el error llega al cliente.
+    const pipeline = await this.kubectl.getPipeline(pipelineName);
+    if (!pipeline) {
+      return;
+    }
 
-          await new Promise((resolve) => setTimeout(resolve, 1000)); // needs some extra time to delete the namespace
-          //this.updateState();
+    await this.kubectl.deletePipeline(pipelineName);
 
-          const m = {
-            name: 'updatePipeline',
-            user: user.id,
-            resource: 'pipeline',
-            action: 'delete',
-            severity: 'normal',
-            message: 'Deleted pipeline: ' + pipelineName,
-            pipelineName: pipelineName,
-            phaseName: '',
-            appName: '',
-            data: {
-              pipeline: pipeline,
-            },
-          } as INotification;
-          this.notificationsService.send(m);
-        }
-      })
-      .catch((error) => {
-        this.logger.error(error);
-      });
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // needs some extra time to delete the namespace
+    //this.updateState();
+
+    const m = {
+      name: 'updatePipeline',
+      user: user.id,
+      resource: 'pipeline',
+      action: 'delete',
+      severity: 'normal',
+      message: 'Deleted pipeline: ' + pipelineName,
+      pipelineName: pipelineName,
+      phaseName: '',
+      appName: '',
+      data: {
+        pipeline: pipeline,
+      },
+    } as INotification;
+    void this.notificationsService.send(m);
   }
+
   public async updatePipeline(
     pipeline: IPipeline,
     resourceVersion: string,
@@ -240,7 +233,7 @@ export class PipelinesService {
         pipeline: pipeline,
       },
     } as INotification;
-    this.notificationsService.send(m);
+    void this.notificationsService.send(m);
   }
 
   public async createPipeline(pipeline: IPipeline, user: IUser) {
@@ -271,7 +264,7 @@ export class PipelinesService {
         pipeline: pipeline,
       },
     } as INotification;
-    this.notificationsService.send(m);
+    void this.notificationsService.send(m);
 
     return { status: 'ok', message: 'Pipeline created: ' + pipeline.name };
   }

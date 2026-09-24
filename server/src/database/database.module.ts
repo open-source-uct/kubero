@@ -1,4 +1,4 @@
-import { Global, Module, Logger } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { DatabaseService } from './database.service';
 import { PrismaClient } from '@prisma/client';
 

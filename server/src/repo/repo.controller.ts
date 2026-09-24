@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   Param,
   Post,
   Req,
@@ -21,6 +22,8 @@ import { ConnectRepoDto } from './dto/connect-repo.dto';
 
 @Controller({ path: 'api/repo', version: '1' })
 export class RepoController {
+  private readonly logger = new Logger(RepoController.name);
+
   constructor(private readonly repoService: RepoService) {}
 
   @Get('/providers')
@@ -206,7 +209,12 @@ export class RepoController {
     @Req() req: Request,
   ) {
     const ret: string = 'ok';
-    this.repoService.handleWebhook(provider, req.headers, body);
+    // se responde 'ok' enseguida; un fallo al procesar el webhook se registra
+    this.repoService
+      .handleWebhook(provider, req.headers, body)
+      .catch((error) => {
+        this.logger.error(`handleWebhook failed for ${provider}: ${error}`);
+      });
     return ret;
   }
 }

@@ -23,7 +23,7 @@ export interface IApp {
       hash?: string;
     }[];
   };
-  envVars: {}[];
+  envVars: object[];
   image: {
     repository: string;
     tag: string;
@@ -121,7 +121,7 @@ export interface IApp {
   podSecurityContext: {},
   replicaCount: number,
 */
-  resources: {};
+  resources: object;
   /*
   service: {
       port: number,
@@ -129,7 +129,7 @@ export interface IApp {
   },
   */
   serviceAccount: {
-    annotations: {};
+    annotations: object;
     create: boolean;
     name: string;
   };

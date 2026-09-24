@@ -1,9 +1,10 @@
+import * as YAML from 'yaml';
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 
 @Injectable()
 export class TemplatesService {
-  private YAML = require('yaml');
+  private YAML = YAML;
   constructor() {}
 
   async getTemplate(templateB64: string) {

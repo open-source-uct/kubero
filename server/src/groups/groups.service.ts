@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaClient, User as PrismaUser } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class GroupsService {
@@ -29,20 +29,20 @@ export class GroupsService {
     });
   }
 
-  async findById(id: string): Promise<any | null> {
+  async findById(id: string): Promise<any> {
     return this.prisma.userGroup.findUnique({
       where: { id },
     });
   }
 
-  async update(id: string, groupData: any): Promise<any | null> {
+  async update(id: string, groupData: any): Promise<any> {
     return this.prisma.userGroup.update({
       where: { id },
       data: groupData,
     });
   }
 
-  async delete(id: string): Promise<any | null> {
+  async delete(id: string): Promise<any> {
     return this.prisma.userGroup.delete({
       where: { id },
     });

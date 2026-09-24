@@ -53,7 +53,7 @@ export class AuthService {
       const passwordMatch = await bcrypt.compare(pass, user.password);
       //if (passwordMatch) {
       if (user.password === password || passwordMatch) {
-        const { password, ...result } = user;
+        const { password: _password, ...result } = user;
         return result;
       }
     }
@@ -62,9 +62,9 @@ export class AuthService {
 
   async validateToken(token: string): Promise<boolean> {
     try {
-      const decoded = this.jwtService.verify(token);
+      this.jwtService.verify(token);
       return true;
-    } catch (_error) {
+    } catch {
       return false;
     }
   }

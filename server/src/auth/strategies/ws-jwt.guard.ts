@@ -1,6 +1,5 @@
 import { CanActivate, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Observable } from 'rxjs';
 import { UsersService } from '../../users/users.service';
 
 @Injectable()
@@ -12,9 +11,7 @@ export class WsJwtGuard implements CanActivate {
     private usersService: UsersService,
   ) {}
 
-  canActivate(
-    context: any,
-  ): boolean | any | Promise<boolean | any> | Observable<boolean | any> {
+  async canActivate(context: any): Promise<boolean> {
     const client = context.switchToWs().getClient();
     const token = this.extractToken(client);
 
@@ -31,18 +28,17 @@ export class WsJwtGuard implements CanActivate {
         client.disconnect();
         return false;
       }
-      return new Promise((resolve, reject) => {
-        return this.usersService.findOne(decoded.username).then((user) => {
-          if (user) {
-            context.switchToWs().getClient().user = user;
-            resolve(true);
-          } else {
-            this.logger.debug('User not found, disconnecting client');
-            client.disconnect();
-            reject(false);
-          }
-        });
-      });
+
+      // antes se envolvía en un new Promise sin catch: si findOne fallaba la
+      // promesa nunca se resolvía y el socket quedaba colgado
+      const user = await this.usersService.findOne(decoded.username);
+      if (!user) {
+        this.logger.debug('User not found, disconnecting client');
+        client.disconnect();
+        return false;
+      }
+      client.user = user;
+      return true;
     } catch (ex) {
       this.logger.error('Token validation error', ex.message);
       client.disconnect();

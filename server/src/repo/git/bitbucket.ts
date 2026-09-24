@@ -7,7 +7,7 @@ import {
   IPullrequest,
 } from './types';
 import { Repo } from './repo';
-import gitUrlParse = require('git-url-parse');
+import * as gitUrlParse from 'git-url-parse';
 debug('app:kubero:bitbucket:api');
 
 import { Bitbucket, APIClient } from 'bitbucket';
@@ -228,8 +228,10 @@ export class BitbucketApi extends Repo {
         },
       };
     } catch (e) {
-      const res = e as RequestError;
-      this.logger.log('Error adding deploy key: ' + res);
+      this.logger.log(
+        'Error adding deploy key: ' +
+          (e instanceof Error ? e.message : String(e)),
+      );
     }
 
     return ret;
@@ -260,7 +262,8 @@ export class BitbucketApi extends Repo {
       branch = refs[refs.length - 1];
       ssh_url = body.repository.ssh_url;
     } else if (body.pull_request != undefined) {
-      ((action = body.action), (branch = body.pull_request.head.ref));
+      action = body.action;
+      branch = body.pull_request.head.ref;
       ssh_url = body.pull_request.head.repo.ssh_url;
     } else {
       ssh_url = body.repository.ssh_url;

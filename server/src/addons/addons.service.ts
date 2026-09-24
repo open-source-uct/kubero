@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { IPlugin } from './plugins/plugin.interface';
 import { KuberoMysql } from './plugins/kuberoMysql';
 import { KuberoRedis } from './plugins/kuberoRedis';
@@ -30,12 +30,15 @@ import { Elasticsearch } from './plugins/elasticsearch';
 
 @Injectable()
 export class AddonsService {
+  private readonly logger = new Logger(AddonsService.name);
   private operatorsAvailable: string[] = [];
   public addonsList: IPlugin[] = []; // List or possibly installed operators
   private CRDList: any; //List of installed CRDs from kubectl
 
   constructor(private kubectl: KubernetesService) {
-    this.loadOperators();
+    this.loadOperators().catch((error) => {
+      this.logger.error('Failed to load operators: ' + error);
+    });
   }
 
   public async loadOperators(): Promise<void> {
