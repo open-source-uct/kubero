@@ -1,3 +1,7 @@
+import {
+  verifyHmacSha256,
+  webhookSecret,
+} from '../../common/utils/webhook.util';
 import debug from 'debug';
 import * as crypto from 'crypto';
 import {
@@ -205,27 +209,18 @@ export class GiteaApi extends Repo {
     delivery: string,
     signature: string,
     body: any,
+    rawBody?: Buffer,
   ): IWebhook | boolean {
     //https://docs.github.com/en/developers/webhooks-and-events/webhooks/securing-your-webhooks
-    const secret = process.env.KUBERO_WEBHOOK_SECRET as string;
-    const hash =
-      'sha256=' +
-      crypto
-        .createHmac('sha256', secret)
-        .update(JSON.stringify(body, null, '  '))
-        .digest('hex');
-
-    let verified = false;
-    if (hash === signature) {
-      debug.debug('Gitea webhook signature is valid for event: ' + delivery);
-      verified = true;
-    } else {
+    // Gitea firma el JSON con sangría de 2 espacios; se usa el cuerpo crudo y
+    // solo si no está se reconstruye igual
+    const payload = rawBody ?? JSON.stringify(body, null, '  ');
+    if (!verifyHmacSha256(payload, signature, webhookSecret(), 'sha256=')) {
       this.logger.log('ERROR: invalid signature for event: ' + delivery);
-      this.logger.log('Hash:      ' + hash);
-      this.logger.log('Signature: ' + signature);
-      verified = false;
       return false;
     }
+    debug.debug('Gitea webhook signature is valid for event: ' + delivery);
+    const verified = true;
 
     let branch: string = 'main';
     let ssh_url: string = '';

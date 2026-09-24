@@ -1,3 +1,7 @@
+import {
+  verifyHmacSha256,
+  webhookSecret,
+} from '../../common/utils/webhook.util';
 import debug from 'debug';
 import * as crypto from 'crypto';
 import {
@@ -213,24 +217,15 @@ export class GogsApi extends Repo {
     delivery: string,
     signature: string,
     body: any,
+    rawBody?: Buffer,
   ): IWebhook | boolean {
-    const secret = process.env.KUBERO_WEBHOOK_SECRET as string;
-    const hash = crypto
-      .createHmac('sha256', secret)
-      .update(JSON.stringify(body, null, '  '))
-      .digest('hex');
-
-    let verified = false;
-    if (hash === signature) {
-      debug.debug('Gogs webhook signature is valid for event: ' + delivery);
-      verified = true;
-    } else {
+    const payload = rawBody ?? JSON.stringify(body, null, '  ');
+    if (!verifyHmacSha256(payload, signature, webhookSecret())) {
       this.logger.log('ERROR: invalid signature for event: ' + delivery);
-      this.logger.log('Hash:      ' + hash);
-      this.logger.log('Signature: ' + signature);
-      verified = false;
       return false;
     }
+    debug.debug('Gogs webhook signature is valid for event: ' + delivery);
+    const verified = true;
 
     let branch: string = 'main';
     let ssh_url: string = '';

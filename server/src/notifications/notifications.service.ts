@@ -38,7 +38,7 @@ export class NotificationsService {
     // las notificaciones son secundarias: un fallo aquí no debe romper la
     // operación que las dispara (los callers no esperan a send)
     try {
-      this.sendWebsocketMessage(message);
+      await this.sendWebsocketMessage(message);
       this.createKubernetesEvent(message);
       this.writeAuditLog(message);
     } catch (error) {
@@ -68,8 +68,43 @@ export class NotificationsService {
       }
       */
   }
-  private sendWebsocketMessage(n: INotification) {
-    this.eventsGateway.sendEvent(n.name, n);
+  // A quién le llega el evento por websocket, con la misma regla con que se
+  // filtra la lista de pipelines (ver KubernetesService.getPipelinesList):
+  // - undefined: a todos los usuarios (el pipeline no restringe por equipo)
+  // - lista de equipos: solo a esos equipos y al equipo admin
+  // Antes se emitía a todos, así que un evento de un pipeline le llegaba
+  // (nombre incluido) a usuarios de otros equipos.
+  private async audienceOf(n: INotification): Promise<string[] | undefined> {
+    // eventos del sistema (configuración, etc.): solo admin
+    if (!n.pipelineName) {
+      return [];
+    }
+    // en algunos eventos data.pipeline es solo el nombre (string), no el objeto
+    const pipeline: any =
+      typeof n.data?.pipeline === 'object' ? n.data.pipeline : undefined;
+    let access = pipeline?.access ?? pipeline?.spec?.access;
+    let known = pipeline !== undefined && pipeline !== null;
+    if (!known) {
+      try {
+        const kp = await this.kubectl.getPipeline(n.pipelineName);
+        access = kp?.spec?.access;
+        known = !!kp;
+      } catch {
+        known = false;
+      }
+    }
+    if (!known) {
+      // no se pudo saber a quién pertenece: por seguridad, solo admin
+      return [];
+    }
+    if (!access) {
+      return undefined;
+    }
+    return access.teams || [];
+  }
+
+  private async sendWebsocketMessage(n: INotification) {
+    this.eventsGateway.sendEvent(n.name, n, await this.audienceOf(n));
   }
 
   private createKubernetesEvent(n: INotification) {

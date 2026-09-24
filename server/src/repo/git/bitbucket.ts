@@ -1,3 +1,7 @@
+import {
+  verifyHmacSha256,
+  webhookSecret,
+} from '../../common/utils/webhook.util';
 import debug from 'debug';
 import {
   IWebhook,
@@ -240,8 +244,17 @@ export class BitbucketApi extends Repo {
   public getWebhook(
     event: string,
     delivery: string,
+    signature: string,
     body: any,
+    rawBody?: Buffer,
   ): IWebhook | boolean {
+    // Antes se marcaba como verificado siempre. Bitbucket Cloud puede firmar
+    // con el secreto del webhook (X-Hub-Signature); ahora es obligatorio.
+    const payload = rawBody ?? JSON.stringify(body);
+    if (!verifyHmacSha256(payload, signature, webhookSecret(), 'sha256=')) {
+      this.logger.log('ERROR: invalid signature for event: ' + delivery);
+      return false;
+    }
     // use github and gitea naming for the event
     let github_event = event;
     if (event === 'repo:push') {
@@ -277,7 +290,7 @@ export class BitbucketApi extends Repo {
         delivery: delivery,
         body: body,
         branch: branch,
-        verified: true, // bitbucket does not support verification with signatures :(
+        verified: true,
         repo: {
           ssh_url: ssh_url,
         },

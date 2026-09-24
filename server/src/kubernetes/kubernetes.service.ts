@@ -1,5 +1,5 @@
 import * as YAML from 'yaml';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   IKubectlPipelineList,
   IKubectlPipeline,
@@ -193,8 +193,20 @@ export class KubernetesService {
 
   public setCurrentContext(context: string) {
     if (context) {
-      this.kc.setCurrentContext(context);
+      this.useContext(context);
     }
+  }
+
+  // El KubeConfig es compartido entre todos los requests: fijarle un contexto
+  // que no existe lo deja sin credenciales para el resto de los usuarios hasta
+  // que otro request lo repare. Por eso solo se acepta un contexto conocido.
+  private useContext(context: string) {
+    const known = this.kc.getContexts().some((c) => c.name === context);
+    if (!known) {
+      this.logger.warn('Unknown kubernetes context: ' + context);
+      throw new NotFoundException(`Unknown kubernetes context "${context}"`);
+    }
+    this.kc.setCurrentContext(context);
   }
 
   public getCurrentContext() {
@@ -318,7 +330,7 @@ export class KubernetesService {
   public async createApp(app: App, context: string) {
     this.logger.debug('create app: ' + app.name);
     if (context) {
-      this.kc.setCurrentContext(context);
+      this.useContext(context);
     }
 
     const appl = new KubectlApp(app);
@@ -342,7 +354,7 @@ export class KubernetesService {
   public async updateApp(app: App, resourceVersion: string, context: string) {
     this.logger.debug('update app: ' + app.name);
     if (context) {
-      this.kc.setCurrentContext(context);
+      this.useContext(context);
     }
 
     const appl = new KubectlApp(app);
@@ -377,7 +389,7 @@ export class KubernetesService {
 
     const namespace = pipelineName + '-' + phaseName;
     if (context) {
-      this.kc.setCurrentContext(context);
+      this.useContext(context);
     }
 
     await this.customObjectsApi
@@ -401,7 +413,7 @@ export class KubernetesService {
   ): Promise<IKubectlApp> {
     const namespace = pipelineName + '-' + phaseName;
     if (context) {
-      this.kc.setCurrentContext(context);
+      this.useContext(context);
     }
 
     const app = await this.customObjectsApi
@@ -428,7 +440,7 @@ export class KubernetesService {
     context: string,
   ): Promise<IKubectlAppList> {
     if (context) {
-      this.kc.setCurrentContext(context);
+      this.useContext(context);
     }
     try {
       const appslist = await this.customObjectsApi.listNamespacedCustomObject(
@@ -449,7 +461,7 @@ export class KubernetesService {
 
   public async getAllAppsList(context: string): Promise<IKubectlAppList> {
     if (context) {
-      this.kc.setCurrentContext(context);
+      this.useContext(context);
     }
     try {
       const appslist = await this.customObjectsApi.listClusterCustomObject(
@@ -476,7 +488,7 @@ export class KubernetesService {
   ) {
     this.logger.debug('restart app: ' + appName);
     if (context) {
-      this.kc.setCurrentContext(context);
+      this.useContext(context);
     }
 
     const namespace = pipelineName + '-' + phaseName;
@@ -568,7 +580,7 @@ export class KubernetesService {
     // getAppsList y el resto de los métodos de este archivo), así que
     // siempre leía del último contexto usado, no del que se le pasaba
     if (context) {
-      this.kc.setCurrentContext(context);
+      this.useContext(context);
     }
     const pods = await this.coreV1Api.listNamespacedPod(namespace);
     return pods.body.items;

@@ -28,6 +28,8 @@ async function bootstrap() {
       logLevels: logLevels as LogLevel[],
     }),
     cors: true,
+    // los webhooks se firman sobre el cuerpo tal cual llegó
+    rawBody: true,
   });
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
 

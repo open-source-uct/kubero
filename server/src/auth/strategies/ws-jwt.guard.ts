@@ -1,56 +1,35 @@
 import { CanActivate, Injectable, Logger } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { UsersService } from '../../users/users.service';
 
+/**
+ * Guard de los mensajes del websocket. La autenticación se hace al conectar
+ * (EventsGateway.handleConnection) y deja la identidad en `client.data.user`;
+ * aquí solo se comprueba que exista y que el JWT no haya caducado desde
+ * entonces.
+ */
 @Injectable()
 export class WsJwtGuard implements CanActivate {
   private logger = new Logger(WsJwtGuard.name);
 
-  constructor(
-    private jwtService: JwtService,
-    private usersService: UsersService,
-  ) {}
-
   async canActivate(context: any): Promise<boolean> {
     const client = context.switchToWs().getClient();
-    const token = this.extractToken(client);
+    // el cliente puede escribir antes de que termine de autenticarse al
+    // conectar (ver EventsGateway.handleConnection): se espera ese resultado
+    await client.data?.authentication;
+    const user = client.data?.user;
+    const expiresAt: number | undefined = client.data?.expiresAt;
 
-    if (!token) {
-      this.logger.debug('No token provided, disconnecting client');
-      client.disconnect();
+    if (!user) {
+      this.logger.debug(
+        'Message from an unauthenticated socket, disconnecting',
+      );
+      client.disconnect(true);
       return false;
     }
-
-    try {
-      const decoded = this.jwtService.verify(token);
-      if (!decoded || !decoded.username) {
-        this.logger.debug('Token verification failed, disconnecting client');
-        client.disconnect();
-        return false;
-      }
-
-      // antes se envolvía en un new Promise sin catch: si findOne fallaba la
-      // promesa nunca se resolvía y el socket quedaba colgado
-      const user = await this.usersService.findOne(decoded.username);
-      if (!user) {
-        this.logger.debug('User not found, disconnecting client');
-        client.disconnect();
-        return false;
-      }
-      client.user = user;
-      return true;
-    } catch (ex) {
-      this.logger.error('Token validation error', ex.message);
-      client.disconnect();
+    if (expiresAt && Date.now() > expiresAt) {
+      this.logger.debug('Socket token expired, disconnecting client');
+      client.disconnect(true);
       return false;
     }
-  }
-
-  private extractToken(client: any): string | null {
-    const authHeader = client.handshake.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      return authHeader.split(' ')[1];
-    }
-    return client.handshake.auth?.token || null;
+    return true;
   }
 }

@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { IPipelineList, IPipeline } from './pipelines.interface';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { Buildpack } from '../config/buildpack/buildpack';
@@ -74,25 +79,29 @@ export class PipelinesService {
     return pipeline;
   }
 
+  // Devuelve el contexto de kubernetes de la fase, o lanza si el usuario no
+  // tiene acceso al pipeline (403) o la fase no existe (404). Antes devolvía
+  // 'missing-<pipeline>-<fase>' (un string truthy), con lo que los
+  // `if (contextName)` de los callers nunca bloqueaban a nadie.
   public async getContext(
     pipelineName: string,
     phaseName: string,
     userGroups: string[],
   ): Promise<string> {
-    let context: string = 'missing-' + pipelineName + '-' + phaseName;
     const pipelinesList = await this.listPipelines(userGroups);
 
-    for (const pipeline of pipelinesList.items) {
-      if (pipeline.name == pipelineName) {
-        for (const phase of pipeline.phases) {
-          if (phase.name == phaseName) {
-            //this.kubectl.setCurrentContext(phase.context);
-            context = phase.context;
-          }
-        }
-      }
+    const pipeline = pipelinesList.items.find((p) => p.name == pipelineName);
+    if (!pipeline) {
+      throw new ForbiddenException('No access to this pipeline');
     }
-    return context;
+
+    const phase = pipeline.phases.find((ph) => ph.name == phaseName);
+    if (!phase) {
+      throw new NotFoundException(
+        `Phase "${phaseName}" not found in pipeline "${pipelineName}"`,
+      );
+    }
+    return phase.context;
   }
 
   public async getPipeline(

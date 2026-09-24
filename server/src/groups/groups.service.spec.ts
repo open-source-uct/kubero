@@ -1,3 +1,4 @@
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { GroupsService } from './groups.service';
 
@@ -94,5 +95,100 @@ describe('GroupsService', () => {
     expect(prismaMock.userGroup.delete).toHaveBeenCalledWith({
       where: { id: '5' },
     });
+  });
+});
+
+describe('GroupsService protected teams', () => {
+  let service: GroupsService;
+  let prisma: any;
+
+  beforeEach(() => {
+    prisma = {
+      userGroup: {
+        findUnique: jest.fn(),
+        update: jest.fn().mockResolvedValue({}),
+        delete: jest.fn().mockResolvedValue({}),
+      },
+    };
+    service = new GroupsService();
+    // @ts-expect-error prisma es privado; se reemplaza por un mock
+    service['prisma'] = prisma;
+  });
+
+  it.each(['admin', 'everyone'])(
+    'refuses to delete the %s team',
+    async (name) => {
+      prisma.userGroup.findUnique.mockResolvedValue({ id: 'g', name });
+      await expect(service.delete('g')).rejects.toThrow(ForbiddenException);
+      expect(prisma.userGroup.delete).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['admin', 'everyone'])(
+    'refuses to rename the %s team',
+    async (name) => {
+      prisma.userGroup.findUnique.mockResolvedValue({ id: 'g', name });
+      await expect(service.update('g', { name: 'other' })).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(prisma.userGroup.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('still lets the description of a protected team change', async () => {
+    prisma.userGroup.findUnique.mockResolvedValue({ id: 'g', name: 'admin' });
+    await service.update('g', { description: 'nuevo' });
+    expect(prisma.userGroup.update).toHaveBeenCalled();
+  });
+
+  it('deletes and renames any other team', async () => {
+    prisma.userGroup.findUnique.mockResolvedValue({ id: 'g', name: 'Taller1' });
+    await service.delete('g');
+    await service.update('g', { name: 'Taller 1' });
+    expect(prisma.userGroup.delete).toHaveBeenCalled();
+    expect(prisma.userGroup.update).toHaveBeenCalled();
+  });
+});
+
+describe('GroupsService names', () => {
+  let service: GroupsService;
+  let prisma: any;
+
+  beforeEach(() => {
+    prisma = {
+      userGroup: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'g', name: 'Taller1' }),
+        create: jest.fn().mockResolvedValue({}),
+        update: jest.fn().mockResolvedValue({}),
+      },
+    };
+    service = new GroupsService();
+    // @ts-expect-error prisma es privado; se reemplaza por un mock
+    service['prisma'] = prisma;
+  });
+
+  it('trims the name of a new team ("Taller1 " != "Taller1" for pipeline access)', async () => {
+    await service.create('  Taller1 ', 'desc');
+    expect(prisma.userGroup.create).toHaveBeenCalledWith({
+      data: { name: 'Taller1', description: 'desc' },
+    });
+  });
+
+  it('trims the name when renaming a team', async () => {
+    await service.update('g', { name: 'Taller 2 ' });
+    expect(prisma.userGroup.update).toHaveBeenCalledWith({
+      where: { id: 'g' },
+      data: { name: 'Taller 2' },
+    });
+  });
+
+  it('rejects an empty or blank name', async () => {
+    await expect(service.create('   ', 'd')).rejects.toThrow(
+      BadRequestException,
+    );
+    await expect(service.update('g', { name: '' })).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(prisma.userGroup.create).not.toHaveBeenCalled();
   });
 });

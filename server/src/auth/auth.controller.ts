@@ -10,6 +10,7 @@ import {
   //HttpStatus,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { LoginThrottleService } from './login-throttle.service';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
@@ -28,7 +29,10 @@ import { AuthGuard } from '@nestjs/passport';
 
 @Controller({ path: 'api/auth', version: '1' })
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly loginThrottle: LoginThrottleService,
+  ) {}
 
   @Post('login')
   @ApiOperation({
@@ -40,8 +44,18 @@ export class AuthController {
     type: LoginOKResponseDTO,
     isArray: false,
   })
-  async login(@Body() auth: LoginDTO) {
-    return await this.authService.login(auth.username, auth.password);
+  async login(@Body() auth: LoginDTO, @Request() req: any) {
+    const ip: string = req?.ip ?? 'unknown';
+    // 429 si ya hubo demasiados intentos fallidos con este usuario
+    this.loginThrottle.assertAllowed(ip, auth.username);
+    try {
+      const result = await this.authService.login(auth.username, auth.password);
+      this.loginThrottle.reset(ip, auth.username);
+      return result;
+    } catch (error) {
+      this.loginThrottle.recordFailure(ip, auth.username);
+      throw error;
+    }
   }
 
   @Get('logout')

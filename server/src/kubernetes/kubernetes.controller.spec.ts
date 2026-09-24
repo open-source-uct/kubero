@@ -1,3 +1,5 @@
+import { ForbiddenException } from '@nestjs/common';
+import { PipelinesService } from '../pipelines/pipelines.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { KubernetesController } from './kubernetes.controller';
 import { KubernetesService } from './kubernetes.service';
@@ -51,6 +53,8 @@ export const mockContext: Context = {
 describe('KubernetesController', () => {
   let controller: KubernetesController;
   let service: jest.Mocked<KubernetesService>;
+  let pipelines: { listPipelines: jest.Mock };
+  const adminReq = { user: { userGroups: ['admin'] } };
 
   beforeEach(async () => {
     service = {
@@ -58,11 +62,20 @@ describe('KubernetesController', () => {
       getStorageClasses: jest.fn(),
       getDomains: jest.fn(),
       getContexts: jest.fn(),
+      setCurrentContext: jest.fn(),
     } as any;
+    pipelines = {
+      listPipelines: jest.fn().mockResolvedValue({
+        items: [{ name: 'mine', phases: [{ name: 'dev', context: 'ctx1' }] }],
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [KubernetesController],
-      providers: [{ provide: KubernetesService, useValue: service }],
+      providers: [
+        { provide: KubernetesService, useValue: service },
+        { provide: PipelinesService, useValue: pipelines },
+      ],
     }).compile();
 
     controller = module.get<KubernetesController>(KubernetesController);
@@ -72,9 +85,37 @@ describe('KubernetesController', () => {
     expect(controller).toBeDefined();
   });
 
+  describe('getEvents access', () => {
+    const teamReq = { user: { userGroups: ['Taller1'] } };
+
+    it('should let a team read the events of its own pipeline namespace', async () => {
+      service.getEvents.mockResolvedValue([]);
+      await controller.getEvents('mine-dev', teamReq);
+      expect(service.setCurrentContext).toHaveBeenCalledWith('ctx1');
+      expect(service.getEvents).toHaveBeenCalledWith('mine-dev');
+    });
+
+    it('should refuse the events of a namespace outside its pipelines', async () => {
+      await expect(
+        controller.getEvents('kube-system', teamReq),
+      ).rejects.toThrow(ForbiddenException);
+      await expect(
+        controller.getEvents('ramtun-production', teamReq),
+      ).rejects.toThrow(ForbiddenException);
+      expect(service.getEvents).not.toHaveBeenCalled();
+    });
+
+    it('should let the admin team read any namespace', async () => {
+      service.getEvents.mockResolvedValue([]);
+      await controller.getEvents('kube-system', adminReq);
+      expect(pipelines.listPipelines).not.toHaveBeenCalled();
+      expect(service.getEvents).toHaveBeenCalledWith('kube-system');
+    });
+  });
+
   it('should get events', async () => {
     service.getEvents.mockResolvedValue([mockCoreV1Event]);
-    const result = await controller.getEvents('default');
+    const result = await controller.getEvents('default', adminReq);
     expect(service.getEvents).toHaveBeenCalledWith('default');
     expect(result).toEqual([
       {
