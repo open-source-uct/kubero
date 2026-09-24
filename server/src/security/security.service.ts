@@ -67,7 +67,7 @@ export class SecurityService {
       return scanResult;
     }
 
-    let logs = '';
+    let logs: any = '';
     if (contextName) {
       this.kubectl.setCurrentContext(contextName);
       logs = await this.kubectl.getVulnerabilityScanLogs(
@@ -76,19 +76,32 @@ export class SecurityService {
       );
     }
 
-    if (!logs) {
-      // Sin logs el escaneo puede seguir corriendo o haber terminado mal. Antes
-      // se respondía siempre 'running': si el pod había fallado (imagen que no se
-      // baja, registry privado...) la pantalla sondeaba para siempre.
-      if (logPod.status === 'Failed' || logPod.status === 'Succeeded') {
-        scanResult.status = 'failed';
-        scanResult.message =
-          logPod.status === 'Failed'
-            ? 'the vulnerability scan failed'
-            : 'the vulnerability scan finished without results';
-        scanResult.logPod = logPod;
-        return scanResult;
-      }
+    // Lo que devuelve el pod solo es un resultado si es el JSON de trivy. Si
+    // trivy falla (imagen que no existe, registry sin acceso...) el pod termina
+    // en Failed y sus logs son texto de error: antes ese texto contaba como
+    // "hay logs" y el escaneo fallido se mostraba como resultado correcto, con
+    // cero vulnerabilidades.
+    const isTrivyResult =
+      !!logs &&
+      typeof logs === 'object' &&
+      (logs.ArtifactName !== undefined ||
+        logs.SchemaVersion !== undefined ||
+        logs.Results !== undefined);
+    const finished =
+      logPod.status === 'Failed' || logPod.status === 'Succeeded';
+
+    if (logPod.status === 'Failed' || (!isTrivyResult && finished)) {
+      scanResult.status = 'failed';
+      scanResult.message =
+        logPod.status === 'Failed'
+          ? 'the vulnerability scan failed'
+          : 'the vulnerability scan finished without results';
+      scanResult.logPod = logPod;
+      return scanResult;
+    }
+
+    if (!isTrivyResult) {
+      // el pod sigue en marcha y todavía no imprimió el resultado
       scanResult.status = 'running';
       scanResult.message = 'no vulnerability scan logs found';
       return scanResult;
