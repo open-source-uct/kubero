@@ -115,15 +115,6 @@ export class App implements IApp {
     };
   };
 
-  public vulnerabilityscan: {
-    enabled: boolean;
-    schedule: string;
-    image: {
-      repository: string;
-      tag: string;
-    };
-  };
-
   private imagePullSecrets: [];
   public ingress: {
     annotations: object;
@@ -247,8 +238,6 @@ export class App implements IApp {
     this.image.run.securityContext = Buildpack.SetSecurityContext(
       this.image.run.securityContext,
     );
-
-    this.vulnerabilityscan = app.vulnerabilityscan;
 
     this.imagePullSecrets = [];
 

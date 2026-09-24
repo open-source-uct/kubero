@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import {
   MetricsOptions,
   IMetric,
@@ -107,11 +107,54 @@ export class MetricsService {
       */
   }
 
+  // Lo que llega desde la URL (pipeline, fase, app) y desde la query string
+  // (host, calc) se pegaba tal cual dentro de la consulta PromQL: con un valor
+  // como `x"} or {namespace="otro-equipo` se podían leer las métricas de
+  // cualquier namespace del cluster, saltándose el control por equipo. Solo se
+  // aceptan nombres de recursos válidos y `calc` es una lista cerrada.
+  private static readonly SAFE_LABEL = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+  private safe(name: string, value: unknown): string {
+    if (typeof value !== 'string' || !MetricsService.SAFE_LABEL.test(value)) {
+      throw new BadRequestException(`Invalid ${name}`);
+    }
+    return value;
+  }
+
+  private namespaceOf(q: PrometheusQuery): string {
+    return `${this.safe('pipeline', q.pipeline)}-${this.safe('phase', q.phase)}`;
+  }
+
+  private calcOf(q: PrometheusQuery): 'rate' | 'increase' {
+    return q.calc === 'increase' ? 'increase' : 'rate';
+  }
+
+  // El namespace contiene todas las apps del pipeline: sin filtrar por pod, la
+  // gráfica de una app mostraba también los pods de las demás.
+  private podFilter(q: PrometheusQuery): string {
+    return `pod=~"${this.safe('app', q.app)}-kuberoapp-.*"`;
+  }
+
+  // Con 24 h o 7 d cada pod que existió en el rango es una serie (se recrean
+  // en cada despliegue): webinfo llegaba a 96 áreas superpuestas y el navegador
+  // se congelaba al dibujarlas. Se dejan las más recientes.
+  private static readonly MAX_SERIES = 12;
+
+  private limitSeries(series: IMetric[]): IMetric[] {
+    const lastSeen = (s: IMetric) => {
+      const d = s.data as unknown as number[][];
+      return d.length ? d[d.length - 1][0] : 0;
+    };
+    return [...series]
+      .sort((a, b) => lastSeen(b) - lastSeen(a) || a.name.localeCompare(b.name))
+      .slice(0, MetricsService.MAX_SERIES);
+  }
+
   public async queryMetrics(
     metric: string,
     q: PrometheusQuery,
   ): Promise<QueryResult | undefined> {
-    const query = `${metric}{namespace="${q.pipeline}-${q.phase}", container=~"kuberoapp-web|kuberoapp-worker"}`;
+    const query = `${metric}{namespace="${this.namespaceOf(q)}", container=~"kuberoapp-web|kuberoapp-worker", ${this.podFilter(q)}}`;
     //console.log(query);
     const { end, start, step } = this.getStepsAndStart(q.scale);
     let result: QueryResult | undefined;
@@ -152,7 +195,7 @@ export class MetricsService {
       });
     }
 
-    return resp;
+    return this.limitSeries(resp);
   }
 
   public async getLoadMetrics(q: PrometheusQuery): Promise<IMetric[]> {
@@ -180,7 +223,7 @@ export class MetricsService {
       });
     }
 
-    return resp;
+    return this.limitSeries(resp);
   }
 
   private getStepsAndStart(scale: string): {
@@ -225,7 +268,7 @@ export class MetricsService {
 
     const { end, start, step, vector } = this.getStepsAndStart(q.scale);
     // rate(nginx_ingress_controller_requests{namespace="asdf-production", host="a.a.localhost"}[10m])
-    const query = `${q.calc}(container_cpu_usage_seconds_total{namespace="${q.pipeline}-${q.phase}", container=~"kuberoapp-web|kuberoapp-worker"}[${vector}])`;
+    const query = `${this.calcOf(q)}(container_cpu_usage_seconds_total{namespace="${this.namespaceOf(q)}", container=~"kuberoapp-web|kuberoapp-worker", ${this.podFilter(q)}}[${vector}])`;
     //console.log(query);
     try {
       metrics = await this.prom.rangeQuery(query, start, end, step);
@@ -246,7 +289,7 @@ export class MetricsService {
       console.log(end, start, step);
       console.log(this.prom);
     }
-    return resp;
+    return this.limitSeries(resp);
   }
 
   public async getHttpStatusCodesMetrics(
@@ -257,7 +300,7 @@ export class MetricsService {
 
     const { end, start, step, vector } = this.getStepsAndStart(q.scale);
     // rate(nginx_ingress_controller_requests{namespace="asdf-production", host="a.a.localhost"}[10m])
-    const query = `${q.calc}(nginx_ingress_controller_requests{namespace="${q.pipeline}-${q.phase}", host="${q.host}"}[${vector}])`;
+    const query = `${this.calcOf(q)}(nginx_ingress_controller_requests{namespace="${this.namespaceOf(q)}", host="${this.safe('host', q.host)}"}[${vector}])`;
     //console.log(query);
     try {
       metrics = await this.prom.rangeQuery(query, start, end, step);
@@ -289,7 +332,7 @@ export class MetricsService {
 
     const { end, start, step, vector } = this.getStepsAndStart(q.scale);
     // rate(nginx_ingress_controller_response_duration_seconds_count{namespace="asdf-production", host="a.a.localhost",status="200"}[10m]) //in ms
-    const query = `${q.calc}(nginx_ingress_controller_response_duration_seconds_count{namespace="${q.pipeline}-${q.phase}", host="${q.host}", status="200"}[${vector}])`;
+    const query = `${this.calcOf(q)}(nginx_ingress_controller_response_duration_seconds_count{namespace="${this.namespaceOf(q)}", host="${this.safe('host', q.host)}", status="200"}[${vector}])`;
     //console.log(query);
     try {
       metrics = await this.prom.rangeQuery(query, start, end, step);
@@ -321,7 +364,7 @@ export class MetricsService {
 
     const { end, start, step, vector } = this.getStepsAndStart(q.scale);
     // sum(rate(nginx_ingress_controller_response_size_sum{namespace="asdf-production", host="a.a.localhost"}[10m]))
-    const query = `sum(${q.calc}(nginx_ingress_controller_response_size_sum{namespace="${q.pipeline}-${q.phase}", host="${q.host}"}[${vector}]))`;
+    const query = `sum(${this.calcOf(q)}(nginx_ingress_controller_response_size_sum{namespace="${this.namespaceOf(q)}", host="${this.safe('host', q.host)}"}[${vector}]))`;
     //console.log(query);
     try {
       metrics = await this.prom.rangeQuery(query, start, end, step);

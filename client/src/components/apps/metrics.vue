@@ -99,7 +99,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, markRaw } from 'vue'
 import VueApexCharts from "vue3-apexcharts";
 import { useKuberoStore } from '../../stores/kubero'
 import { mapState } from 'pinia'
@@ -700,7 +700,7 @@ export default defineComponent({
                 }
             })
             .then((response) => {
-                this.memoryData = response.data;
+                this.memoryData = markRaw(response.data);
             })
             .catch((error) => {
                 console.log(error);
@@ -713,7 +713,7 @@ export default defineComponent({
                 }
             })
             .then((response) => {
-              this.loadData = response.data;
+              this.loadData = markRaw(response.data);
             })
             .catch((error) => {
                 console.log(error);
@@ -728,8 +728,8 @@ export default defineComponent({
                 }
             })
             .then((response) => {
-              this.httpStusCodeData = response.data;
-              this.httpStusCodeDataIncrease = response.data;
+              this.httpStusCodeData = markRaw(response.data);
+              this.httpStusCodeDataIncrease = markRaw(response.data);
             })
             .catch((error) => {
                 console.log(error);
@@ -744,7 +744,7 @@ export default defineComponent({
                 }
             })
             .then((response) => {
-              this.httpStusCodeDataIncrease = response.data;
+              this.httpStusCodeDataIncrease = markRaw(response.data);
             })
             .catch((error) => {
                 console.log(error);
@@ -774,7 +774,7 @@ export default defineComponent({
                 }
             })
             .then((response) => {
-              this.httpResponseTrafficData = response.data;
+              this.httpResponseTrafficData = markRaw(response.data);
             })
             .catch((error) => {
                 console.log(error);
@@ -789,7 +789,7 @@ export default defineComponent({
                 }
             })
             .then((response) => {
-              this.cpuData = response.data;
+              this.cpuData = markRaw(response.data);
             })
             .catch((error) => {
                 console.log(error);
@@ -804,7 +804,7 @@ export default defineComponent({
                 }
             })
             .then((response) => {
-              this.cpuDataRate = response.data;
+              this.cpuDataRate = markRaw(response.data);
             })
             .catch((error) => {
                 console.log(error);

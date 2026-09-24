@@ -15,7 +15,6 @@ export interface INotification {
     | 'addon'
     | 'settings'
     | 'events'
-    | 'security'
     | 'templates'
     | 'config'
     | 'addons'

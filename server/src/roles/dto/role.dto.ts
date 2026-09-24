@@ -22,6 +22,8 @@ const RESOURCE_TYPES = [
   'addon',
   'settings',
   'events',
+  // ya no lo usa ningún endpoint (se quitó el escaneo de vulnerabilidades), pero
+  // se sigue aceptando: roles antiguos lo tienen y un cliente viejo lo reenvía
   'security',
   'templates',
   'config',

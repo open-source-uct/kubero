@@ -97,7 +97,6 @@ const messages = {
           metrics: 'Metrics',
           logs: 'Logs',
           events: 'Events',
-          vulnerabilities: 'Vulnerabilities',
         },
         actions: {
           name: 'Actions',
@@ -164,7 +163,6 @@ const messages = {
           basicAuthPass: 'Password',
           readOnlyAppStorage: 'Read-Only App Volume',
           readOnlyRootFilesystem: 'Read-Only Root Filesystem',
-          vulnerabililityScan: 'Enable Trivy vulnerabfility scans',
           privilegeEscalation: 'Allow Privilege Escalation',
           runAsNonRoot: 'Run as Non-Root',
           runAsUser: 'Run as User',
@@ -248,26 +246,6 @@ const messages = {
             title: 'No events for {app}',
             message: 'The default TTL for events in the Kube-API is 1 hour. If you want to see older events, you have to increase the TTL in the Kube-apiserver.',
             link: 'Kubernetes Docs',
-          }
-        },
-        vulnerabilities: {
-          scanFailed: 'The vulnerability scan failed. Try again in a moment.',
-          scanTimeout: 'The scan is taking too long. Check the scan job of this app.',
-          lastScan: 'Last Scan',
-          artefact: 'Artifact',
-          arch: 'Architecture',
-          created: 'Created',
-          os: 'OS',
-          layers: 'Layers',
-          workingDir: 'Working Directory',
-          exposedPorts: 'Exposed Ports',
-          summary: 'Summary',
-          empty: {
-            title: 'No vulnerabilityscans found for { app }',
-            message: 'To scan this app for vulnerabilities, please trigger a rescan.',
-          },
-          actions: {
-            rescan: 'Rescan',
           }
         },
       },
@@ -371,7 +349,6 @@ const messages = {
             pipelines: 'Pipelines',
             accounts: 'Accounts',
             settings: 'Settings',
-            security: 'Security',
             tokens: 'Tokens',
             audit: 'Audit',
             console: 'Console',

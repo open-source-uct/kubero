@@ -60,18 +60,6 @@
         </div>
     </v-card-text>
 
-    <table style="width: 100%;" v-if="vulnSummary.unknown != undefined">
-      <tbody>
-        <tr>
-          <td title="UNKNOWN" class="vuln-summary severity-unknown">{{ vulnSummary.unknown }}<br>UNKNOWN</td>
-          <td title="LOW" class="vuln-summary severity-low">{{ vulnSummary.low }}<br>LOW</td>
-          <td title="MEDIUM" class="vuln-summary severity-medium">{{ vulnSummary.medium }}<br>MEDIUM</td>
-          <td title="HIGH" class="vuln-summary severity-high">{{ vulnSummary.high }}<br>HIGH</td>
-          <td title="CRITICAL" class="vuln-summary severity-critical">{{ vulnSummary.critical }}<br>CRITICAL</td>
-          <td title="TOTAL" class="vuln-summary severity-total">{{ vulnSummary.total }}<br>TOTAL</td>
-        </tr>
-      </tbody>
-    </table>
 
     <v-divider></v-divider>
     <v-card-text v-if="metricsDisplay == 'bars'" class="py-2">
@@ -244,20 +232,11 @@ export default defineComponent({
       loadingState: false,
       metrics: [] as Metric[],
       metricsDisplay: "dots",
-      vulnSummary: {
-        "total": undefined,
-        "critical": undefined,
-        "high": undefined,
-        "medium": undefined,
-        "low": undefined,
-        "unknown": undefined
-      },
       metricsInterval: 0 as any, // can't find the right type for this "as unknown as NodeJS.Timeout,"
     }),
     mounted() {
         this.loadMetrics();
         this.metricsInterval = setInterval(this.loadMetrics, 40000);
-        this.loadVulnSummary();
     },
     unmounted() {
         clearInterval(this.metricsInterval);
@@ -327,32 +306,11 @@ export default defineComponent({
                 console.log(error);
             });
         },
-        loadVulnSummary() {
-            axios.get(`/api/security/${this.pipeline}/${this.phase}/${this.app.name}/scan/result`)
-            .then(response => {
-                this.vulnSummary = response.data.logsummary;
-            })
-            .catch(error => {
-                console.log(error);
-            });
-        },
     }
 });
 </script>
 
 <style>
-.vuln-summary {
-    font-size: 0.75rem;
-    font-weight: 500;
-    line-height: 1.5;
-    letter-spacing: 0.00938em;
-    text-transform: uppercase;
-    color: rgba(0, 0, 0, 0.54);
-
-    width: 16%;
-    text-align: center;
-}
-
 .v-btn.v-size--default {
     font-size: 0.675rem;
 }

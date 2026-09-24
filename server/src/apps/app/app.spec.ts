@@ -76,11 +76,6 @@ const baseApp = {
     },
     pullPolicy: 'Always',
   },
-  vulnerabilityscan: {
-    enabled: false,
-    schedule: '* * * * *',
-    image: { repository: 'repo', tag: 'tag' },
-  },
   serviceAccount: { annotations: {}, create: true, name: 'svc' },
   ingress: {
     annotations: {},

@@ -34,7 +34,7 @@ kuberoStore.kubero.socket = socket;
 type Message = {
     name: string,
     user: string,
-    resource: "system" | "app" | "pipeline" | "phase" | "namespace" | "addon" | "settings" | "user" | "events" | "security" | "templates" | "config" | "addons" | "kubernetes" | "unknown",
+    resource: "system" | "app" | "pipeline" | "phase" | "namespace" | "addon" | "settings" | "user" | "events" | "templates" | "config" | "addons" | "kubernetes" | "unknown",
     action: string,
     severity: "normal" | "info" | "warning" | "critical" | "error" | "unknown",
     message: string,

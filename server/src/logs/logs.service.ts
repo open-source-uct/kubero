@@ -177,7 +177,7 @@ export class LogsService {
         const isJob = !!pod.metadata?.labels?.['job-name'];
 
         if (container == 'web' && podName.startsWith(appPrefix) && !isJob) {
-          // only fetch logs for the web container, exclude trivy and build jobs
+          // only fetch logs for the web container, exclude job pods (builds)
           for (const c of pod.spec?.containers || []) {
             const ll = await this.fetchLogs(
               namespace,
