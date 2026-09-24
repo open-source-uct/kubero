@@ -89,7 +89,7 @@
                         <v-col cols="2" class="pb-0 text-right text-caption font-weight-light">Uptime</v-col>
                     </v-row>
                     <v-row v-for="metric in metrics" :key="metric.name" id="metrics">
-                        <v-col cols="8" class="py-0 text-left text-body-2 overflow-x-hidden"><nobr>{{metric.name}}</nobr></v-col>
+                        <v-col cols="8" class="py-0 text-left text-body-2 overflow-x-hidden"><span style="white-space: nowrap;">{{metric.name}}</span></v-col>
                         <v-col cols="1" class="py-0 text-left text-body-2">{{metric.cpu.usage}}{{metric.cpu.unit}}</v-col>
                         <v-col cols="1" class="py-0 text-right text-body-2">{{metric.memory.usage}}{{metric.memory.unit}}</v-col>
                         <v-col cols="2" class="py-0 text-right text-body-2">{{metric.uptime.formatted}}</v-col>
@@ -350,14 +350,6 @@ interface Spec {
   };
   fullnameOverride: string;
   image: Image;
-  vulnerabilityscan: {
-    enabled: boolean;
-    image: {
-      repository: string;
-      tag: string;
-    };
-    schedule: string;
-  };
   imagePullSecrets: any[];
   ingress: Ingress;
   nameOverride: string;
@@ -405,14 +397,6 @@ type appData = {
         },
         fullnameOverride: string,
         image: Image,
-        vulnerabilityscan: {
-            enabled: boolean,
-            image: {
-                repository: string,
-                tag: string,
-            },
-            schedule: string,
-        },
         imagePullSecrets: any[],
         ingress: Ingress,
         nameOverride: string,

@@ -72,14 +72,6 @@ export interface IApp {
   extraVolumes: IExtraVolume[];
   cronjobs: ICronjob[];
   addons: IAddon[];
-  vulnerabilityscan: {
-    enabled: boolean;
-    schedule: string;
-    image: {
-      repository: string;
-      tag: string;
-    };
-  };
   ingress: {
     annotations: object;
     className: string;

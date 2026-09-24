@@ -2,7 +2,6 @@
     <v-container>
         <v-row class="justify-space-between mb-2">
             <v-col cols="10" sm="10" md="10" lg="10" xl="10">
-                <!--<h1>Vulnerabilities in {{ app }}</h1>-->
             </v-col>
             <v-col>
                 <Buildsform :pipeline="pipeline" :phase="phase" :app="app" :appData="appData"></Buildsform>

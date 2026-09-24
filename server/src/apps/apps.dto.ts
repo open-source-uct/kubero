@@ -204,14 +204,6 @@ export class GetAppDTO {
     };
     sleep: string;
     tolerations: Array<any>;
-    vulnerabilityscan: {
-      enabled: boolean;
-      image: {
-        repository: string;
-        tag: string;
-      };
-      schedule: string;
-    };
     web: {
       autoscaling: {
         maxReplicas: number;

@@ -9,7 +9,6 @@
                 <v-tab class="background">{{ $t('app.nav.metrics') }}</v-tab>
                 <v-tab class="background" :disabled="!authStore.hasPermission('logs:ok')">{{ $t('app.nav.logs') }}</v-tab>
                 <v-tab class="background">{{ $t('app.nav.events') }}</v-tab>
-                <v-tab class="background" :disabled="!authStore.hasPermission('security:read') && !authStore.hasPermission('security:write')">{{ $t('app.nav.vulnerabilities') }}</v-tab>
                 <v-spacer  class="background"></v-spacer>
             </v-tabs>
 
@@ -67,23 +66,20 @@
         </v-container>
         
         <v-window v-model="tab">
-            <v-window-item transition="false" reverse-transition="false" class="background">
+            <v-window-item :transition="false" :reverse-transition="false" class="background">
                 <Overview :pipeline="pipeline" :phase="phase" :app="app" :appData="appData" :pipelineData="pipelineData"/>
             </v-window-item>
-            <v-window-item transition="false" reverse-transition="false" class="background">
+            <v-window-item :transition="false" :reverse-transition="false" class="background">
                 <Builds :pipeline="pipeline" :phase="phase" :app="app" :appData="appData" :pipelineData="pipelineData"/>
             </v-window-item>
-            <v-window-item transition="false" reverse-transition="false" class="background">
+            <v-window-item :transition="false" :reverse-transition="false" class="background">
                 <Metrics :pipeline="pipeline" :phase="phase" :app="app" :host="appData.spec.ingress.hosts[0].host" :active="tab == 2"/>
             </v-window-item>
-            <v-window-item transition="false" reverse-transition="false" class="background">
+            <v-window-item :transition="false" :reverse-transition="false" class="background">
                 <LogsTab :pipeline="pipeline" :phase="phase" :app="app" :deploymentstrategy="appData.spec.deploymentstrategy" :buildstrategy="appData.spec.buildstrategy" :hasAddons="(appData.spec.addons?.length ?? 0) > 0"/>
             </v-window-item>
-            <v-window-item transition="false" reverse-transition="false" class="background">
+            <v-window-item :transition="false" :reverse-transition="false" class="background">
                 <Events :pipeline="pipeline" :phase="phase" :app="app"/>
-            </v-window-item>
-            <v-window-item transition="false" reverse-transition="false" class="background">
-                <Vulnerabilities :pipeline="pipeline" :phase="phase" :app="app"/>
             </v-window-item>
         </v-window>
     </v-container>
@@ -98,7 +94,6 @@ import Events from "./events.vue";
 import LogsTab from "./logstab.vue";
 import Metrics from "./metrics.vue";
 import Builds from "./builds.vue";
-import Vulnerabilities from "./vulnerabilities.vue";
 import Swal from 'sweetalert2';
 import { useKuberoStore } from '../../stores/kubero'
 import { mapState } from 'pinia'
@@ -247,7 +242,6 @@ export default defineComponent({
         Breadcrumbs,
         Events,
         LogsTab,
-        Vulnerabilities,
         Overview,
         Metrics,
         Builds

@@ -263,13 +263,6 @@
                   color="primary"
                 ></v-switch>
               </v-col>
-              <v-col cols="12" md="6">
-                <v-switch
-                  v-model="vulnerabilityscan.enabled"
-                  :label="$t('app.form.vulnerabililityScan')"
-                  color="primary"
-                ></v-switch>
-              </v-col>
             </v-row>
 
             <v-row>
@@ -1466,14 +1459,6 @@ export default defineComponent({
         "SYSLOG",
         "WAKE_ALARM",
       ],
-      vulnerabilityscan: {
-        enabled: false,
-        schedule: "0 0 * * *",
-        image: {
-          repository: "aquasec/trivy",
-          tag: "latest",
-        },
-      },
       healthcheck: {
         enabled: true,
         path: "/",
@@ -1894,7 +1879,6 @@ export default defineComponent({
             this.cronjobs =
               this.cronjobUnformat(response.data.spec.cronjobs) || [];
             this.addons = response.data.spec.addons || [];
-            this.vulnerabilityscan = response.data.spec.vulnerabilityscan;
             this.ingress = response.data.spec.ingress || {};
             this.healthcheck = response.data.spec.healthcheck || {
               enabled: true,
@@ -2100,7 +2084,6 @@ export default defineComponent({
           addons: this.addons,
           security: this.security,
           ingress: this.ingress,
-          vulnerabilityscan: this.vulnerabilityscan,
           healthcheck: this.healthcheck,
         };
 
@@ -2217,7 +2200,6 @@ export default defineComponent({
           addons: this.addons,
           security: this.security,
           ingress: this.ingress,
-          vulnerabilityscan: this.vulnerabilityscan,
           healthcheck: this.healthcheck,
         };
 

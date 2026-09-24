@@ -16,7 +16,6 @@ import { KubernetesModule } from './kubernetes/kubernetes.module';
 import { AuditModule } from './audit/audit.module';
 import { AddonsModule } from './addons/addons.module';
 import { NotificationsModule } from './notifications/notifications.module';
-import { SecurityModule } from './security/security.module';
 import { TemplatesController } from './templates/templates.controller';
 import { TemplatesService } from './templates/templates.service';
 import { StatusModule } from './status/status.module';
@@ -44,7 +43,6 @@ import { CliModule } from './cli/cli.module';
     AuditModule,
     AddonsModule,
     NotificationsModule,
-    SecurityModule,
     StatusModule,
     DatabaseModule,
     GroupModule,

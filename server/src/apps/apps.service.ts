@@ -363,14 +363,6 @@ export class AppsService {
           cronjobs: [],
           addons: [],
           resources: {},
-          vulnerabilityscan: {
-            enabled: false,
-            schedule: '0 0 * * *',
-            image: {
-              repository: 'aquasec/trivy',
-              tag: 'latest',
-            },
-          },
           ingress: {
             annotations: {},
             className: process.env.INGRESS_CLASSNAME || 'nginx',
