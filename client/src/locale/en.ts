@@ -35,9 +35,13 @@ const messages = {
         applyChanges: "Apply Changes",
         login: "Login",
         faculty: "Facultad de Ingeniería · UCT",
+        close: "Close",
+        copy: "Copy",
+        edit: "Edit",
+        delete: "Delete",
       },
       setup: {
-        title: "Asistente de Configuración Inicial · Kubero",
+        title: "Initial Setup Wizard · Kubero",
       },
       pipeline: {
         name: 'Pipeline',
@@ -290,7 +294,8 @@ const messages = {
         },
       },
       user: {
-    active: 'Active',
+        active: 'Active',
+        disabled: 'Disabled',
         name: 'User',
         email: 'E-Mail',
         username: 'Username',
@@ -503,6 +508,11 @@ const messages = {
         },
       },
       settings: {
+        tabs: {
+          general: 'General',
+          deployment: 'Deployment',
+          templates: 'Templates',
+        },
         deployment: {
           title: 'Connecting repositories',
           configAlert: 'Configuration changes won\'t take effect until the Kubero UI container is restarted manually.',
@@ -579,6 +589,10 @@ const messages = {
             size: 'Size',
           },
         },
+        templates: {
+          title: 'Templates',
+          allowTemplates: 'Allow Templates',
+        },
       },
       templates: {
         search: 'Search',
@@ -589,6 +603,10 @@ const messages = {
           install: 'Install',
           loadTemplate: 'Load Template',
         },
+      },
+      builds: {
+        newBuild: 'New Build',
+        build: 'Build',
       },
       $vuetify: {
         ...en,

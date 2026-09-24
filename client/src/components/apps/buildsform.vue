@@ -8,7 +8,7 @@
           <v-btn
             block
             prepend-icon="mdi-wrench"
-            text="Build"
+            :text="$t('builds.build')"
             color="secondary"
             v-bind="activatorProps"
           ></v-btn>

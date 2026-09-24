@@ -23,7 +23,7 @@
       </template>
       <template v-slot:[`item.isActive`]="{ item }">
         <v-chip :color="item.isActive ? 'green' : 'red'" dark>
-          {{ item.isActive ? 'Aktive' : 'Disabled' }}
+          {{ item.isActive ? $t('user.active') : $t('user.disabled') }}
         </v-chip>
       </template>
       <template v-slot:[`item.name`]="{ item }">

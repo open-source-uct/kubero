@@ -2,9 +2,9 @@
   <v-form>
     <v-container>
       <v-tabs v-model="tab" style="margin-bottom: 30px">
-        <v-tab value="general">{{ $t('settings.general') }}</v-tab>
-        <v-tab value="deployment">{{ $t('settings.deployment') }}</v-tab>
-        <v-tab value="templates">{{ $t('settings.templates') }}</v-tab>
+        <v-tab value="general">{{ $t('settings.tabs.general') }}</v-tab>
+        <v-tab value="deployment">{{ $t('settings.tabs.deployment') }}</v-tab>
+        <v-tab value="templates">{{ $t('settings.tabs.templates') }}</v-tab>
       </v-tabs>
 
       <v-window v-model="tab">

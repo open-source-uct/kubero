@@ -34,6 +34,10 @@ const messages = {
     applyChanges: 'Aplicar cambios',
     login: 'Iniciar Sesión',
     faculty: 'Facultad de Ingeniería · UCT',
+    close: 'Cerrar',
+    copy: 'Copiar',
+    edit: 'Editar',
+    delete: 'Eliminar',
   },
   setup: {
     title: 'Asistente de Configuración Inicial · Kubero',
@@ -289,6 +293,7 @@ const messages = {
   },
   user: {
     active: 'Activo',
+    disabled: 'Deshabilitado',
     name: 'Usuario',
     email: 'Correo electrónico',
     username: 'Nombre de usuario',
@@ -501,6 +506,11 @@ const messages = {
     },
   },
   settings: {
+    tabs: {
+      general: 'General',
+      deployment: 'Despliegue',
+      templates: 'Plantillas',
+    },
     deployment: {
       title: 'Conectar repositorios',
       configAlert: 'Los cambios de configuración no surtirán efecto hasta que el contenedor de la interfaz de Kubero se reinicie manualmente.',
@@ -572,10 +582,14 @@ const messages = {
       auditLogs: {
         title: 'Registros de auditoría',
         enabled: 'Habilitado (**)',
-        storageClass: 'Storage Class',
+        storageClass: 'Clase de almacenamiento',
         limit: 'Límite',
         size: 'Tamaño',
       },
+    },
+    templates: {
+      title: 'Plantillas',
+      allowTemplates: 'Permitir plantillas',
     },
   },
   templates: {
@@ -587,6 +601,10 @@ const messages = {
       install: 'Instalar',
       loadTemplate: 'Cargar plantilla',
     },
+  },
+  builds: {
+    newBuild: 'Nueva compilación',
+    build: 'Compilar',
   },
   $vuetify: {
     ...es,
