@@ -6,7 +6,12 @@ const authFile = path.resolve(__dirname, '../.auth/user.json');
 
 setup('Autenticar usuario admin y guardar estado de sesion', async ({ page }) => {
   const user = process.env.E2E_USERNAME || 'admin';
-  const password = process.env.E2E_PASSWORD || 'Ypoy1lnew/sTRJUpg5I';
+  const password = process.env.E2E_PASSWORD;
+  if (!password) {
+    throw new Error(
+      'Falta la variable de entorno E2E_PASSWORD. Copia client/.env.example a client/.env y define las credenciales de prueba.',
+    );
+  }
 
   // Asegurar que el directorio de almacenamiento de sesión existe
   const authDir = path.dirname(authFile);
