@@ -18,3 +18,9 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright & E2E Test Artifacts
+test-results/
+playwright-report/
+e2e/.auth/
+.env

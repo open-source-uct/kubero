@@ -25,12 +25,14 @@
             v-if="rail"
             icon="mdi-chevron-right"
             variant="text"
+            aria-label="Expand navigation"
             @click="rail = false"
           ></v-btn>
           <v-btn
             v-else
             icon="mdi-chevron-left"
             variant="text"
+            aria-label="Collapse navigation"
             @click="rail = true"
           ></v-btn>
         </template>
@@ -150,7 +152,7 @@
                 target="_blank"
                 prepend-icon="mdi-discord"
                 :title="$t('navigation.discord')">
-                <img src="./../../../public/img/icons/discord.svg" class="image-icon"/>
+                <img src="./../../../public/img/icons/discord.svg" class="image-icon" alt="Discord"/>
             </v-list-item>
             <!--
             <v-list-item 
