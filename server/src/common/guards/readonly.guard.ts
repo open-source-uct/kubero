@@ -10,7 +10,7 @@ import {
 @Injectable()
 export class ReadonlyGuard implements CanActivate {
   private logger = new Logger(ReadonlyGuard.name);
-  canActivate(context: ExecutionContext): boolean {
+  canActivate(_context: ExecutionContext): boolean {
     if (process.env.KUBERO_READONLY === 'true') {
       this.logger.warn(
         'Kubero is in read-only mode, write operations are blocked',

@@ -38,7 +38,7 @@ export interface IPipelinePhase {
   name: string;
   enabled: boolean;
   context: string;
-  defaultEnvvars: {}[];
+  defaultEnvvars: object[];
   domain: string;
   //apps: IApp[];
 }

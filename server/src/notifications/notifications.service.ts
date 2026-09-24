@@ -35,9 +35,15 @@ export class NotificationsService {
   }
 
   public async send(message: INotification) {
-    this.sendWebsocketMessage(message);
-    this.createKubernetesEvent(message);
-    this.writeAuditLog(message);
+    // las notificaciones son secundarias: un fallo aquí no debe romper la
+    // operación que las dispara (los callers no esperan a send)
+    try {
+      this.sendWebsocketMessage(message);
+      this.createKubernetesEvent(message);
+      this.writeAuditLog(message);
+    } catch (error) {
+      this.logger.error('Failed to emit notification', error);
+    }
 
     // Load notifications from database instead of config
     try {
@@ -67,7 +73,7 @@ export class NotificationsService {
   }
 
   private createKubernetesEvent(n: INotification) {
-    this.kubectl.createEvent(
+    void this.kubectl.createEvent(
       'Normal',
       n.action.replace(/^./, (str) => str.toUpperCase()),
       n.name,
@@ -76,7 +82,7 @@ export class NotificationsService {
   }
 
   private writeAuditLog(n: INotification) {
-    this.auditService.log({
+    void this.auditService.log({
       action: n.action,
       user: n.user,
       severity: n.severity,
@@ -91,7 +97,7 @@ export class NotificationsService {
 
   public sendDelayed(message: INotification) {
     setTimeout(() => {
-      this.send(message);
+      void this.send(message);
     }, 1000);
   }
 

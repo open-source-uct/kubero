@@ -8,7 +8,7 @@ import {
   IPullrequest,
 } from './types';
 import { Repo } from './repo';
-import gitUrlParse = require('git-url-parse');
+import * as gitUrlParse from 'git-url-parse';
 debug('app:kubero:gitea:api');
 
 //https://www.npmjs.com/package/gitea-js
@@ -236,7 +236,8 @@ export class GiteaApi extends Repo {
       branch = refs[refs.length - 1];
       ssh_url = body.repository.ssh_url;
     } else if (body.pull_request != undefined) {
-      ((action = body.action), (branch = body.pull_request.head.ref));
+      action = body.action;
+      branch = body.pull_request.head.ref;
       ssh_url = body.pull_request.head.repo.ssh_url;
     } else {
       ssh_url = body.repository.ssh_url;

@@ -299,11 +299,17 @@ export class RepoService {
 
     if (typeof webhook != 'boolean') {
       switch (webhook.event) {
+        // no se espera: el proveedor git no debe quedar esperando el rebuild,
+        // pero un fallo se registra en vez de quedar como promesa sin manejar
         case 'push':
-          this.handleWebhookPush(webhook);
+          this.handleWebhookPush(webhook).catch((error) => {
+            this.logger.error('handleWebhookPush failed: ' + error);
+          });
           break;
         case 'pull_request':
-          this.handleWebhookPullRequest(webhook);
+          this.handleWebhookPullRequest(webhook).catch((error) => {
+            this.logger.error('handleWebhookPullRequest failed: ' + error);
+          });
           break;
         default:
           this.logger.debug('webhook event not handled: ' + event);
@@ -344,9 +350,14 @@ export class RepoService {
           app: app,
         },
       } as INotification;
-      this.notificationsService.send(m);
+      void this.notificationsService.send(m);
 
-      this.appsService.rebuildApp(app, ['admin']); // return all pipelines to search for the app
+      // un app que falle no debe impedir el rebuild de las demás
+      try {
+        await this.appsService.rebuildApp(app, ['admin']); // return all pipelines to search for the app
+      } catch (error) {
+        this.logger.error('rebuild failed for ' + app.name + ': ' + error);
+      }
     }
   }
 
@@ -356,7 +367,7 @@ export class RepoService {
     switch (webhook.action) {
       case 'opened':
       case 'reopened':
-        this.appsService.createPRApp(
+        await this.appsService.createPRApp(
           webhook.branch,
           webhook.branch,
           webhook.repo.ssh_url,
@@ -365,7 +376,7 @@ export class RepoService {
         ); // "undefined" will create the app in all pipelines
         break;
       case 'closed':
-        this.appsService.deletePRApp(
+        await this.appsService.deletePRApp(
           webhook.branch,
           webhook.branch,
           webhook.repo.ssh_url,

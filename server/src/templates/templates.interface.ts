@@ -6,9 +6,9 @@ import { IAddon } from '../addons/addons.interface';
 export interface ITemplate {
   name: string;
   deploymentstrategy: 'git' | 'docker';
-  envVars: {}[];
+  envVars: object[];
   serviceAccount?: {
-    annotations: {};
+    annotations: object;
     create: boolean;
     name: string;
   };

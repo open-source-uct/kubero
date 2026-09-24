@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Post,
   Put,
@@ -25,6 +26,8 @@ import { ReadonlyGuard } from '../common/guards/readonly.guard';
 
 @Controller({ path: 'api/deployments', version: '1' })
 export class DeploymentsController {
+  private readonly logger = new Logger(DeploymentsController.name);
+
   constructor(private readonly deploymentsService: DeploymentsService) {}
 
   @Get('/:pipeline/:phase/:app')
@@ -183,13 +186,12 @@ export class DeploymentsController {
     @Param('tag') tag: string,
     @Request() req: any,
   ): Promise<OKDTO> {
-    this.deploymentsService.deployApp(
-      pipeline,
-      phase,
-      app,
-      tag,
-      req.user.userGroups,
-    );
+    // el deploy es asíncrono: se responde 'triggered' y un fallo se registra
+    this.deploymentsService
+      .deployApp(pipeline, phase, app, tag, req.user.userGroups)
+      .catch((error) => {
+        this.logger.error(`deployApp failed for ${app}: ${error}`);
+      });
     return {
       message: `Deployment triggered for ${app} in ${pipeline} phase ${phase} with tag ${tag}`,
       status: 'success',

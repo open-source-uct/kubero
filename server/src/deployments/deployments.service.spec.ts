@@ -10,13 +10,6 @@ import { mockKubectlApp as app } from '../apps/apps.controller.spec';
 
 const mockUserGroups = ['group1', 'group2'];
 
-const mockUser: IUser = {
-  username: 'testuser',
-  userId: 'testuser',
-  role: 'user',
-  userGroups: mockUserGroups,
-} as any;
-
 describe('DeploymentsService', () => {
   let service: DeploymentsService;
   let kubectl: jest.Mocked<KubernetesService>;

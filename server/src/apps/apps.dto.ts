@@ -13,7 +13,7 @@ class GetAppMetadataDTO {
     manager: string;
   };
   @ApiProperty()
-  managedFields: Array<{}>;
+  managedFields: Array<object>;
   @ApiProperty()
   name: string;
   @ApiProperty()
@@ -37,7 +37,7 @@ export class GetAppDTO {
   @ApiProperty()
   spec: {
     addons: Array<any>;
-    affinity: {};
+    affinity: object;
     autodeploy: boolean;
     autoscale: boolean;
     autoscaling: {
@@ -161,11 +161,11 @@ export class GetAppDTO {
     };
     name: string;
     nameOverride: string;
-    nodeSelector: {};
+    nodeSelector: object;
     phase: string;
     pipeline: string;
-    podAnnotations: {};
-    podSecurityContext: {};
+    podAnnotations: object;
+    podSecurityContext: object;
     podsize: {
       default: boolean;
       description: string;
@@ -200,7 +200,7 @@ export class GetAppDTO {
       type: string;
     };
     serviceAccount: {
-      annotations: {};
+      annotations: object;
     };
     sleep: string;
     tolerations: Array<any>;

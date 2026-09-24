@@ -7,7 +7,6 @@ import {
   HttpStatus,
   Param,
   Post,
-  Put,
   UseGuards,
   Request,
 } from '@nestjs/common';
@@ -167,10 +166,10 @@ export class TokenController {
         HttpStatus.BAD_REQUEST,
       );
     }
-    return this.tokenService.delete(id).then(() => {
-      this.tokenService
-        .findAll()
-        .then((tokens) => tokens.filter((token) => token.user.id === userId));
-    });
+    await this.tokenService.delete(id);
+    // devuelve los tokens que le quedan al usuario (antes la promesa interna
+    // no se retornaba y la respuesta salía vacía)
+    const tokens = await this.tokenService.findAll();
+    return tokens.filter((token) => token.user.id === userId);
   }
 }

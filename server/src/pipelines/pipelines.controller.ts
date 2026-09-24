@@ -5,7 +5,6 @@ import {
   Delete,
   ForbiddenException,
   Get,
-  HttpCode,
   HttpException,
   HttpStatus,
   Logger,
@@ -14,7 +13,6 @@ import {
   Put,
   UseGuards,
   Request,
-  Req,
 } from '@nestjs/common';
 import { PipelinesService } from './pipelines.service';
 import {

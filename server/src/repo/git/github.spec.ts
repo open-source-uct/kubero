@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import { GithubApi } from './github';
 import { Repo } from './repo';
 
@@ -150,7 +151,6 @@ describe('GithubApi', () => {
 
     it('should return a webhook object if signature is valid', () => {
       process.env.KUBERO_WEBHOOK_SECRET = 'secret';
-      const crypto = require('crypto');
       const body = {
         repository: { ssh_url: 'ssh://repo' },
         ref: 'refs/heads/main',

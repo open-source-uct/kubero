@@ -44,14 +44,14 @@ export class MetricsService {
 
     this.prom
       .status()
-      .then((status) => {
+      .then(() => {
         Logger.log(
           '✅ Feature: Prometheus Metrics initialized with ' + options.endpoint,
           'Feature',
         );
         this.status = true;
       })
-      .catch((error) => {
+      .catch(() => {
         Logger.warn(
           '❌ Feature: Prometheus not accesible on ' + options.endpoint,
           'Feature',
@@ -74,7 +74,7 @@ export class MetricsService {
       } else {
         return true;
       }
-    } catch (_error) {
+    } catch {
       return false;
     }
   }
@@ -113,7 +113,7 @@ export class MetricsService {
   ): Promise<QueryResult | undefined> {
     const query = `${metric}{namespace="${q.pipeline}-${q.phase}", container=~"kuberoapp-web|kuberoapp-worker"}`;
     //console.log(query);
-    const { end, start, step, vector } = this.getStepsAndStart(q.scale);
+    const { end, start, step } = this.getStepsAndStart(q.scale);
     let result: QueryResult | undefined;
     try {
       result = await this.prom.rangeQuery(query, start, end, step);
@@ -353,7 +353,7 @@ export class MetricsService {
     let rules: RuleGroup[] = [];
     try {
       rules = await this.prom.rules();
-    } catch (error) {
+    } catch {
       console.log('error fetching rules');
     }
 

@@ -377,7 +377,7 @@ export class UsersService {
   async delete(userId: string): Promise<void> {
     try {
       await this.prisma.user.delete({ where: { id: userId } });
-    } catch (error) {
+    } catch {
       this.logger.warn(`User with ID ${userId} not found for deletion.`);
     }
   }

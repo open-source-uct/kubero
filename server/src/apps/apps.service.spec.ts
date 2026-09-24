@@ -120,8 +120,6 @@ describe('AppsService', () => {
   let kubectl: jest.Mocked<KubernetesService>;
   let pipelinesService: jest.Mocked<PipelinesService>;
   let notificationsService: jest.Mocked<NotificationsService>;
-  let configService: jest.Mocked<ConfigService>;
-  let eventsGateway: jest.Mocked<EventsGateway>;
   const user: IUser = { id: '1', username: 'testuser' } as IUser;
 
   beforeEach(async () => {
@@ -160,8 +158,6 @@ describe('AppsService', () => {
     kubectl = module.get(KubernetesService);
     pipelinesService = module.get(PipelinesService);
     notificationsService = module.get(NotificationsService);
-    configService = module.get(ConfigService);
-    eventsGateway = module.get(EventsGateway);
   });
 
   it('should be defined', () => {

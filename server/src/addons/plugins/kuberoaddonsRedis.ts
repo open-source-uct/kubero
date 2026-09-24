@@ -1,4 +1,3 @@
-import { KuberoRabbitMQ } from './kuberoRabbitMQ';
 import { Plugin } from './plugin';
 import { IPlugin, IPluginFormFields } from './plugin.interface';
 
@@ -136,6 +135,6 @@ export class KuberoAddonRedis extends Plugin implements IPlugin {
 
   constructor(availableOperators: any) {
     super();
-    super.init(availableOperators);
+    void super.init(availableOperators);
   }
 }

@@ -84,6 +84,6 @@ kubectl apply -n mongodb-operator-system --server-side -f https://raw.githubuser
 
   constructor(availableOperators: any) {
     super();
-    super.init(availableOperators);
+    void super.init(availableOperators);
   }
 }

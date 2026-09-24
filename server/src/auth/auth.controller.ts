@@ -83,9 +83,8 @@ export class AuthController {
         req.headers.authorization.split(' ')[1],
       );
     }
-    const { message, status } =
-      await this.authService.getSession(isAuthenticated);
-    //res.status(status);
+    // status siempre es 200 (ver getSession), no hace falta aplicarlo
+    const { message } = await this.authService.getSession(isAuthenticated);
     res.send(message);
   }
 

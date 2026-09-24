@@ -103,7 +103,6 @@ describe('SecurityService', () => {
           },
         ],
       };
-      // @ts-ignore
       const summary = service['getVulnSummary'](logs);
       expect(summary.total).toBe(6);
       expect(summary.critical).toBe(1);
@@ -114,7 +113,6 @@ describe('SecurityService', () => {
     });
 
     it('should return default summary if logs are missing', () => {
-      // @ts-ignore
       const summary = service['getVulnSummary'](null);
       expect(summary.total).toBe(0);
     });

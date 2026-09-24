@@ -32,7 +32,7 @@ describe('GroupsService', () => {
       },
     };
     service = new GroupsService();
-    // @ts-ignore
+    // @ts-expect-error prisma es privado; se reemplaza por un mock
     service['prisma'] = prismaMock;
   });
 

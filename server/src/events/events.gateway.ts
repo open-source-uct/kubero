@@ -4,7 +4,6 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
-  WsResponse,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { UseGuards } from '@nestjs/common';
@@ -27,21 +26,21 @@ export class EventsGateway {
   }
 
   @SubscribeMessage('join')
-  handleJoin(
+  async handleJoin(
     @MessageBody() data: { room: string },
     @ConnectedSocket() client: Socket,
-  ): void {
+  ): Promise<void> {
     //Logger.debug('joining room ' + data.room);
-    client.join(data.room);
+    await client.join(data.room);
   }
 
   @SubscribeMessage('leave')
-  handleLeave(
+  async handleLeave(
     @MessageBody() data: { room: string },
     @ConnectedSocket() client: Socket,
-  ): void {
+  ): Promise<void> {
     //Logger.debug('leaving room ' + data.room);
-    client.leave(data.room);
+    await client.leave(data.room);
   }
 
   sendEvent(event: string, data: any) {
@@ -57,7 +56,7 @@ export class EventsGateway {
   @SubscribeMessage('terminal')
   handleTerminal(
     @MessageBody() data: any,
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() _client: Socket,
   ): void {
     if (this.execStreams[data.room]) {
       this.execStreams[data.room].stream.write(data.data);

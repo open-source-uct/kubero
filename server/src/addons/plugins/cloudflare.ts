@@ -128,6 +128,6 @@ export class Tunnel extends Plugin implements IPlugin {
 
   constructor(availableOperators: any) {
     super();
-    super.init(availableOperators);
+    void super.init(availableOperators);
   }
 }

@@ -26,11 +26,6 @@ const validDockerPipeline = {
 };
 
 const mockUserGroups = ['group1', 'group2'];
-const mockUser = {
-  id: 1,
-  strategy: 'local',
-  username: 'admin',
-};
 
 const mockJWT = {
   userId: 1,

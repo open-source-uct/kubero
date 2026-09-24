@@ -79,6 +79,7 @@ describe('TokenController', () => {
       const req = { user: { userId: 'u1' } };
       const result = await controller.deleteMyToken('1', req);
       expect(tokenService.delete).toHaveBeenCalledWith('1');
+      expect(result).toEqual([{ id: '1', user: { id: 'u1' } }]);
     });
 
     it('should throw if id or userId missing', async () => {
