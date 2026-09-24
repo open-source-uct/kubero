@@ -251,6 +251,8 @@ const messages = {
           }
         },
         vulnerabilities: {
+          scanFailed: 'The vulnerability scan failed. Try again in a moment.',
+          scanTimeout: 'The scan is taking too long. Check the scan job of this app.',
           lastScan: 'Last Scan',
           artefact: 'Artifact',
           arch: 'Architecture',

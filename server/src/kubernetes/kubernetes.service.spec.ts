@@ -239,6 +239,190 @@ describe('KubernetesService', () => {
     expect((service as any).kc.setCurrentContext).not.toHaveBeenCalled();
   });
 
+  describe('pipelines list cache', () => {
+    const list = (service: any) =>
+      service.customObjectsApi.listNamespacedCustomObject;
+    const body = (...pipelines: any[]) => ({
+      body: {
+        items: pipelines.map((p) => ({ spec: p })),
+      },
+    });
+
+    it('reads Kubernetes once for calls made within a few seconds', async () => {
+      list(service).mockClear();
+      await service.getPipelinesList(['admin']);
+      await service.getPipelinesList(['admin']);
+      await service.getPipelinesList(['Taller1']);
+      expect(list(service)).toHaveBeenCalledTimes(1);
+    });
+
+    it('shares one read between simultaneous calls', async () => {
+      list(service).mockClear();
+      await Promise.all([
+        service.getPipelinesList(['admin']),
+        service.getPipelinesList(['admin']),
+        service.getPipelinesList(['admin']),
+      ]);
+      expect(list(service)).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not hand the cached object to callers: one user cannot alter what another gets', async () => {
+      list(service).mockResolvedValue(
+        body(
+          { name: 'a', access: { teams: ['Taller1'] } },
+          { name: 'b', access: { teams: ['Taller2'] } },
+        ),
+      );
+      (service as any).invalidatePipelinesCache();
+      const first = await service.getPipelinesList(['Taller1']);
+      expect(first.items.map((i: any) => i.spec.name)).toEqual(['a']);
+      first.items[0].spec.name = 'tampered';
+      const second = await service.getPipelinesList(['Taller1']);
+      expect(second.items.map((i: any) => i.spec.name)).toEqual(['a']);
+      const other = await service.getPipelinesList(['Taller2']);
+      expect(other.items.map((i: any) => i.spec.name)).toEqual(['b']);
+    });
+
+    it('still filters by team on every call', async () => {
+      list(service).mockResolvedValue(
+        body({ name: 'a', access: { teams: ['Taller1'] } }),
+      );
+      (service as any).invalidatePipelinesCache();
+      expect((await service.getPipelinesList(['Taller2'])).items).toHaveLength(
+        0,
+      );
+      expect((await service.getPipelinesList(['Taller1'])).items).toHaveLength(
+        1,
+      );
+      expect((await service.getPipelinesList(['admin'])).items).toHaveLength(1);
+    });
+
+    it.each([
+      ['createPipeline', (s: any) => s.createPipeline({ name: 'n' })],
+      ['updatePipeline', (s: any) => s.updatePipeline({ name: 'n' }, '1')],
+      ['deletePipeline', (s: any) => s.deletePipeline('n')],
+    ])(
+      'is dropped after %s so the change is visible immediately',
+      async (_n, write) => {
+        list(service).mockResolvedValue(body({ name: 'a' }));
+        (service as any).invalidatePipelinesCache();
+        await service.getPipelinesList([]);
+        list(service).mockClear();
+        await write(service);
+        await service.getPipelinesList([]);
+        expect(list(service)).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it('does not cache a failed read', async () => {
+      (service as any).invalidatePipelinesCache();
+      list(service).mockClear();
+      list(service).mockRejectedValueOnce(new Error('api down'));
+      await expect(service.getPipelinesList([])).rejects.toThrow('api down');
+      list(service).mockResolvedValue(body({ name: 'a' }));
+      const ok = await service.getPipelinesList([]);
+      expect(ok.items).toHaveLength(1);
+    });
+  });
+
+  describe('vulnerability scan jobs', () => {
+    it('deletes the previous scan job WITH its pods (background propagation)', async () => {
+      // sin propagationPolicy los pods del escaneo anterior quedaban huérfanos
+      // y se acumulaban en el namespace de la app
+      const batch = (service as any).batchV1Api;
+      await service.createScanImageJob('ns', 'app', 'img', 'v1', false);
+      expect(batch.deleteNamespacedJob).toHaveBeenCalledWith(
+        'app-kuberoapp-vuln',
+        'ns',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'Background',
+      );
+    });
+
+    it('does not re-pull trivy every time and bounds how long a scan can run', async () => {
+      const batch = (service as any).batchV1Api;
+      await service.createScanImageJob('ns', 'app', 'img', 'v1', false);
+      const job = batch.createNamespacedJob.mock.calls.at(-1)[1];
+      expect(job.spec.activeDeadlineSeconds).toBe(900);
+      expect(job.spec.template.spec.containers[0].imagePullPolicy).toBe(
+        'IfNotPresent',
+      );
+    });
+
+    it('applies the same limits to repository scans', async () => {
+      const batch = (service as any).batchV1Api;
+      await service.createScanRepoJob(
+        'ns',
+        'app',
+        'git@example.com:x/y.git',
+        'main',
+      );
+      const job = batch.createNamespacedJob.mock.calls.at(-1)[1];
+      expect(job.spec.activeDeadlineSeconds).toBe(900);
+      expect(job.spec.template.spec.containers[0].imagePullPolicy).toBe(
+        'IfNotPresent',
+      );
+    });
+
+    it('ignores pods that are being deleted when looking for the latest scan pod', async () => {
+      (service as any).coreV1Api.listNamespacedPod = jest
+        .fn()
+        .mockResolvedValue({
+          body: {
+            items: [
+              {
+                metadata: {
+                  name: 'old-terminating',
+                  creationTimestamp: '2026-09-24T10:00:00Z',
+                  deletionTimestamp: '2026-09-24T10:05:00Z',
+                },
+                status: { phase: 'Succeeded' },
+              },
+              {
+                metadata: {
+                  name: 'older-but-alive',
+                  creationTimestamp: '2026-09-24T09:00:00Z',
+                },
+                status: { phase: 'Succeeded' },
+              },
+            ],
+          },
+        });
+      const pod = await service.getLatestPodByLabel(
+        'ns',
+        'vulnerabilityscan=app',
+      );
+      expect(pod.name).toBe('older-but-alive');
+    });
+
+    it('returns no pod when the only one is being deleted', async () => {
+      (service as any).coreV1Api.listNamespacedPod = jest
+        .fn()
+        .mockResolvedValue({
+          body: {
+            items: [
+              {
+                metadata: {
+                  name: 'gone',
+                  creationTimestamp: '2026-09-24T10:00:00Z',
+                  deletionTimestamp: '2026-09-24T10:05:00Z',
+                },
+                status: { phase: 'Succeeded' },
+              },
+            ],
+          },
+        });
+      const pod = await service.getLatestPodByLabel(
+        'ns',
+        'vulnerabilityscan=app',
+      );
+      expect(pod.name).toBeUndefined();
+    });
+  });
+
   it('should createEvent', async () => {
     await expect(
       service.createEvent('Normal', 'reason', 'event', 'msg'),

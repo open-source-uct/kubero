@@ -232,6 +232,44 @@ export class KubernetesService {
     return namespaces.body.items;
   }
 
+  // La lista de pipelines se lee de Kubernetes en cada request autorizado
+  // (getContext -> listPipelines). Con la pantalla de métricas pidiendo varias
+  // series cada pocos segundos eso eran decenas de lecturas por minuto. Se
+  // guarda unos segundos, se comparte la misma lectura entre llamadas
+  // simultáneas y se descarta al crear, editar o borrar un pipeline.
+  private static readonly PIPELINES_CACHE_MS = 5000;
+  private pipelinesCache?: { at: number; data: Promise<IKubectlPipelineList> };
+
+  private invalidatePipelinesCache() {
+    this.pipelinesCache = undefined;
+  }
+
+  private fetchPipelines(): Promise<IKubectlPipelineList> {
+    const now = Date.now();
+    if (
+      this.pipelinesCache &&
+      now - this.pipelinesCache.at < KubernetesService.PIPELINES_CACHE_MS
+    ) {
+      return this.pipelinesCache.data;
+    }
+    const data = this.customObjectsApi
+      .listNamespacedCustomObject(
+        'application.kubero.dev',
+        'v1alpha1',
+        process.env.KUBERO_NAMESPACE || 'kubero',
+        'kuberopipelines',
+      )
+      .then((ps) => ps.body as IKubectlPipelineList);
+    this.pipelinesCache = { at: now, data };
+    // un error no se guarda: el siguiente request vuelve a intentarlo
+    data.catch(() => {
+      if (this.pipelinesCache?.data === data) {
+        this.pipelinesCache = undefined;
+      }
+    });
+    return data;
+  }
+
   public async getPipelinesList(
     userGroups: string[] = [],
   ): Promise<IKubectlPipelineList> {
@@ -239,13 +277,8 @@ export class KubernetesService {
     let pipelines = {} as IKubectlPipelineList;
     pipelines.items = [];
     try {
-      const ps = await this.customObjectsApi.listNamespacedCustomObject(
-        'application.kubero.dev',
-        'v1alpha1',
-        process.env.KUBERO_NAMESPACE || 'kubero',
-        'kuberopipelines',
-      );
-      pipelines = ps.body as IKubectlPipelineList;
+      // copia propia: el objeto de la caché se comparte y no debe modificarse
+      pipelines = structuredClone(await this.fetchPipelines());
     } catch (error) {
       this.logger.error('❌ getPipelinesList: error getting pipelines!');
       throw error;
@@ -263,6 +296,7 @@ export class KubernetesService {
   }
 
   public async createPipeline(pl: IPipeline) {
+    this.invalidatePipelinesCache();
     this.logger.debug('create pipeline: ' + pl.name);
     const pipeline = new KubectlPipeline(pl);
 
@@ -278,10 +312,12 @@ export class KubernetesService {
       .catch((error) => {
         this.logger.error('❌ Error creating pipeline: ' + pl.name);
         throw error;
-      });
+      })
+      .finally(() => this.invalidatePipelinesCache());
   }
 
   public async updatePipeline(pl: IPipeline, resourceVersion: string) {
+    this.invalidatePipelinesCache();
     this.logger.debug('update pipeline: ' + pl.name);
     const pipeline = new KubectlPipeline(pl);
     pipeline.metadata.resourceVersion = resourceVersion;
@@ -299,10 +335,12 @@ export class KubernetesService {
       .catch(() => {
         this.logger.debug('❌ Error updating pipeline: ' + pl.name);
         //this.logger.debug(error);
-      });
+      })
+      .finally(() => this.invalidatePipelinesCache());
   }
 
   public async deletePipeline(pipelineName: string) {
+    this.invalidatePipelinesCache();
     this.logger.debug('delete pipeline: ' + pipelineName);
     this.kc.setCurrentContext(process.env.KUBERO_CONTEXT || 'default');
     await this.customObjectsApi
@@ -315,7 +353,8 @@ export class KubernetesService {
       )
       .catch(() => {
         // this.logger.debug(error);
-      });
+      })
+      .finally(() => this.invalidatePipelinesCache());
   }
 
   public async getPipeline(pipelineName: string): Promise<IKubectlPipeline> {
@@ -915,7 +954,18 @@ export class KubernetesService {
 
   private async deleteScanJob(namespace: string, name: string): Promise<any> {
     try {
-      await this.batchV1Api.deleteNamespacedJob(name, namespace);
+      // Sin propagationPolicy la API de Jobs deja los pods huérfanos: cada
+      // reescaneo dejaba un pod más (se acumulaban Succeeded y Failed) y el
+      // pod viejo podía confundirse con el del escaneo nuevo.
+      await this.batchV1Api.deleteNamespacedJob(
+        name,
+        namespace,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'Background',
+      );
       // wait for job to be deleted
       await new Promise((resolve) => setTimeout(resolve, 1000));
     } catch {
@@ -940,6 +990,8 @@ export class KubernetesService {
       },
       spec: {
         ttlSecondsAfterFinished: 86400,
+        // un escaneo que se cuelga no debe quedar corriendo para siempre
+        activeDeadlineSeconds: 900,
         completions: 1,
         template: {
           metadata: {
@@ -956,6 +1008,7 @@ export class KubernetesService {
               {
                 name: 'trivy-repo-scan',
                 image: 'aquasec/trivy:latest',
+                imagePullPolicy: 'IfNotPresent',
                 command: [
                   'trivy',
                   'repo',
@@ -1005,6 +1058,8 @@ export class KubernetesService {
       },
       spec: {
         ttlSecondsAfterFinished: 86400,
+        // un escaneo que se cuelga no debe quedar corriendo para siempre
+        activeDeadlineSeconds: 900,
         completions: 1,
         backoffLimit: 1,
         template: {
@@ -1022,6 +1077,7 @@ export class KubernetesService {
               {
                 name: 'trivy-repo-scan',
                 image: 'aquasec/trivy:latest',
+                imagePullPolicy: 'IfNotPresent',
                 command: [
                   'trivy',
                   'image',
@@ -1116,6 +1172,10 @@ export class KubernetesService {
       let latestPod: V1Pod | null = null;
       for (let i = 0; i < pods.body.items.length; i++) {
         const pod = pods.body.items[i];
+        // un pod en borrado es de un escaneo anterior: no es el resultado actual
+        if (pod.metadata?.deletionTimestamp) {
+          continue;
+        }
         if (latestPod === null) {
           latestPod = pod;
         } else {

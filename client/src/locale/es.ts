@@ -249,6 +249,8 @@ const messages = {
       },
     },
     vulnerabilities: {
+      scanFailed: 'El escaneo de vulnerabilidades falló. Inténtalo de nuevo en un momento.',
+      scanTimeout: 'El escaneo está tardando demasiado. Revisa el job de escaneo de esta app.',
       lastScan: 'Último escaneo',
       artefact: 'Artefacto',
       arch: 'Arquitectura',
