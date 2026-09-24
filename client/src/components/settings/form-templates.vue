@@ -4,7 +4,7 @@
 
         <v-switch
             v-model="settings.kubero.config.templates.enabled"
-            label="Allow Templates"
+            :label="$t('settings.templates.allowTemplates')"
             color="primary"
             required
         ></v-switch>

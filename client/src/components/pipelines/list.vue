@@ -46,24 +46,24 @@
           class="empty"
           width="100%"
           style="
-            max-width: 500px;
-            filter: invert(39%) sepia(47%) saturate(584%) hue-rotate(228deg)
-              brightness(95%) contrast(80%);
+            max-width: 480px;
+            filter: brightness(0) saturate(100%) invert(32%) sepia(90%) saturate(1450%) hue-rotate(180deg) brightness(92%) contrast(101%);
           "
         />
 
-        <h1 style="font-size: 3em">👋 Welcome to Kubero!</h1>
-        <p>
-          Congratulations on successfully installing Kubero! We're glad to have
-          you on board.
+        <h1 style="font-size: 2.25rem" class="font-weight-bold mb-2">{{ $t('pipeline.empty.title') }}</h1>
+        <p class="text-body-1 text-medium-emphasis">
+          {{ $t('pipeline.empty.description') }}
         </p>
         <br />
 
         <v-btn
-          elevation="2"
+          elevation="1"
           color="primary"
+          size="large"
+          class="font-weight-bold"
           :to="{ name: 'Pipeline Form', params: { pipeline: 'new' } }"
-          >Create your first pipeline</v-btn
+          >{{ $t('pipeline.empty.createFirst') }}</v-btn
         >
       </v-col>
     </v-row>
@@ -103,16 +103,10 @@
             })
           "
         >
-          <img
-            :src="
-              item.git?.repository?.admin == true
-                ? '/img/icons/hexagon3.svg'
-                : '/img/icons/hexagon3-empty-bold-tp.svg'
-            "
-            alt="Pipeline"
-            width="40"
-            height="40"
-          />
+          <v-icon
+            size="38"
+            color="primary"
+          >{{ item.git?.repository?.admin == true ? 'mdi-source-fork' : 'mdi-source-branch' }}</v-icon>
         </v-col>
         <v-col
           cols="12"
@@ -318,9 +312,9 @@ export default defineComponent({
         text: "Do you want to delete this pipeline? This action cannot be undone. It will delete all the apps and data associated with this pipeline.",
         icon: "question",
         showCancelButton: true,
-        confirmButtonText: "Delete",
-        cancelButtonText: "Cancel",
-        confirmButtonColor: "rgb(var(--v-theme-kubero))",
+        confirmButtonText: this.$t('global.delete'),
+        cancelButtonText: this.$t('global.cancel'),
+        confirmButtonColor: "rgb(var(--v-theme-primary))",
         background: "rgb(var(--v-theme-cardBackground))",
         /*background: "rgb(var(--v-theme-on-surface-variant))",*/
         color:
@@ -369,16 +363,14 @@ export default defineComponent({
 }
 .v-card a {
   text-decoration: none;
-  color: #8560a9 !important;
+  color: rgb(var(--v-theme-primary)) !important;
 }
 
 .connected {
   background-image: url("./../../../public/img/icons/connected.svg");
   background-size: contain;
   background-repeat: no-repeat;
-  filter: invert(39%) sepia(47%) saturate(584%) hue-rotate(228deg)
-    brightness(95%) contrast(80%);
-  /*filter: invert(93%) sepia(49%) saturate(7411%) hue-rotate(184deg) brightness(87%) contrast(90%);*/
+  filter: brightness(0) saturate(100%) invert(32%) sepia(90%) saturate(1450%) hue-rotate(180deg) brightness(92%) contrast(101%);
 }
 
 .connected::before {
@@ -396,9 +388,7 @@ export default defineComponent({
   background-image: url("./../../../public/img/icons/disconnected.svg");
   background-size: contain;
   background-repeat: no-repeat;
-  filter: invert(39%) sepia(47%) saturate(584%) hue-rotate(228deg)
-    brightness(95%) contrast(80%);
-  /*filter: invert(93%) sepia(49%) saturate(7411%) hue-rotate(184deg) brightness(87%) contrast(90%);*/
+  filter: brightness(0) saturate(100%) invert(60%) sepia(5%) saturate(300%) hue-rotate(180deg) brightness(90%) contrast(85%);
 }
 
 .disconnected::before {

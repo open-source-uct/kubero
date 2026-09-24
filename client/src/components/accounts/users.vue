@@ -23,7 +23,7 @@
       </template>
       <template v-slot:[`item.isActive`]="{ item }">
         <v-chip :color="item.isActive ? 'green' : 'red'" dark>
-          {{ item.isActive ? 'Aktive' : 'Disabled' }}
+          {{ item.isActive ? $t('user.active') : $t('user.disabled') }}
         </v-chip>
       </template>
       <template v-slot:[`item.name`]="{ item }">
@@ -142,20 +142,20 @@
 
     <!-- Dialog to edit a user -->
     <v-dialog v-model="editDialog" max-width="500px">
-      <v-card>
-        <v-card-title>{{ $t('user.actions.edit') }}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{ $t('user.actions.edit') }}</v-card-title>
         <v-card-text>
-          <v-text-field v-model="editedUser.username" label="Username"></v-text-field>
-          <v-text-field v-model="editedUser.firstName" label="First Name"></v-text-field>
-          <v-text-field v-model="editedUser.lastName" label="Last Name"></v-text-field>
-          <v-text-field v-model="editedUser.email" label="E-Mail"></v-text-field>
-          <v-switch v-model="editedUser.isActive" label="Aktive"></v-switch>
+          <v-text-field v-model="editedUser.username" :label="$t('user.username')"></v-text-field>
+          <v-text-field v-model="editedUser.firstName" :label="$t('user.firstName')"></v-text-field>
+          <v-text-field v-model="editedUser.lastName" :label="$t('user.lastName')"></v-text-field>
+          <v-text-field v-model="editedUser.email" :label="$t('user.email')"></v-text-field>
+          <v-switch v-model="editedUser.isActive" :label="$t('user.active')" color="primary"></v-switch>
           <v-select
             v-model="editedUser.role"
             :items="roles"
             item-title="name"
             item-value="id"
-            label="Role"
+            :label="$t('user.role')"
             clearable
           ></v-select>
           <v-select
@@ -163,7 +163,7 @@
             :items="teams"
             item-title="name"
             item-value="id"
-            label="Teams"
+            :label="$t('user.teams')"
             multiple
             clearable
           >
@@ -182,21 +182,21 @@
 
     <!-- Dialog for a new User -->
     <v-dialog v-model="createDialog" max-width="500px">
-      <v-card>
-        <v-card-title>{{ $t('user.actions.create') }}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{ $t('user.actions.create') }}</v-card-title>
         <v-card-text>
-          <v-text-field v-model="newUser.username" label="Username"></v-text-field>
-          <v-text-field v-model="newUser.firstName" label="First Name"></v-text-field>
-          <v-text-field v-model="newUser.lastName" label="Last Name"></v-text-field>
-          <v-text-field v-model="newUser.email" label="E-Mail"></v-text-field>
-          <v-text-field v-model="newUser.password" label="Password"></v-text-field>
-          <v-switch v-model="newUser.isActive" label="Aktive"></v-switch>
+          <v-text-field v-model="newUser.username" :label="$t('user.username')"></v-text-field>
+          <v-text-field v-model="newUser.firstName" :label="$t('user.firstName')"></v-text-field>
+          <v-text-field v-model="newUser.lastName" :label="$t('user.lastName')"></v-text-field>
+          <v-text-field v-model="newUser.email" :label="$t('user.email')"></v-text-field>
+          <v-text-field v-model="newUser.password" :label="$t('user.password')" type="password"></v-text-field>
+          <v-switch v-model="newUser.isActive" :label="$t('user.active')" color="primary"></v-switch>
           <v-select
             v-model="newUser.role"
             :items="roles"
             item-title="name"
             item-value="id"
-            label="Role"
+            :label="$t('user.role')"
             clearable
           ></v-select>
           <v-select
@@ -204,7 +204,7 @@
             :items="teams"
             item-title="name"
             item-value="id"
-            label="Teams"
+            :label="$t('user.teams')"
             multiple
             clearable
           >
@@ -223,8 +223,8 @@
 
     <!-- Dialog to change password -->
     <v-dialog v-model="changePasswordDialog" max-width="500px">
-      <v-card>
-        <v-card-title>{{ $t('user.changePasswordFor', {user: editedUser.username}) }}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{ $t('user.changePasswordFor', {user: editedUser.username}) }}</v-card-title>
         <v-card-text>
           <v-text-field
             v-model="editedUser.password"

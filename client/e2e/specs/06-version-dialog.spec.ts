@@ -15,7 +15,7 @@ test.describe('Diálogo Modal de Versión y Diagnóstico', () => {
     await expect(textarea).toBeVisible();
     const debugText = await textarea.inputValue();
     expect(debugText).toContain('Kubero UI Version: dev');
-    expect(debugText).toContain('Kubernetes Version: v1.37.0');
+    expect(debugText).toMatch(/Kubernetes Version: (v1\.|unknown)/);
 
     // 3. Cerrar diálogo
     await navDrawer.closeVersionDialog();

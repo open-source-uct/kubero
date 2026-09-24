@@ -13,9 +13,9 @@
                 :key="b.name" :id="b.name">
             <v-col cols="12">
             <v-card 
-                elevation="2" 
-                outlined 
+                elevation="1" 
                 color="cardBackground"
+                class="uct-card mb-3"
                 :loading="b.state == 'Active'"
                 >
 

@@ -5,6 +5,21 @@
       permanent
       :rail="rail"
   >
+    <!-- Cabecera Institucional UCT -->
+    <div class="nav-brand-header py-3 px-2 text-center">
+      <router-link to="/" class="d-block">
+        <v-img
+          src="@/assets/logouct-header.png"
+          max-height="42"
+          max-width="170"
+          class="mx-auto"
+          alt="UCT"
+          contain
+        ></v-img>
+      </router-link>
+    </div>
+    <v-divider></v-divider>
+
     <v-list class="profile-dark-bg">
       <v-list-item
         link to="/profile"
@@ -41,7 +56,7 @@
 
     <v-divider></v-divider>
 
-    <v-list nav density="compact">
+    <v-list nav density="compact" active-color="primary">
         <v-list-item 
             link to="/"
             prepend-icon="mdi-server"
@@ -86,27 +101,30 @@
             :title="$t('navigation.general')"
             prepend-icon="mdi-tune"
             density="compact"
-            style="transform: scale(0.9);"
+            class="nav-subitem"
           ></v-list-item>
           <v-list-item
               link to="/runpacks" 
               v-if="kubero.isAuthenticated && !kubero.adminDisabled"
               prepend-icon="mdi-cube-outline"
-              style="transform: scale(0.9);"
+              density="compact"
+              class="nav-subitem"
               :title="$t('navigation.runpacks')">
           </v-list-item>
           <v-list-item 
               link to="/podsizes" 
               v-if="kubero.isAuthenticated && !kubero.adminDisabled"
               prepend-icon="mdi-arrow-expand-vertical"
-              style="transform: scale(0.9);"
+              density="compact"
+              class="nav-subitem"
               :title="$t('navigation.podSizes')">
           </v-list-item>
           <v-list-item 
               link to="/notifications" 
               v-if="kubero.isAuthenticated && !kubero.adminDisabled"
               prepend-icon="mdi-email-fast-outline"
-              style="transform: scale(0.9);"
+              density="compact"
+              class="nav-subitem"
               :title="$t('navigation.notifications')">
           </v-list-item>
         </v-list-group>
@@ -183,8 +201,10 @@
     >
       <v-card
         min-width="400"
+        color="cardBackground"
+        class="uct-card"
         prepend-icon="mdi-information-outline"
-        title="Version and Features"
+        :title="$t('navigation.aboutKubero')"
       >
         <v-card-text>
             <v-row dense>
@@ -252,7 +272,7 @@
         <template v-slot:actions>
           <v-btn
             class="ms-auto"
-            text="Ok"
+            :text="$t('global.close')"
             @click="debugDialog = false"
           ></v-btn>
         </template>
@@ -386,10 +406,31 @@ img.image-icon {
 .profile-dark-bg {
   background: rgba(var(--v-theme-secondary), 0.5) !important;
 }
+
+.nav-subitem {
+  font-size: 0.85rem !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
+}
 </style>
 
 <style>
+.v-navigation-drawer,
+.v-navigation-drawer__content {
+  overflow-x: hidden !important;
+}
+
 .v-list-group__items {
-  --indent-padding: inherit;
+  --indent-padding: 0px !important;
+  overflow-x: hidden !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.v-list-group__items .v-list-item {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
 }
 </style>

@@ -18,7 +18,7 @@
                         indeterminate
                         size="18"
                         width="2"
-                        color="#8560A9"
+                        color="primary"
                         class="mr-1"
                     ></v-progress-circular>
                     <span>{{ $t('app.vulnerabilities.actions.rescan') }}</span>
@@ -29,7 +29,7 @@
 
                 <v-row v-if="renderVulnerabilities">
                     <v-col cols="6" sm="6" md="6" lg="9" xl="9" v-if="renderVulnerabilities" >
-                        <v-card elevation="2" outlined color="cardBackground">
+                        <v-card elevation="1" color="cardBackground" class="uct-card">
                             <v-card-title>
                                 <h3 class="headline mb-0">Metadata</h3>
                             </v-card-title>

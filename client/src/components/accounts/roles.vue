@@ -174,11 +174,11 @@
 
     <!-- Dialog to edit a role -->
     <v-dialog v-model="editDialog" max-width="500px">
-      <v-card>
-        <v-card-title>{{ $t('roles.actions.edit') }}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{ $t('roles.actions.edit') }}</v-card-title>
         <v-card-text>
-          <v-text-field v-model="editedRole.name" label="Role Name"></v-text-field>
-          <v-text-field v-model="editedRole.description" label="Descrioption"></v-text-field>
+          <v-text-field v-model="editedRole.name" :label="$t('roles.form.name')"></v-text-field>
+          <v-text-field v-model="editedRole.description" :label="$t('roles.form.description')"></v-text-field>
           <v-table density="compact" class="mb-4">
             <tbody>
               <tr>
@@ -270,19 +270,19 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn text @click="editDialog = false">Abort</v-btn>
-          <v-btn color="primary" @click="saveEdit">Save</v-btn>
+          <v-btn text @click="editDialog = false">{{ $t('global.abort') }}</v-btn>
+          <v-btn color="primary" @click="saveEdit">{{ $t('global.save') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
     <!-- Dialog for a new Role -->
     <v-dialog v-model="createDialog" max-width="500px">
-      <v-card>
-        <v-card-title>{{ $t('roles.actions.create') }}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{ $t('roles.actions.create') }}</v-card-title>
         <v-card-text>
-          <v-text-field v-model="newRole.name" label="Role Name"></v-text-field>
-          <v-text-field v-model="newRole.description" label="Descrioption"></v-text-field>
+          <v-text-field v-model="newRole.name" :label="$t('roles.form.name')"></v-text-field>
+          <v-text-field v-model="newRole.description" :label="$t('roles.form.description')"></v-text-field>
           <v-table density="compact" class="mb-4">
             <tbody>
               <tr>
@@ -374,8 +374,8 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn text @click="createDialog = false">Abort</v-btn>
-          <v-btn color="primary" @click="saveCreate">Create</v-btn>
+          <v-btn text @click="createDialog = false">{{ $t('global.abort') }}</v-btn>
+          <v-btn color="primary" @click="saveCreate">{{ $t('global.create') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>

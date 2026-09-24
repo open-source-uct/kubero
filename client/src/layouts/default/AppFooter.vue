@@ -1,11 +1,11 @@
 <template>
-  <v-footer padless>
+  <v-footer color="navBG" class="border-t py-2">
     <v-col
       cols="12"
-      class="grey lighten-2 text-center"
+      class="text-center text-caption text-medium-emphasis py-1"
     >
-      <strong>Kubero</strong> {{ kuberoversion }} | 
-      <strong>Kubernetes API</strong> {{ kubeversion }}
+      <span class="font-weight-medium">Universidad Católica de Temuco</span> · {{ $t('global.faculty') }} · Kubero v{{ kuberoversion }}
+      <span v-if="kubeversion && kubeversion != 'unknown'"> | K8s API {{ kubeversion }}</span>
     </v-col>
   </v-footer>
 </template>

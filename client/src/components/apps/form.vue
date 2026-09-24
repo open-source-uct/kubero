@@ -11,16 +11,11 @@
       <Breadcrumbs :items="breadcrumbItems"></Breadcrumbs>
       <v-row>
         <v-col cols="12" md="1" class="hidden-xs-and-down">
-          <v-img
-            :src="
-              deploymentstrategy == 'git'
-                ? '/img/icons/hexagon1.svg'
-                : '/img/icons/hexagon1-empty-bold-tp.svg'
-            "
-            max-width="50"
-            max-height="50"
+          <v-icon
+            size="48"
+            color="primary"
             class="mr-2"
-          ></v-img>
+          >{{ deploymentstrategy == 'git' ? 'mdi-source-branch' : 'mdi-docker' }}</v-icon>
         </v-col>
         <v-col cols="12" sm="11" md="11" lg="11" xl="11">
           <h1 v-if="app == 'new'">
@@ -941,15 +936,15 @@
       </v-expansion-panels>
 
       <!-- ADDONS -->
-      <div class="text-uppercase text-caption-2 font-weight-medium pt-5">
+      <div class="uct-section-title pt-5">
         {{ $t("app.titles.addOns") }}
       </div>
       <Addons :addons="addons" :appname="name" />
 
       <!-- ENV VAR OVERLAP DIALOG -->
       <v-dialog v-model="envOverlapDialog" max-width="800px" persistent>
-        <v-card>
-          <v-card-title class="headline">
+        <v-card color="cardBackground" class="uct-card">
+          <v-card-title class="text-h6 font-weight-bold">
             {{ $t("app.form.envVarConflicts") }}
           </v-card-title>
           <v-card-text>

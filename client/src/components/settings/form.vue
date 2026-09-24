@@ -2,9 +2,9 @@
   <v-form>
     <v-container>
       <v-tabs v-model="tab" style="margin-bottom: 30px">
-        <v-tab value="general">General</v-tab>
-        <v-tab value="deployment">Deployment</v-tab>
-        <v-tab value="templates">Templates</v-tab>
+        <v-tab value="general">{{ $t('settings.tabs.general') }}</v-tab>
+        <v-tab value="deployment">{{ $t('settings.tabs.deployment') }}</v-tab>
+        <v-tab value="templates">{{ $t('settings.tabs.templates') }}</v-tab>
       </v-tabs>
 
       <v-window v-model="tab">
@@ -28,7 +28,7 @@
         color="primary"
         @click="saveSettings"
         style="margin-left: 10px; margin-top: 20px"
-        >update configuration</v-btn
+        >{{ $t('global.applyChanges') }}</v-btn
       >
     </v-container>
   </v-form>

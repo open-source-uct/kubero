@@ -20,6 +20,17 @@ export default createVuetify({
   locale: {
     adapter: createVueI18nAdapter({ i18n, useI18n }),
   },
+  defaults: {
+    VCard: {
+      rounded: 'md',
+    },
+    VBtn: {
+      rounded: 'md',
+    },
+    VChip: {
+      rounded: 'xs',
+    },
+  },
   theme: {
     themes: {
       dark: {

@@ -200,9 +200,9 @@ export default defineComponent({
                 text: "Do you want to delete this App? This action cannot be undone. It will delete all the data associated with this app.",
                 icon: "question",
                 showCancelButton: true,
-                confirmButtonText: "Delete",
-                cancelButtonText: "Cancel",
-                confirmButtonColor: "rgb(var(--v-theme-kubero))",
+                confirmButtonText: this.$t('global.delete'),
+                cancelButtonText: this.$t('global.cancel'),
+                confirmButtonColor: "rgb(var(--v-theme-primary))",
                 background: "rgb(var(--v-theme-cardBackground))",
                 /*background: "rgb(var(--v-theme-on-surface-variant))",*/
                 color: "rgba(var(--v-theme-on-background),var(--v-high-emphasis-opacity));",

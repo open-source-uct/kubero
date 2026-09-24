@@ -204,7 +204,9 @@ a:link { text-decoration: none;}
 
 .v-tabs.console-bar {
     color: #9F9F9F;
-    background-color: #1E1E1E; /*#444*/
+    background-color: #16202D;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
     flex-shrink: 0;
 }
 
@@ -212,10 +214,15 @@ a:link { text-decoration: none;}
     flex: 1;
     overflow-x: auto;
     overflow-y: auto;
-    background-color: #333;
-    color: #c0c0c0;
-    padding: 5px;
-    font: 0.85rem Inconsolata, monospace;
+    background-color: #0B1119;
+    color: #E2E8F0;
+    padding: 10px;
+    font-family: "Fira Code", SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    border: 1px solid rgba(135, 135, 135, 0.2);
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
     display: flex;
     flex-direction: column-reverse;
     min-height: 0;
