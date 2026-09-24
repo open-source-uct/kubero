@@ -139,6 +139,8 @@ export class AuthService {
     username: string,
     role: string,
     userGroups: string[],
+    permissions: string[] = [],
+    expiresAt?: string,
   ): Promise<string> {
     if (!userId || !username || !role) {
       this.logger.error('Invalid user data for token generation', {
@@ -154,14 +156,32 @@ export class AuthService {
       username: username,
       role: role,
       userGroups: userGroups,
-      permissions: [],
+      permissions: permissions,
       strategy: 'token',
     };
+
+    // el JWT debe expirar cuando el usuario lo pidió (expiresAt), no según
+    // el tiempo de sesión normal (JWT_EXPIRESIN), que es de horas
+    let expiresInSeconds =
+      Number(process.env.JWT_EXPIRESIN?.replace('s', '')) || 36000;
+    if (expiresAt) {
+      const seconds = Math.floor(
+        (new Date(expiresAt).getTime() - Date.now()) / 1000,
+      );
+      if (seconds <= 0) {
+        throw new HttpException(
+          'expiresAt must be in the future',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      expiresInSeconds = seconds;
+    }
+
     const token = this.jwtService.sign(u, {
       secret:
         process.env.JWT_SECRET ||
         'DO NOT USE THIS VALUE. INSTEAD, CREATE A COMPLEX SECRET AND KEEP IT SAFE OUTSIDE OF THE SOURCE CODE.',
-      expiresIn: process.env.JWT_EXPIRESIN || '36000s',
+      expiresIn: expiresInSeconds,
     });
     return token;
   }

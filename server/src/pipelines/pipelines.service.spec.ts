@@ -184,6 +184,35 @@ describe('PipelinesService', () => {
       expect(result?.name).toBe('pipe1');
       expect(result?.resourceVersion).toBe('5');
     });
+
+    it('should mask the registry password', async () => {
+      kubectl.getPipeline.mockResolvedValue({
+        spec: {
+          name: 'pipe1',
+          registry: { host: 'docker.io', username: 'user', password: 'secret' },
+        },
+      });
+      const result = await service.getPipeline('pipe1');
+      expect(result?.registry?.password).toBe('');
+      expect(result?.registry?.host).toBe('docker.io');
+    });
+  });
+
+  describe('userHasAccessToPipeline', () => {
+    it('should return true when the pipeline is in the filtered list', async () => {
+      service.listPipelines = jest.fn().mockResolvedValue({
+        items: [{ name: 'pipe1' }, { name: 'pipe2' }],
+      });
+      const result = await service.userHasAccessToPipeline('pipe1', ['group1']);
+      expect(service.listPipelines).toHaveBeenCalledWith(['group1']);
+      expect(result).toBe(true);
+    });
+
+    it('should return false when the pipeline is not in the filtered list', async () => {
+      service.listPipelines = jest.fn().mockResolvedValue({ items: [] });
+      const result = await service.userHasAccessToPipeline('pipe1', ['group1']);
+      expect(result).toBe(false);
+    });
   });
 
   describe('deletePipeline', () => {

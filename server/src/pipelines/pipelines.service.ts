@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { IPipelineList, IPipeline, IKubectlPipelineList } from './pipelines.interface';
+import {
+  IPipelineList,
+  IPipeline,
+  IKubectlPipelineList,
+} from './pipelines.interface';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { Buildpack } from '../config/buildpack/buildpack';
 import { IUser } from '../auth/auth.interface';
@@ -16,9 +20,11 @@ export class PipelinesService {
     private notificationsService: NotificationsService,
   ) {}
 
-  public async listPipelines(userGroups: string[] = []): Promise<IPipelineList> {
+  public async listPipelines(
+    userGroups: string[] = [],
+  ): Promise<IPipelineList> {
     //this.logger.debug('listPipelines for userGroups: ' + userGroups.join(', '));
-    let pipelines = await this.kubectl.getPipelinesList(userGroups);
+    const pipelines = await this.kubectl.getPipelinesList(userGroups);
 
     const ret: IPipelineList = {
       items: [],
@@ -29,7 +35,10 @@ export class PipelinesService {
     return ret;
   }
 
-  public async getPipelineWithApps(pipelineName: string, userGroups: string[] = []): Promise<IPipeline | undefined> {
+  public async getPipelineWithApps(
+    pipelineName: string,
+    userGroups: string[] = [],
+  ): Promise<IPipeline | undefined> {
     this.logger.debug('listApps in ' + pipelineName);
 
     await this.kubectl.setCurrentContext(
@@ -49,7 +58,11 @@ export class PipelinesService {
     if (pipeline) {
       for (const phase of pipeline.phases) {
         if (phase.enabled == true) {
-          const contextName = await this.getContext(pipelineName, phase.name, userGroups);
+          const contextName = await this.getContext(
+            pipelineName,
+            phase.name,
+            userGroups,
+          );
           if (contextName) {
             const namespace = pipelineName + '-' + phase.name;
             const apps = await this.kubectl.getAppsList(namespace, contextName);
@@ -124,8 +137,23 @@ export class PipelinesService {
         delete pipeline.spec.git.keys.priv;
         delete pipeline.spec.git.keys.pub;
       }
+      if (pipeline.spec.registry) {
+        pipeline.spec.registry.password = '';
+      }
       return pipeline.spec;
     }
+  }
+
+  // true si el usuario puede ver/editar esta pipeline según sus equipos.
+  // Reutiliza el mismo filtro que ya aplica el listado (equipos + bypass de
+  // admin), así el chequeo puntual queda siempre alineado con lo que el
+  // usuario ve en /api/pipelines.
+  public async userHasAccessToPipeline(
+    pipelineName: string,
+    userGroups: string[] = [],
+  ): Promise<boolean> {
+    const pipelines = await this.listPipelines(userGroups);
+    return pipelines.items.some((p) => p.name === pipelineName);
   }
 
   // delete a pipeline and all its namespaces/phases

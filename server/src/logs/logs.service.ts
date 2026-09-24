@@ -15,7 +15,7 @@ export class LogsService {
     private kubectl: KubernetesService,
     private pipelinesService: PipelinesService,
     private EventsGateway: EventsGateway,
-  ) { }
+  ) {}
 
   private logcolor(str: string) {
     let hash = 0;
@@ -36,7 +36,7 @@ export class LogsService {
     appName: string,
     podName: string,
     container: string,
-    userGroups: string[]
+    userGroups: string[],
   ) {
     const logStream = new Stream.PassThrough();
 

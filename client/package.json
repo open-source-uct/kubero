@@ -41,6 +41,7 @@
     "@axe-core/playwright": "^4.13.0",
     "@babel/types": "^7.21.4",
     "@playwright/test": "^1.63.0",
+    "@types/lodash": "^4.17.20",
     "@types/lodash.get": "^4.4.9",
     "@types/lodash.set": "^4.3.9",
     "@types/node": "^18.15.0",
