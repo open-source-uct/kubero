@@ -21,13 +21,13 @@ describe('AuthService', () => {
       findOneOrCreate: jest.fn().mockResolvedValue({
         userId: 3,
         username: 'oauthuser',
-        emails: [{ value: 'undefined@kubero.dev'  }],
+        emails: [{ value: 'undefined@kubero.dev' }],
       }),
     };
     rolesService = {
       getPermissions: jest.fn().mockResolvedValue([
         { resource: 'app', action: 'read' },
-        { resource: 'app', action: 'write' }
+        { resource: 'app', action: 'write' },
       ]),
     };
     kubectl = {
@@ -169,9 +169,13 @@ describe('AuthService', () => {
 
   describe('generateToken', () => {
     it('should embed the given permissions instead of an empty array', async () => {
-      await service.generateToken('1', 'test', 'student', ['students'], [
-        'app:write',
-      ]);
+      await service.generateToken(
+        '1',
+        'test',
+        'student',
+        ['students'],
+        ['app:write'],
+      );
       expect(jwtService.sign).toHaveBeenCalledWith(
         {
           userId: '1',
