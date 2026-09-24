@@ -1,5 +1,13 @@
 <template>
   <v-container>
+    <v-alert
+      v-if="actionError"
+      type="error"
+      variant="tonal"
+      closable
+      class="mb-4"
+      @click:close="actionError = ''"
+    >{{ actionError }}</v-alert>
     <v-data-table
       :headers="headers"
       :items="teams"
@@ -81,9 +89,18 @@
 
     <!-- Dialog to edit a group -->
     <v-dialog v-model="editDialog" max-width="500px">
-      <v-card>
-        <v-card-title>{{ $t('teams.actions.edit') }}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{ $t('teams.actions.edit') }}</v-card-title>
         <v-card-text>
+          <v-alert
+            v-if="actionError"
+            type="error"
+            variant="tonal"
+            closable
+            density="compact"
+            class="mb-4"
+            @click:close="actionError = ''"
+          >{{ actionError }}</v-alert>
           <v-text-field v-model="editedTeam.name" :label="$t('teams.form.name')"></v-text-field>
           <v-text-field
             v-model="editedTeam.description"
@@ -103,9 +120,18 @@
 
     <!-- Dialog for a new Team -->
     <v-dialog v-model="createDialog" max-width="500px">
-      <v-card>
-        <v-card-title>{{ $t('teams.actions.create') }}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{ $t('teams.actions.create') }}</v-card-title>
         <v-card-text>
+          <v-alert
+            v-if="actionError"
+            type="error"
+            variant="tonal"
+            closable
+            density="compact"
+            class="mb-4"
+            @click:close="actionError = ''"
+          >{{ actionError }}</v-alert>
           <v-text-field v-model="newTeam.name" :label="$t('teams.form.name')"></v-text-field>
           <v-text-field
             v-model="newTeam.description"
@@ -157,6 +183,16 @@ export default defineComponent({
       { title: '', value: 'actions', sortable: false, align: 'end' as const },
     ]
 
+    // El server explica por qué rechaza una acción (último administrador, equipo
+    // protegido, id que ya no existe...). Antes solo iba a la consola y la
+    // pantalla parecía no hacer nada.
+    const actionError = ref('')
+    const errorText = (e: any): string => {
+      const message = e?.response?.data?.message
+      if (Array.isArray(message)) return message.join(', ')
+      return message || e?.message || 'Error'
+    }
+
     const loadTeams = async () => {
       loading.value = true
       try {
@@ -169,6 +205,7 @@ export default defineComponent({
     }
 
     const openEditTeamDialog = (group: Team) => {
+      actionError.value = ''
       editedTeam.value = { ...group }
       editDialog.value = true
     }
@@ -180,6 +217,7 @@ export default defineComponent({
         editDialog.value = false
       } catch (e) {
         console.error('Error saving group:', e)
+        actionError.value = errorText(e)
       }
     }
 
@@ -189,10 +227,12 @@ export default defineComponent({
         await loadTeams()
       } catch (e) {
         console.error('Error deleting group:', e)
+        actionError.value = errorText(e)
       }
     }
 
     const openCreateDialog = () => {
+      actionError.value = ''
       newTeam.value = { name: '' }
       createDialog.value = true
     }
@@ -204,6 +244,7 @@ export default defineComponent({
         createDialog.value = false
       } catch (e) {
         console.error('Error creating group:', e)
+        actionError.value = errorText(e)
       }
     }
 
@@ -224,6 +265,7 @@ export default defineComponent({
       saveEdit,
       deleteTeam,
       openCreateDialog,
+      actionError,
       saveCreate,
       writeUserPermission,
     }

@@ -1,5 +1,5 @@
-import { Plugin, } from './plugin';
-import { IPlugin, IPluginFormFields  } from './plugin.interface';
+import { Plugin } from './plugin';
+import { IPlugin, IPluginFormFields } from './plugin.interface';
 
 // Classname must be same as the CRD's Name
 export class PostgresCluster extends Plugin implements IPlugin {
@@ -189,6 +189,6 @@ kubectl apply --server-side -k github.com/CrunchyData/postgres-operator-examples
 
   constructor(availableOperators: any) {
     super();
-    super.init(availableOperators);
+    void super.init(availableOperators);
   }
 }

@@ -16,7 +16,7 @@
                                 <ul style="list-style-type: none; padding: 0;">
                                     <li v-for="host in appData.spec.ingress.hosts" :key="host.host">
                                         <a :href="'https://' + host.host" target="_blank">{{ host.host }}</a> 
-                                        <v-icon size="x-small" style="color: rgba(var(--v-theme-kubero), var(--v-high-emphasis-opacity));">mdi-open-in-new</v-icon>
+                                        <v-icon size="x-small" style="color: rgba(var(--v-theme-primary), var(--v-high-emphasis-opacity));">mdi-open-in-new</v-icon>
                                     </li>
                                 </ul>
                             </td>
@@ -77,8 +77,8 @@
                         <v-col cols="6" class="pb-0 text-right text-caption font-weight-light">Memory</v-col>
                     </v-row>
                     <v-row v-for="metric in metrics" :key="metric.name" style="height:20px">
-                        <v-col cols="6" class="text-left"><v-progress-linear :value="metric.cpu.percentage" color="#8560A9" class="mr-6 float-left"></v-progress-linear></v-col>
-                        <v-col cols="6" class="text-right"><v-progress-linear :value="metric.memory.percentage" color="#8560A9" class="float-left" ></v-progress-linear></v-col>
+                        <v-col cols="6" class="text-left"><v-progress-linear :value="metric.cpu.percentage" color="primary" class="mr-6 float-left" rounded></v-progress-linear></v-col>
+                        <v-col cols="6" class="text-right"><v-progress-linear :value="metric.memory.percentage" color="accent" class="float-left" rounded></v-progress-linear></v-col>
                     </v-row>
                 </div>
                 <div class="px-3" v-if="metricsDisplay == 'table'">
@@ -529,16 +529,16 @@ export default defineComponent({
 
 <style scoped>
 #metrics:nth-child(even) {
-  background-color: rgba(133, 96, 169, .1);
+  background-color: rgba(var(--v-theme-primary), .04);
 }
 #metrics:nth-child(odd) {
-  background-color: rgba(133, 96, 169, .2);
+  background-color: rgba(var(--v-theme-primary), .08);
 }
 
 .theme--light#metrics:nth-child(odd) {
-  background-color: rgba(133, 96, 169, .2);
+  background-color: rgba(var(--v-theme-primary), .08);
 }
 .theme--dark#metrics:nth-child(odd) {
-  background-color: rgba(133, 96, 169, .2);
+  background-color: rgba(var(--v-theme-primary), .12);
 }
 </style>

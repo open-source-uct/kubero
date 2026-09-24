@@ -127,7 +127,6 @@ const mockJWT = {
 
 describe('AppsController', () => {
   let controller: AppsController;
-  let service: AppsService;
 
   const mockAppsService = {
     getApp: jest.fn(),
@@ -158,7 +157,6 @@ describe('AppsController', () => {
       .compile();
 
     controller = module.get<AppsController>(AppsController);
-    service = module.get<AppsService>(AppsService);
   });
 
   it('should be defined', () => {
@@ -214,7 +212,11 @@ describe('AppsController', () => {
         req,
       );
       expect(result).toEqual(mockApp);
-      expect(mockAppsService.createApp).toHaveBeenCalledWith(mockApp, mockUser, mockUserGroups);
+      expect(mockAppsService.createApp).toHaveBeenCalledWith(
+        mockApp,
+        mockUser,
+        mockUserGroups,
+      );
     });
   });
 

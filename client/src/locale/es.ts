@@ -2,6 +2,7 @@ import { es } from 'vuetify/locale'
 
 const messages = {
   navigation: {
+    aboutKubero: 'Acerca de Kubero',
     pipelines: 'Pipelines',
     templates: 'Plantillas',
     activity: 'Actividad',
@@ -31,6 +32,15 @@ const messages = {
     cancel: 'Cancelar',
     save: 'Guardar',
     applyChanges: 'Aplicar cambios',
+    login: 'Iniciar Sesión',
+    faculty: 'Facultad de Ingeniería · UCT',
+    close: 'Cerrar',
+    copy: 'Copiar',
+    edit: 'Editar',
+    delete: 'Eliminar',
+  },
+  setup: {
+    title: 'Asistente de Configuración Inicial · Kubero',
   },
   pipeline: {
     name: 'Pipeline',
@@ -70,8 +80,16 @@ const messages = {
         gitrepo: 'Al conectarse, los webhooks y las claves de despliegue se almacenan en el repositorio. Esto significa que las aplicaciones configuradas en este proyecto se pueden redesplegar automáticamente con un \'git push\' y abrir un PR iniciará una nueva instancia en la fase de "revisión".',
       },
     },
+    empty: {
+      title: '👋 ¡Bienvenido a Kubero!',
+      description: 'Plataforma de despliegues y gestión de contenedores de la Universidad Católica de Temuco.',
+      createFirst: 'Crear tu primer pipeline',
+    },
   },
   app: {
+    buttons: {
+      new: 'Nueva App',
+    },
     nav: {
       overview: 'Resumen',
       builds: 'Compilaciones',
@@ -171,6 +189,7 @@ const messages = {
       healthCheckPath: 'Ruta de comprobación de estado',
       healthCheckStartupSeconds: 'Segundos de inicio (Startup)',
       healthCheckTimeoutSeconds: 'Segundos de tiempo de espera (Timeout)',
+      healthcheckTimeoutSeconds: 'Segundos de tiempo de espera (Timeout)',
       healthCheckIntervalSeconds: 'Segundos de intervalo',
       noNewEnvVarsFound: 'No se encontraron nuevas variables de entorno en el archivo subido',
       envVarConflicts: 'Conflictos en variables de entorno',
@@ -273,6 +292,8 @@ const messages = {
     },
   },
   user: {
+    active: 'Activo',
+    disabled: 'Deshabilitado',
     name: 'Usuario',
     email: 'Correo electrónico',
     username: 'Nombre de usuario',
@@ -282,6 +303,8 @@ const messages = {
     teams: 'Equipos',
     provider: 'Proveedor',
     status: 'Estado',
+    githubLogin: 'Continuar con GitHub',
+    oauth2Login: 'Iniciar con Institucional (OAuth2)',
     password: 'Contraseña',
     changePassword: 'Cambiar contraseña',
     changePasswordFor: 'Cambiar contraseña para {user}',
@@ -289,6 +312,7 @@ const messages = {
     newPassword: 'Nueva contraseña',
     confirmPassword: 'Confirmar contraseña',
     errors: {
+      wrongCredentials: 'Usuario o contraseña incorrectos',
       passwordMismatch: 'Las contraseñas no coinciden',
       passwordConfirm: 'Por favor confirma tu contraseña',
       firstNameRequired: 'El nombre es obligatorio',
@@ -300,6 +324,7 @@ const messages = {
       passwordMinLength: 'La contraseña debe tener al menos 8 caracteres',
     },
     actions: {
+      name: 'Acciones',
       create: 'Crear usuario',
       edit: 'Editar usuario',
       search: 'Buscar usuario',
@@ -414,6 +439,7 @@ const messages = {
     },
     errors: {
       loadinPodsize: 'Error al cargar tamaños de Pod',
+      loadingPodsize: 'Error al cargar tamaños de Pod',
     },
   },
   runpacks: {
@@ -480,6 +506,11 @@ const messages = {
     },
   },
   settings: {
+    tabs: {
+      general: 'General',
+      deployment: 'Despliegue',
+      templates: 'Plantillas',
+    },
     deployment: {
       title: 'Conectar repositorios',
       configAlert: 'Los cambios de configuración no surtirán efecto hasta que el contenedor de la interfaz de Kubero se reinicie manualmente.',
@@ -551,10 +582,14 @@ const messages = {
       auditLogs: {
         title: 'Registros de auditoría',
         enabled: 'Habilitado (**)',
-        storageClass: 'Storage Class',
+        storageClass: 'Clase de almacenamiento',
         limit: 'Límite',
         size: 'Tamaño',
       },
+    },
+    templates: {
+      title: 'Plantillas',
+      allowTemplates: 'Permitir plantillas',
     },
   },
   templates: {
@@ -566,6 +601,10 @@ const messages = {
       install: 'Instalar',
       loadTemplate: 'Cargar plantilla',
     },
+  },
+  builds: {
+    newBuild: 'Nueva compilación',
+    build: 'Compilar',
   },
   $vuetify: {
     ...es,

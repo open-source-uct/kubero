@@ -1,3 +1,4 @@
+import * as sshpk from 'sshpk';
 import { Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
 import {
@@ -12,7 +13,7 @@ import { IDeployKeyPair } from '../repo.interface';
 export abstract class Repo {
   protected repoProvider: string;
   protected logger = new Logger(Repo.name);
-  protected sshpk = require('sshpk');
+  protected sshpk = sshpk;
 
   constructor(repoProvider: string) {
     this.repoProvider = repoProvider;
@@ -119,9 +120,8 @@ export abstract class Repo {
   public async disconnectRepo(gitrepo: string): Promise<boolean> {
     this.logger.log('disconnectPipeline: ' + gitrepo);
 
-    const { owner, repo } = this.parseRepo(gitrepo);
-
     // TODO: implement remove deploy key and webhook for all providers
+    //const { owner, repo } = this.parseRepo(gitrepo);
     //this.removeDeployKey(owner, repo, 0);
     //this.removeWebhook(owner, repo, 0);
 
@@ -155,6 +155,7 @@ export abstract class Repo {
     delivery: string,
     signature: string,
     body: any,
+    rawBody?: Buffer,
   ): IWebhook | boolean;
   //protected abstract removeWebhook(owner: string, repo: string, id: number): Promise<boolean>;
   protected abstract getBranches(repo: string): Promise<string[]> | undefined;

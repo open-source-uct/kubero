@@ -1,4 +1,3 @@
-export interface Users {}
 export interface User {
   id: string;
   name?: string;

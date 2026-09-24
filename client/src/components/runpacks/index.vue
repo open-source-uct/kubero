@@ -201,8 +201,8 @@
     </div>
 
     <v-dialog v-model="editDialog" max-width="1000px">
-      <v-card>
-        <v-card-title>{{ $t('runpacks.actions.edit') }}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{ $t('runpacks.actions.edit') }}</v-card-title>
         <v-card-text v-if="editedRunpack">
           <v-text-field v-model="editedRunpack.name" :label="$t('runpacks.form.name')"></v-text-field>
           <v-text-field v-model="editedRunpack.language" :label="$t('runpacks.form.language')"></v-text-field>
@@ -230,8 +230,8 @@
     </v-dialog>
 
     <v-dialog v-model="createDialog" max-width="1000px">
-      <v-card>
-        <v-card-title>{{ $t('runpacks.actions.create') }}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{ $t('runpacks.actions.create') }}</v-card-title>
         <v-card-text>
           <v-text-field v-model="newRunpack.name" :label="$t('runpacks.form.name')"></v-text-field>
           <v-text-field v-model="newRunpack.language" :label="$t('runpacks.form.language')"></v-text-field>

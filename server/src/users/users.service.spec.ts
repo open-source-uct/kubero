@@ -1,6 +1,7 @@
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { PrismaClient, User as PrismaUser } from '@prisma/client';
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { User as PrismaUser } from '@prisma/client';
+import { HttpException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import axios from 'axios';
 
@@ -26,6 +27,7 @@ describe('UsersService', () => {
     role: {
       findFirst: jest.Mock;
       findMany: jest.Mock;
+      findUnique: jest.Mock;
     };
     userGroup: {
       findFirst: jest.Mock;
@@ -34,7 +36,7 @@ describe('UsersService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     prismaMock = {
       user: {
         findUnique: jest.fn(),
@@ -47,6 +49,7 @@ describe('UsersService', () => {
       role: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
+        findUnique: jest.fn(),
       },
       userGroup: {
         findFirst: jest.fn(),
@@ -54,12 +57,18 @@ describe('UsersService', () => {
     };
 
     // Mock bcrypt methods
-    (mockedBcrypt.compare as jest.Mock).mockImplementation(() => Promise.resolve(true));
-    (mockedBcrypt.hash as jest.Mock).mockImplementation(() => Promise.resolve('hashedPassword'));
-    (mockedBcrypt.hashSync as jest.Mock).mockImplementation(() => 'hashedPassword');
+    (mockedBcrypt.compare as jest.Mock).mockImplementation(() =>
+      Promise.resolve(true),
+    );
+    (mockedBcrypt.hash as jest.Mock).mockImplementation(() =>
+      Promise.resolve('hashedPassword'),
+    );
+    (mockedBcrypt.hashSync as jest.Mock).mockImplementation(
+      () => 'hashedPassword',
+    );
 
     service = new UsersService();
-    // @ts-ignore
+    // @ts-expect-error prisma es privado; se reemplaza por un mock
     service['prisma'] = prismaMock;
   });
 
@@ -217,9 +226,13 @@ describe('UsersService', () => {
         id: '1',
         username: 'user1',
         email: 'user1@example.com',
-        tokens: [{ id: 'token1', createdAt: new Date(), expiresAt: new Date() }],
+        tokens: [
+          { id: 'token1', createdAt: new Date(), expiresAt: new Date() },
+        ],
         role: { id: 'role1', name: 'admin', description: 'Administrator' },
-        userGroups: [{ id: 'group1', name: 'admins', description: 'Admin group' }],
+        userGroups: [
+          { id: 'group1', name: 'admins', description: 'Admin group' },
+        ],
       };
       prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
 
@@ -276,7 +289,7 @@ describe('UsersService', () => {
         'existinguser',
         'existing@example.com',
         'oauth2',
-        'https://example.com/avatar.jpg'
+        'https://example.com/avatar.jpg',
       );
 
       expect(result).toBe(existingUser);
@@ -303,7 +316,7 @@ describe('UsersService', () => {
         'newuser',
         'new@example.com',
         'oauth2',
-        'https://example.com/avatar.jpg'
+        'https://example.com/avatar.jpg',
       );
 
       expect(result).toBe(newUser);
@@ -315,17 +328,20 @@ describe('UsersService', () => {
       prismaMock.role.findFirst.mockResolvedValueOnce(null);
 
       await expect(
-        service.findOneOrCreate('newuser', 'new@example.com', 'oauth2', '')
+        service.findOneOrCreate('newuser', 'new@example.com', 'oauth2', ''),
       ).rejects.toThrow('Default role not found');
     });
 
     it('should throw error if default user group not found', async () => {
       prismaMock.user.findUnique.mockResolvedValueOnce(null);
-      prismaMock.role.findFirst.mockResolvedValueOnce({ id: 'role1', name: 'guest' });
+      prismaMock.role.findFirst.mockResolvedValueOnce({
+        id: 'role1',
+        name: 'guest',
+      });
       prismaMock.userGroup.findFirst.mockResolvedValueOnce(null);
 
       await expect(
-        service.findOneOrCreate('newuser', 'new@example.com', 'oauth2', '')
+        service.findOneOrCreate('newuser', 'new@example.com', 'oauth2', ''),
       ).rejects.toThrow('Default user group not found');
     });
   });
@@ -351,20 +367,33 @@ describe('UsersService', () => {
 
       prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
       (mockedBcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
-      (mockedBcrypt.hash as jest.Mock).mockResolvedValueOnce('hashedNewPassword');
+      (mockedBcrypt.hash as jest.Mock).mockResolvedValueOnce(
+        'hashedNewPassword',
+      );
       prismaMock.user.update.mockResolvedValueOnce(updatedUser);
 
-      const result = await service.updateMyPassword('1', 'currentPass', 'newPassword123');
+      const result = await service.updateMyPassword(
+        '1',
+        'currentPass',
+        'newPassword123',
+      );
 
       expect(result).toBe(updatedUser);
-      expect(mockedBcrypt.compare).toHaveBeenCalledWith('currentPass', 'hashedCurrentPassword');
+      expect(mockedBcrypt.compare).toHaveBeenCalledWith(
+        'currentPass',
+        'hashedCurrentPassword',
+      );
       expect(mockedBcrypt.hash).toHaveBeenCalledWith('newPassword123', 10);
     });
 
     it('should return undefined for invalid input parameters', async () => {
       const result1 = await service.updateMyPassword('1', '', 'newPassword123');
       const result2 = await service.updateMyPassword('1', 'currentPass', '');
-      const result3 = await service.updateMyPassword('1', 'currentPass', 'short');
+      const result3 = await service.updateMyPassword(
+        '1',
+        'currentPass',
+        'short',
+      );
 
       expect(result1).toBeUndefined();
       expect(result2).toBeUndefined();
@@ -374,7 +403,11 @@ describe('UsersService', () => {
     it('should return undefined when user not found', async () => {
       prismaMock.user.findUnique.mockResolvedValueOnce(null);
 
-      const result = await service.updateMyPassword('1', 'currentPass', 'newPassword123');
+      const result = await service.updateMyPassword(
+        '1',
+        'currentPass',
+        'newPassword123',
+      );
 
       expect(result).toBeUndefined();
     });
@@ -385,7 +418,7 @@ describe('UsersService', () => {
       (mockedBcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
 
       await expect(
-        service.updateMyPassword('1', 'wrongPassword', 'newPassword123')
+        service.updateMyPassword('1', 'wrongPassword', 'newPassword123'),
       ).rejects.toThrow(HttpException);
     });
 
@@ -393,11 +426,13 @@ describe('UsersService', () => {
       const mockUser = { id: '1', password: 'hashedCurrentPassword' };
       prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
       (mockedBcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
-      (mockedBcrypt.hash as jest.Mock).mockResolvedValueOnce('hashedNewPassword');
+      (mockedBcrypt.hash as jest.Mock).mockResolvedValueOnce(
+        'hashedNewPassword',
+      );
       prismaMock.user.update.mockRejectedValueOnce(new Error('Database error'));
 
       await expect(
-        service.updateMyPassword('1', 'currentPass', 'newPassword123')
+        service.updateMyPassword('1', 'currentPass', 'newPassword123'),
       ).rejects.toThrow('Database error');
     });
   });
@@ -454,7 +489,10 @@ describe('UsersService', () => {
         buffer: Buffer.from('fake-image-data'),
         mimetype: 'image/jpeg',
       };
-      const updatedUser = { id: '1', image: 'data:image/jpeg;base64,ZmFrZS1pbWFnZS1kYXRh' };
+      const updatedUser = {
+        id: '1',
+        image: 'data:image/jpeg;base64,ZmFrZS1pbWFnZS1kYXRh',
+      };
 
       prismaMock.user.update.mockResolvedValueOnce(updatedUser);
 
@@ -520,12 +558,19 @@ describe('UsersService', () => {
         headers: { 'content-type': 'image/jpeg' },
       });
 
-      const result = await (service as any).generateUserDataFromImageUrl('https://example.com/image.jpg');
+      const result = await (service as any).generateUserDataFromImageUrl(
+        'https://example.com/image.jpg',
+      );
 
-      expect(result).toBe(`data:image/jpeg;base64,${imageBuffer.toString('base64')}`);
-      expect(mockedAxios.get).toHaveBeenCalledWith('https://example.com/image.jpg', {
-        responseType: 'arraybuffer',
-      });
+      expect(result).toBe(
+        `data:image/jpeg;base64,${imageBuffer.toString('base64')}`,
+      );
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        'https://example.com/image.jpg',
+        {
+          responseType: 'arraybuffer',
+        },
+      );
     });
 
     it('should throw error when image fetch fails', async () => {
@@ -536,7 +581,9 @@ describe('UsersService', () => {
       });
 
       await expect(
-        (service as any).generateUserDataFromImageUrl('https://example.com/notfound.jpg')
+        (service as any).generateUserDataFromImageUrl(
+          'https://example.com/notfound.jpg',
+        ),
       ).rejects.toThrow('Failed to fetch image from URL');
     });
 
@@ -548,7 +595,9 @@ describe('UsersService', () => {
       });
 
       await expect(
-        (service as any).generateUserDataFromImageUrl('https://example.com/text.txt')
+        (service as any).generateUserDataFromImageUrl(
+          'https://example.com/text.txt',
+        ),
       ).rejects.toThrow('Invalid image MIME type');
     });
 
@@ -560,26 +609,37 @@ describe('UsersService', () => {
         headers: {},
       });
 
-      const result = await (service as any).generateUserDataFromImageUrl('https://example.com/image');
+      const result = await (service as any).generateUserDataFromImageUrl(
+        'https://example.com/image',
+      );
 
-      expect(result).toBe(`data:image/jpeg;base64,${imageBuffer.toString('base64')}`);
+      expect(result).toBe(
+        `data:image/jpeg;base64,${imageBuffer.toString('base64')}`,
+      );
     });
   });
 
   describe('create with error handling', () => {
     it('should throw error when no password provided', async () => {
-      const userWithoutPassword = { username: 'testuser', email: 'test@example.com' };
+      const userWithoutPassword = {
+        username: 'testuser',
+        email: 'test@example.com',
+      };
 
       await expect(service.create(userWithoutPassword)).rejects.toThrow(
-        'Password is required for user creation.'
+        'Password is required for user creation.',
       );
     });
 
     it('should throw error when empty password provided', async () => {
-      const userWithEmptyPassword = { username: 'testuser', password: '', email: 'test@example.com' };
+      const userWithEmptyPassword = {
+        username: 'testuser',
+        password: '',
+        email: 'test@example.com',
+      };
 
       await expect(service.create(userWithEmptyPassword)).rejects.toThrow(
-        'Password is required for user creation.'
+        'Password is required for user creation.',
       );
     });
   });
@@ -642,6 +702,115 @@ describe('UsersService', () => {
 
       // Should not throw, but handle gracefully
       await expect(service.delete('nonexistent')).resolves.toBeUndefined();
+    });
+  });
+});
+
+describe('UsersService safeguards', () => {
+  let service: UsersService;
+  let prisma: any;
+
+  const admin = { isActive: true, role: { name: 'admin' } };
+
+  beforeEach(() => {
+    prisma = {
+      user: {
+        findUnique: jest.fn(),
+        count: jest.fn().mockResolvedValue(1), // queda otro admin
+        delete: jest.fn().mockResolvedValue({}),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      role: { findUnique: jest.fn() },
+    };
+    service = new UsersService();
+    // @ts-expect-error prisma es privado; se reemplaza por un mock
+    service['prisma'] = prisma;
+  });
+
+  describe('delete', () => {
+    it('refuses to delete your own account', async () => {
+      await expect(service.delete('u1', 'u1')).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(prisma.user.delete).not.toHaveBeenCalled();
+    });
+
+    it('refuses to delete the last active administrator', async () => {
+      prisma.user.findUnique.mockResolvedValue(admin);
+      prisma.user.count.mockResolvedValue(0);
+      await expect(service.delete('u1', 'someone-else')).rejects.toThrow(
+        ConflictException,
+      );
+      expect(prisma.user.delete).not.toHaveBeenCalled();
+    });
+
+    it('deletes an administrator when another one remains', async () => {
+      prisma.user.findUnique.mockResolvedValue(admin);
+      await service.delete('u1', 'someone-else');
+      expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'u1' } });
+    });
+
+    it('does not count a non-admin as a protected account', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        isActive: true,
+        role: { name: 'student' },
+      });
+      prisma.user.count.mockResolvedValue(0);
+      await service.delete('u2', 'u1');
+      expect(prisma.user.delete).toHaveBeenCalled();
+    });
+  });
+
+  describe('update', () => {
+    it('refuses to deactivate the last active administrator', async () => {
+      prisma.user.findUnique.mockResolvedValue(admin);
+      prisma.user.count.mockResolvedValue(0);
+      await expect(service.update('u1', { isActive: false })).rejects.toThrow(
+        ConflictException,
+      );
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('refuses to move the last administrator to another role', async () => {
+      prisma.user.findUnique.mockResolvedValue(admin);
+      prisma.user.count.mockResolvedValue(0);
+      prisma.role.findUnique.mockResolvedValue({ name: 'student' });
+      await expect(service.update('u1', { role: 'r-student' })).rejects.toThrow(
+        ConflictException,
+      );
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('lets the last administrator keep the admin role', async () => {
+      prisma.user.findUnique.mockResolvedValue(admin);
+      prisma.user.count.mockResolvedValue(0);
+      prisma.role.findUnique.mockResolvedValue({ name: 'admin' });
+      await service.update('u1', { role: 'r-admin', firstName: 'Ana' });
+      expect(prisma.user.update).toHaveBeenCalled();
+    });
+  });
+
+  describe('findOneOrCreate (OAuth)', () => {
+    it('refuses to log in as a local user that has the same username', async () => {
+      // findOneFull devuelve al admin local; el login viene de GitHub
+      jest.spyOn(service, 'findOneFull').mockResolvedValue({
+        id: 'u1',
+        username: 'admin',
+        provider: 'local',
+      } as any);
+      await expect(
+        service.findOneOrCreate('admin', 'a@b.c', 'github', ''),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('lets a user of the same provider log in again', async () => {
+      jest.spyOn(service, 'findOneFull').mockResolvedValue({
+        id: 'u2',
+        username: 'ana',
+        provider: 'github',
+      } as any);
+      const user = await service.findOneOrCreate('ana', 'a@b.c', 'github', '');
+      expect(user).toMatchObject({ username: 'ana' });
     });
   });
 });

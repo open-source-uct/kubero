@@ -4,6 +4,7 @@ import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { ConfigService } from '../config/config.service';
 import { AuditService } from '../audit/audit.service';
 import { RolesService } from '../roles/roles.service';
+import { getJwtSecret } from './jwt-secret';
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
@@ -53,7 +54,7 @@ export class AuthService {
       const passwordMatch = await bcrypt.compare(pass, user.password);
       //if (passwordMatch) {
       if (user.password === password || passwordMatch) {
-        const { password, ...result } = user;
+        const { password: _password, ...result } = user;
         return result;
       }
     }
@@ -62,9 +63,9 @@ export class AuthService {
 
   async validateToken(token: string): Promise<boolean> {
     try {
-      const decoded = this.jwtService.verify(token);
+      this.jwtService.verify(token);
       return true;
-    } catch (_error) {
+    } catch {
       return false;
     }
   }
@@ -141,6 +142,7 @@ export class AuthService {
     userGroups: string[],
     permissions: string[] = [],
     expiresAt?: string,
+    tokenId?: string,
   ): Promise<string> {
     if (!userId || !username || !role) {
       this.logger.error('Invalid user data for token generation', {
@@ -178,10 +180,10 @@ export class AuthService {
     }
 
     const token = this.jwtService.sign(u, {
-      secret:
-        process.env.JWT_SECRET ||
-        'DO NOT USE THIS VALUE. INSTEAD, CREATE A COMPLEX SECRET AND KEEP IT SAFE OUTSIDE OF THE SOURCE CODE.',
+      secret: getJwtSecret(),
       expiresIn: expiresInSeconds,
+      // id de la fila Token: permite revocar el token borrándolo
+      ...(tokenId ? { jwtid: tokenId } : {}),
     });
     return token;
   }

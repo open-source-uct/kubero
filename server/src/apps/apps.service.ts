@@ -1,4 +1,5 @@
-import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import * as YAML from 'yaml';
+import { Injectable, Logger } from '@nestjs/common';
 import { PipelinesService } from '../pipelines/pipelines.service';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -15,7 +16,7 @@ import { EventsGateway } from '../events/events.gateway';
 @Injectable()
 export class AppsService {
   private logger = new Logger(AppsService.name);
-  private YAML = require('yaml');
+  private YAML = YAML;
 
   constructor(
     private kubectl: KubernetesService,
@@ -84,13 +85,6 @@ export class AppsService {
       app.phase,
       userGroups,
     );
-    if (contextName.startsWith('missing-')) {
-      throw new HttpException(
-        `Pipeline "${app.pipeline}" or phase "${app.phase}" not found`,
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
     await this.kubectl.createApp(app, contextName);
 
     const m = {
@@ -113,7 +107,7 @@ export class AppsService {
         app: app,
       },
     } as INotification;
-    this.NotificationsService.send(m);
+    void this.NotificationsService.send(m);
 
     if (
       app.deploymentstrategy == 'git' &&
@@ -121,12 +115,17 @@ export class AppsService {
         app.buildstrategy == 'nixpacks' ||
         app.buildstrategy == 'buildpacks')
     ) {
+      // no se espera (tiene 2s de retraso), pero un fallo se registra
       this.triggerImageBuildDelayed(
         app.pipeline,
         app.phase,
         app.name,
         userGroups,
-      );
+      ).catch((error) => {
+        this.logger.error(
+          'Failed to trigger image build for ' + app.name + ': ' + error,
+        );
+      });
     }
   }
 
@@ -176,7 +175,7 @@ export class AppsService {
     if (contextName) {
       this.kubectl.setCurrentContext(contextName);
 
-      this.kubectl.createBuildJob(
+      await this.kubectl.createBuildJob(
         namespace,
         appName,
         pipeline,
@@ -259,7 +258,7 @@ export class AppsService {
         appName: appName,
         data: {},
       } as INotification;
-      this.NotificationsService.send(m);
+      void this.NotificationsService.send(m);
     }
   }
 
@@ -407,7 +406,7 @@ export class AppsService {
           username: 'unknown',
         } as IUser;
 
-        this.createApp(app, user, userGroups);
+        await this.createApp(app, user, userGroups);
         return { status: 'ok', message: 'app created ' + app.name };
       }
     }
@@ -464,7 +463,13 @@ export class AppsService {
           username: 'unknown',
         } as IUser;
 
-        this.deleteApp(app.pipeline, app.phase, websaveTitle, user, userGroups);
+        await this.deleteApp(
+          app.pipeline,
+          app.phase,
+          websaveTitle,
+          user,
+          userGroups,
+        );
       }
     }
   }
@@ -491,14 +496,14 @@ export class AppsService {
         app.buildstrategy == undefined ||
         app.buildstrategy == 'plain'
       ) {
-        this.kubectl.restartApp(
+        await this.kubectl.restartApp(
           app.pipeline,
           app.phase,
           app.name,
           'web',
           contextName,
         );
-        this.kubectl.restartApp(
+        await this.kubectl.restartApp(
           app.pipeline,
           app.phase,
           app.name,
@@ -507,7 +512,12 @@ export class AppsService {
         );
       } else {
         // rebuild for buildstrategy git/dockerfile or git/nixpacks
-        this.triggerImageBuild(app.pipeline, app.phase, app.name, userGroups);
+        await this.triggerImageBuild(
+          app.pipeline,
+          app.phase,
+          app.name,
+          userGroups,
+        );
       }
 
       const m = {
@@ -528,7 +538,7 @@ export class AppsService {
         appName: app.name,
         data: {},
       } as INotification;
-      this.NotificationsService.send(m);
+      void this.NotificationsService.send(m);
     }
   }
 
@@ -585,14 +595,14 @@ export class AppsService {
       userGroups,
     );
     if (contextName) {
-      this.kubectl.restartApp(
+      await this.kubectl.restartApp(
         pipelineName,
         phaseName,
         appName,
         'web',
         contextName,
       );
-      this.kubectl.restartApp(
+      await this.kubectl.restartApp(
         pipelineName,
         phaseName,
         appName,
@@ -618,7 +628,7 @@ export class AppsService {
         appName: appName,
         data: {},
       } as INotification;
-      this.NotificationsService.send(m);
+      void this.NotificationsService.send(m);
     }
   }
 
@@ -658,7 +668,12 @@ export class AppsService {
         app.buildstrategy == 'nixpacks' ||
         app.buildstrategy == 'buildpacks')
     ) {
-      this.triggerImageBuild(app.pipeline, app.phase, app.name, userGroups);
+      await this.triggerImageBuild(
+        app.pipeline,
+        app.phase,
+        app.name,
+        userGroups,
+      );
     }
 
     if (contextName) {
@@ -685,7 +700,7 @@ export class AppsService {
           app: app,
         },
       } as INotification;
-      this.NotificationsService.send(m);
+      void this.NotificationsService.send(m);
     }
   }
 

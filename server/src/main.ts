@@ -20,7 +20,7 @@ async function bootstrap() {
     'debug',
     'verbose',
   ];
-  Logger.log(`Log levels: ${logLevels}`, 'Bootstrap');
+  Logger.log(`Log levels: ${logLevels.join(',')}`, 'Bootstrap');
 
   const app = await NestFactory.create(AppModule, {
     logger: new CustomConsoleLogger({
@@ -28,6 +28,8 @@ async function bootstrap() {
       logLevels: logLevels as LogLevel[],
     }),
     cors: true,
+    // los webhooks se firman sobre el cuerpo tal cual llegó
+    rawBody: true,
   });
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
 
@@ -109,4 +111,4 @@ async function bootstrap() {
 
   //app.enableShutdownHooks();
 }
-bootstrap();
+void bootstrap();

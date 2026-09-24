@@ -4,7 +4,6 @@ import { LogsService } from './logs.service';
 
 describe('LogsController', () => {
   let controller: LogsController;
-  let service: LogsService;
 
   beforeEach(async () => {
     const mockLogsService = {
@@ -18,7 +17,6 @@ describe('LogsController', () => {
     }).compile();
 
     controller = module.get<LogsController>(LogsController);
-    service = module.get<LogsService>(LogsService);
   });
 
   it('should be defined', () => {

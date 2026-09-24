@@ -13,9 +13,18 @@ import { ConfigService } from '../config/config.service';
 import { ConfigModule } from '../config/config.module';
 import * as dotenv from 'dotenv';
 import { RolesService } from '../roles/roles.service';
+import { getJwtSecret } from './jwt-secret';
+import { LoginThrottleService } from './login-throttle.service';
+import { IdentityService } from './identity.service';
 dotenv.config();
 
-const providers: Provider[] = [AuthService, JwtStrategy, RolesService];
+const providers: Provider[] = [
+  AuthService,
+  JwtStrategy,
+  RolesService,
+  IdentityService,
+  LoginThrottleService,
+];
 if (ConfigService.getOauth2Enabled()) {
   providers.push(Oauth2Strategy);
 }
@@ -31,9 +40,7 @@ if (ConfigService.getGithubEnabled()) {
     KubernetesModule,
     ConfigModule,
     JwtModule.register({
-      secret:
-        process.env.JWT_SECRET ||
-        'DO NOT USE THIS VALUE. INSTEAD, CREATE A COMPLEX SECRET AND KEEP IT SAFE OUTSIDE OF THE SOURCE CODE.',
+      secret: getJwtSecret(),
       signOptions: {
         expiresIn: process.env.JWT_EXPIRESIN || '36000s',
       },
@@ -41,6 +48,6 @@ if (ConfigService.getGithubEnabled()) {
   ],
   providers: providers,
   controllers: [AuthController],
-  exports: [AuthService, JwtModule, UsersModule],
+  exports: [AuthService, JwtModule, UsersModule, IdentityService],
 })
 export class AuthModule {}

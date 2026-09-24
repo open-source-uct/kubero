@@ -1,8 +1,15 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { PrismaClient, User as PrismaUser } from '@prisma/client';
 import * as dotenv from 'dotenv';
 dotenv.config();
-//import * as crypto from 'crypto';
+import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import axios from 'axios';
 
@@ -19,6 +26,11 @@ export class UsersService {
 
   async findOne(username: string): Promise<PrismaUser | null> {
     return this.prisma.user.findUnique({ where: { username } });
+  }
+
+  // Fila del token personal (para comprobar que no fue revocado)
+  async findToken(id: string) {
+    return this.prisma.token.findUnique({ where: { id } });
   }
 
   async findOneFull(username: string): Promise<PartialPrismaUser | null> {
@@ -61,7 +73,9 @@ export class UsersService {
   ): Promise<PartialPrismaUser> {
     let user = await this.findOneFull(username);
     if (!user) {
-      this.logger.debug(`Oauth2 User ${username} not found, creating new user.`);
+      this.logger.debug(
+        `Oauth2 User ${username} not found, creating new user.`,
+      );
 
       // Define default role
       const role = await this.prisma.role.findFirst({
@@ -70,10 +84,14 @@ export class UsersService {
         },
       });
       if (!role) {
-        this.logger.warn(`Default role not found: ${process.env.DEFAULT_USER_ROLE || 'guest'}`);
-        throw new Error(`Default role not found: ${process.env.DEFAULT_USER_ROLE || 'guest'}`);
+        this.logger.warn(
+          `Default role not found: ${process.env.DEFAULT_USER_ROLE || 'guest'}`,
+        );
+        throw new Error(
+          `Default role not found: ${process.env.DEFAULT_USER_ROLE || 'guest'}`,
+        );
       }
-      
+
       // Define default user group
       const defaultUserGroup = process.env.DEFAULT_USER_GROUP || 'everyone';
       const userGroupsData = await this.prisma.userGroup.findFirst({
@@ -86,8 +104,9 @@ export class UsersService {
         throw new Error(`Default user group not found: ${defaultUserGroup}`);
       }
 
-      // Generate a random password (not most secure, but enough for a temporary password)
-      const password = Math.random().toString(36).slice(-8); // Generate a random password
+      // Contraseña aleatoria que nadie conoce (el usuario entra por OAuth).
+      // Antes eran 8 caracteres de Math.random(), adivinables por fuerza bruta.
+      const password = crypto.randomBytes(24).toString('hex');
       const imageData = image
         ? await this.generateUserDataFromImageUrl(image)
         : null;
@@ -98,13 +117,23 @@ export class UsersService {
         email,
         provider,
         image: imageData,
-        role: role.id, 
+        role: role.id,
         userGroups: [userGroupsData.id],
         providerId: null, // Set providerId if needed
         providerData: null, // Set providerData if needed
       });
       this.logger.debug(`User ${username} created successfully.`);
     } else {
+      // Sin esto, una cuenta OAuth cuyo nombre coincida con el de un usuario
+      // local (por ejemplo "admin") entraba como ese usuario y con su rol.
+      if (user.provider && user.provider !== provider) {
+        this.logger.warn(
+          `Refused ${provider} login: username ${username} belongs to a ${user.provider} account.`,
+        );
+        throw new ForbiddenException(
+          'This username is already used by another account',
+        );
+      }
       this.logger.debug(`User ${username} found.`);
     }
     return user;
@@ -209,7 +238,7 @@ export class UsersService {
       this.logger.warn('Password is required for user creation.');
       throw new Error('Password is required for user creation.');
     }
-    
+
     return this.prisma.user.create({
       data: {
         ...cleanedData,
@@ -238,6 +267,21 @@ export class UsersService {
       password,
       ...data
     } = user;
+
+    // no dejar el sistema sin administrador: desactivar al último o cambiarle
+    // el rol a uno que no sea admin
+    if (data.isActive === false) {
+      await this.assertAnotherAdminRemains(userId);
+    }
+    if (role && typeof role === 'string') {
+      const newRole = await this.prisma.role.findUnique({
+        where: { id: role },
+        select: { name: true },
+      });
+      if (newRole && newRole.name !== 'admin') {
+        await this.assertAnotherAdminRemains(userId);
+      }
+    }
 
     // fix relations
     if (role && typeof role === 'string') {
@@ -314,7 +358,9 @@ export class UsersService {
       typeof newPassword !== 'string' ||
       newPassword.length < 8
     ) {
-      this.logger.warn('Invalid current or new password provided for password update.');
+      this.logger.warn(
+        'Invalid current or new password provided for password update.',
+      );
       return undefined;
     }
 
@@ -322,18 +368,25 @@ export class UsersService {
       // First, get the user with their current password
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, password: true }
+        select: { id: true, password: true },
       });
 
       if (!user) {
-        this.logger.warn(`User with ID ${userId} not found for password update.`);
+        this.logger.warn(
+          `User with ID ${userId} not found for password update.`,
+        );
         return undefined;
       }
 
       // Verify current password
-      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      const isCurrentPasswordValid = await bcrypt.compare(
+        currentPassword,
+        user.password,
+      );
       if (!isCurrentPasswordValid) {
-        this.logger.warn(`Invalid current password provided for user ${userId}.`);
+        this.logger.warn(
+          `Invalid current password provided for user ${userId}.`,
+        );
         //throw new Error('Current password is incorrect');
         throw new HttpException(
           `Error updating password: Current password is incorrect`,
@@ -359,10 +412,32 @@ export class UsersService {
     }
   }
 
-  async delete(userId: string): Promise<void> {
+  // Impide dejar el sistema sin ningún administrador activo (borrar, desactivar
+  // o cambiar de rol al último).
+  private async assertAnotherAdminRemains(userId: string): Promise<void> {
+    const target = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isActive: true, role: { select: { name: true } } },
+    });
+    if (!target || target.role?.name !== 'admin' || target.isActive === false) {
+      return;
+    }
+    const others = await this.prisma.user.count({
+      where: { id: { not: userId }, isActive: true, role: { name: 'admin' } },
+    });
+    if (others === 0) {
+      throw new ConflictException('This is the last active administrator');
+    }
+  }
+
+  async delete(userId: string, actingUserId?: string): Promise<void> {
+    if (actingUserId && actingUserId === userId) {
+      throw new ForbiddenException('You cannot delete your own account');
+    }
+    await this.assertAnotherAdminRemains(userId);
     try {
       await this.prisma.user.delete({ where: { id: userId } });
-    } catch (error) {
+    } catch {
       this.logger.warn(`User with ID ${userId} not found for deletion.`);
     }
   }
@@ -441,12 +516,12 @@ export class UsersService {
     if (!mimetype.startsWith('image/')) {
       throw new Error(`Invalid image MIME type: ${mimetype}`);
     }
-    
+
     const buffer = Buffer.from(response.data, 'binary');
     const base64Image = buffer.toString('base64');
     return `data:${mimetype};base64,${base64Image}`;
   }
-/*
+  /*
   async getPermissions(userId: string,): Promise<{ action: string; resource: string }[]> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },

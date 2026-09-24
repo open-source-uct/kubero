@@ -1,8 +1,6 @@
 import axios from 'axios';
 import { Logger } from '@nestjs/common';
 
-
-
 export abstract class Plugin {
   public plugin?: any;
   public id: string = ''; //same as operator name
@@ -34,17 +32,26 @@ export abstract class Plugin {
     this.kind = this.constructor.name;
   }
 
+  // Los plugins la llaman desde su constructor sin poder esperarla, así que
+  // no debe rechazar: un rechazo sin manejar tumba el proceso.
   public async init(availableCRDs: any) {
-    // load data from local Operators
-    this.operator_data = this.loadOperatorData(availableCRDs);
+    try {
+      // load data from local Operators
+      this.operator_data = this.loadOperatorData(availableCRDs);
 
-    // load data from artifacthub
-    await this.loadMetadataFromArtefacthub();
+      // load data from artifacthub
+      await this.loadMetadataFromArtefacthub();
 
-    // load CRD from artefacthub, or alterantively from local operator, as a fallback use the CRD from the plugin
-    this.loadCRD();
+      // load CRD from artefacthub, or alterantively from local operator, as a fallback use the CRD from the plugin
+      this.loadCRD();
 
-    this.loadAdditionalResourceDefinitions();
+      this.loadAdditionalResourceDefinitions();
+    } catch (error) {
+      this.logger.error(
+        'Failed to initialize ' + this.constructor.name + ': ' + error,
+      );
+      return;
+    }
 
     if (this.enabled) {
       this.logger.log('✅ ' + this.id + ' ' + this.constructor.name);
@@ -55,7 +62,7 @@ export abstract class Plugin {
   }
 
   private async loadMetadataFromArtefacthub() {
-    const response = await axios.get(this.artifact_url).catch((error) => {
+    const response = await axios.get(this.artifact_url).catch(() => {
       /*
       this.logger.debug(
         '   No entry found on artefacthub.io for ' + this.id + ': ' +

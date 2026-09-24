@@ -5,7 +5,6 @@ import {
   Delete,
   ForbiddenException,
   Get,
-  HttpCode,
   HttpException,
   HttpStatus,
   Logger,
@@ -14,7 +13,6 @@ import {
   Put,
   UseGuards,
   Request,
-  Req,
 } from '@nestjs/common';
 import { PipelinesService } from './pipelines.service';
 import {
@@ -128,7 +126,8 @@ export class PipelinesController {
     @Param('pipeline') pipelineName: string,
   ) {
     await this.assertPipelineAccess(pipelineName, req.user);
-    this.assertTeamAccess(pl, req.user);
+    const current = await this.pipelinesService.getPipeline(pipelineName);
+    this.assertTeamAccess(pl, req.user, current?.access?.teams ?? []);
     const user: IUser = {
       id: req.user.userId,
       strategy: req.user.strategy,
@@ -207,15 +206,36 @@ export class PipelinesController {
   }
 
   // Un pipeline con la lista de equipos vacía solo lo ven los admins (ver
-  // getPipelinesList), así que un usuario no admin se quedaría sin acceso a su propio pipeline.
+  // getPipelinesList), así que un usuario no admin se quedaría sin acceso a su
+  // propio pipeline.
+  // Además, un usuario que no es admin solo puede asignar SUS equipos (y
+  // conservar los que el pipeline ya tenía): antes podía crear un pipeline para
+  // el equipo de otro y que le apareciera en su listado, o dejarse sin acceso.
   private assertTeamAccess(
     pl: CreatePipelineDTO,
     user: { userGroups?: string[] },
+    existingTeams: string[] = [],
   ) {
-    const isAdmin = user.userGroups?.includes('admin');
-    if (!isAdmin && !pl.access?.teams?.length) {
+    const userGroups = user.userGroups ?? [];
+    if (userGroups.includes('admin')) {
+      return;
+    }
+    const teams = pl.access?.teams ?? [];
+    if (!teams.length) {
       throw new BadRequestException([
         'access.teams must contain at least one team',
+      ]);
+    }
+    const allowed = new Set([...userGroups, ...existingTeams]);
+    const foreign = teams.filter((team) => !allowed.has(team));
+    if (foreign.length > 0) {
+      throw new ForbiddenException(
+        `You can only assign your own teams (not allowed: ${foreign.join(', ')})`,
+      );
+    }
+    if (!teams.some((team) => userGroups.includes(team))) {
+      throw new BadRequestException([
+        'access.teams must include at least one of your teams',
       ]);
     }
   }

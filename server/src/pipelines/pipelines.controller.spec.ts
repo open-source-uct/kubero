@@ -26,11 +26,6 @@ const validDockerPipeline = {
 };
 
 const mockUserGroups = ['group1', 'group2'];
-const mockUser = {
-  id: 1,
-  strategy: 'local',
-  username: 'admin',
-};
 
 const mockJWT = {
   userId: 1,
@@ -147,6 +142,105 @@ describe('PipelinesController', () => {
       const dto: any = { ...validDockerPipeline };
       await controller.createPipeline('new', dto, { user: mockJWT });
       expect(service.createPipeline).toHaveBeenCalled();
+    });
+
+    describe('assigning teams', () => {
+      it("should reject a non admin creating a pipeline for another team's", async () => {
+        const dto: any = {
+          ...validDockerPipeline,
+          access: { teams: ['taller2'] },
+        };
+        await expect(
+          controller.createPipeline('new', dto, { user: mockJWT }),
+        ).rejects.toThrow(ForbiddenException);
+        expect(service.createPipeline).not.toHaveBeenCalled();
+      });
+
+      it('should reject a mix of own and foreign teams', async () => {
+        const dto: any = {
+          ...validDockerPipeline,
+          access: { teams: ['group1', 'taller2'] },
+        };
+        await expect(
+          controller.createPipeline('new', dto, { user: mockJWT }),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('should reject assigning the admin team to a pipeline', async () => {
+        const dto: any = {
+          ...validDockerPipeline,
+          access: { teams: ['admin'] },
+        };
+        await expect(
+          controller.createPipeline('new', dto, { user: mockJWT }),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('should let a non admin assign several of their own teams', async () => {
+        const dto: any = {
+          ...validDockerPipeline,
+          access: { teams: ['group1', 'group2'] },
+        };
+        await controller.createPipeline('new', dto, { user: mockJWT });
+        expect(service.createPipeline).toHaveBeenCalled();
+      });
+
+      it('should let an admin assign any team', async () => {
+        const dto: any = {
+          ...validDockerPipeline,
+          access: { teams: ['taller2'] },
+        };
+        await controller.createPipeline('new', dto, adminReq);
+        expect(service.createPipeline).toHaveBeenCalled();
+      });
+
+      it('should reject an update that assigns a foreign team', async () => {
+        service.getPipeline.mockResolvedValue({
+          name: 'pipeline1',
+          access: { teams: ['group1'] },
+        } as any);
+        const dto: any = {
+          ...validDockerPipeline,
+          access: { teams: ['group1', 'taller2'] },
+          resourceVersion: '1',
+        };
+        await expect(
+          controller.updatePipeline(dto, { user: mockJWT }, 'pipeline1'),
+        ).rejects.toThrow(ForbiddenException);
+        expect(service.updatePipeline).not.toHaveBeenCalled();
+      });
+
+      it('should let an update keep the foreign teams the pipeline already had', async () => {
+        // el selector solo ofrece los equipos propios, pero el pipeline puede
+        // haber sido compartido por un admin con otro equipo
+        service.getPipeline.mockResolvedValue({
+          name: 'pipeline1',
+          access: { teams: ['group1', 'taller3'] },
+        } as any);
+        const dto: any = {
+          ...validDockerPipeline,
+          access: { teams: ['group1', 'taller3'] },
+          resourceVersion: '1',
+        };
+        await controller.updatePipeline(dto, { user: mockJWT }, 'pipeline1');
+        expect(service.updatePipeline).toHaveBeenCalled();
+      });
+
+      it('should reject an update that removes all of the own teams', async () => {
+        service.getPipeline.mockResolvedValue({
+          name: 'pipeline1',
+          access: { teams: ['group1', 'taller3'] },
+        } as any);
+        const dto: any = {
+          ...validDockerPipeline,
+          access: { teams: ['taller3'] },
+          resourceVersion: '1',
+        };
+        await expect(
+          controller.updatePipeline(dto, { user: mockJWT }, 'pipeline1'),
+        ).rejects.toThrow(BadRequestException);
+        expect(service.updatePipeline).not.toHaveBeenCalled();
+      });
     });
 
     it('should let an admin create a pipeline without teams', async () => {

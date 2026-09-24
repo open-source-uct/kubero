@@ -5,9 +5,11 @@ import {
   Param,
   ParseIntPipe,
   Query,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import { AuditService } from './audit.service';
+import { PipelinesService } from '../pipelines/pipelines.service';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
@@ -20,7 +22,10 @@ import { Permissions } from '../auth/permissions.decorator';
 
 @Controller({ path: 'api/audit', version: '1' })
 export class AuditController {
-  constructor(private readonly auditService: AuditService) {}
+  constructor(
+    private readonly auditService: AuditService,
+    private readonly pipelinesService: PipelinesService,
+  ) {}
 
   @ApiOperation({ summary: 'Get all audit entries for a specific app' })
   @Get('/app/:pipeline/:phase/:app')
@@ -42,7 +47,14 @@ export class AuditController {
       new ParseIntPipe({ optional: true }),
     )
     limit: number,
+    @Request() req: any,
   ) {
+    // 403 si el usuario no tiene acceso al pipeline de la app
+    await this.pipelinesService.getContext(
+      pipeline,
+      phase,
+      req.user.userGroups,
+    );
     return this.auditService.getAppEntries(pipeline, phase, app, limit);
   }
 
@@ -63,7 +75,19 @@ export class AuditController {
       new ParseIntPipe({ optional: true }),
     )
     limit: number,
+    @Request() req: any,
   ) {
-    return this.auditService.get(limit);
+    // El equipo admin ve todo el registro (incluye eventos de sistema sin
+    // pipeline). El resto solo ve lo de los pipelines a los que tiene acceso:
+    // antes cualquier usuario con audit:read veía la auditoría de todos.
+    const userGroups: string[] = req.user.userGroups ?? [];
+    if (userGroups.includes('admin')) {
+      return this.auditService.get(limit);
+    }
+    const accessible = await this.pipelinesService.listPipelines(userGroups);
+    return this.auditService.get(
+      limit,
+      accessible.items.map((p) => p.name),
+    );
   }
 }

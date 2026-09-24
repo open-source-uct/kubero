@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   Param,
   Post,
   Req,
@@ -16,15 +17,20 @@ import {
 } from '@nestjs/swagger';
 import { OKDTO } from '../common/dto/ok.dto';
 import { JwtAuthGuard } from '../auth/strategies/jwt.guard';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { Permissions } from '../auth/permissions.decorator';
 import { ReadonlyGuard } from '../common/guards/readonly.guard';
 import { ConnectRepoDto } from './dto/connect-repo.dto';
 
 @Controller({ path: 'api/repo', version: '1' })
 export class RepoController {
+  private readonly logger = new Logger(RepoController.name);
+
   constructor(private readonly repoService: RepoService) {}
 
   @Get('/providers')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:write', 'pipeline:write')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -37,7 +43,8 @@ export class RepoController {
   }
 
   @Get('/:provider/repositories')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:write', 'pipeline:write')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -57,7 +64,8 @@ export class RepoController {
   }
 
   @Get('/:provider/:gitrepob64/branches')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:write', 'pipeline:write')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -86,7 +94,8 @@ export class RepoController {
   }
 
   @Get('/:provider/:gitrepob64/pullrequests')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:write', 'pipeline:write')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -115,7 +124,8 @@ export class RepoController {
   }
 
   @Get('/:provider/:gitrepob64/references')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:write', 'pipeline:write')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -144,7 +154,8 @@ export class RepoController {
   }
 
   @Post('/:provider/connect')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('pipeline:write')
   @UseGuards(ReadonlyGuard)
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
@@ -168,7 +179,8 @@ export class RepoController {
   }
 
   @Post('/:provider/disconnect')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('pipeline:write')
   @UseGuards(ReadonlyGuard)
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
@@ -206,7 +218,12 @@ export class RepoController {
     @Req() req: Request,
   ) {
     const ret: string = 'ok';
-    this.repoService.handleWebhook(provider, req.headers, body);
+    // se responde 'ok' enseguida; un fallo al procesar el webhook se registra
+    this.repoService
+      .handleWebhook(provider, req.headers, body, (req as any).rawBody)
+      .catch((error) => {
+        this.logger.error(`handleWebhook failed for ${provider}: ${error}`);
+      });
     return ret;
   }
 }

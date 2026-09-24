@@ -21,11 +21,16 @@ describe('NotificationsService', () => {
     eventsGateway = { sendEvent: jest.fn() } as any;
     auditService = { log: jest.fn() } as any;
     kubectl = { createEvent: jest.fn() } as any;
-    notificationsDbService = { 
-      getNotificationConfigs: jest.fn().mockResolvedValue([])
+    notificationsDbService = {
+      getNotificationConfigs: jest.fn().mockResolvedValue([]),
     } as any;
 
-    service = new NotificationsService(eventsGateway, auditService, kubectl, notificationsDbService);
+    service = new NotificationsService(
+      eventsGateway,
+      auditService,
+      kubectl,
+      notificationsDbService,
+    );
     service.setConfig({
       notifications: [],
     } as any);
@@ -172,5 +177,85 @@ describe('NotificationsService', () => {
     expect(slack).toHaveBeenCalled();
     expect(webhook).toHaveBeenCalled();
     expect(discord).toHaveBeenCalled();
+  });
+
+  describe('who receives a websocket event', () => {
+    const base: INotification = {
+      name: 'deleteApp',
+      user: 'u',
+      resource: 'app',
+      action: 'delete',
+      severity: 'normal',
+      message: 'm',
+      phaseName: 'production',
+      pipelineName: 'pipe',
+      appName: 'app',
+      data: {},
+    };
+    const sent = () => eventsGateway.sendEvent.mock.calls[0];
+
+    beforeEach(() => {
+      (kubectl as any).getPipeline = jest.fn();
+    });
+
+    it('sends events of a restricted pipeline only to its teams', async () => {
+      (kubectl as any).getPipeline.mockResolvedValue({
+        spec: { access: { teams: ['Taller1', 'Taller3'] } },
+      });
+      await service.send(base);
+      expect(sent()[2]).toEqual(['Taller1', 'Taller3']);
+    });
+
+    it('uses the pipeline that comes in the event data without asking kubernetes', async () => {
+      await service.send({
+        ...base,
+        data: { pipeline: { access: { teams: ['Taller2'] } } },
+      });
+      expect((kubectl as any).getPipeline).not.toHaveBeenCalled();
+      expect(sent()[2]).toEqual(['Taller2']);
+    });
+
+    it('understands the kubernetes shape of the pipeline (spec.access)', async () => {
+      await service.send({
+        ...base,
+        data: { pipeline: { spec: { access: { teams: ['Taller2'] } } } },
+      });
+      expect(sent()[2]).toEqual(['Taller2']);
+    });
+
+    it('ignores data.pipeline when it is only the name of the pipeline', async () => {
+      (kubectl as any).getPipeline.mockResolvedValue({
+        spec: { access: { teams: ['Taller1'] } },
+      });
+      await service.send({ ...base, data: { pipeline: 'pipe' } });
+      expect((kubectl as any).getPipeline).toHaveBeenCalledWith('pipe');
+      expect(sent()[2]).toEqual(['Taller1']);
+    });
+
+    it('sends to everyone when the pipeline has no access restriction', async () => {
+      (kubectl as any).getPipeline.mockResolvedValue({ spec: {} });
+      await service.send(base);
+      expect(sent()[2]).toBeUndefined();
+    });
+
+    it('a pipeline with an empty team list is only for the admin team', async () => {
+      (kubectl as any).getPipeline.mockResolvedValue({
+        spec: { access: { teams: [] } },
+      });
+      await service.send(base);
+      expect(sent()[2]).toEqual([]);
+    });
+
+    it('system events without pipeline go only to the admin team', async () => {
+      await service.send({ ...base, name: 'updateSettings', pipelineName: '' });
+      expect(sent()[2]).toEqual([]);
+      expect((kubectl as any).getPipeline).not.toHaveBeenCalled();
+    });
+
+    it('fails closed (admin only) when the owner of the pipeline cannot be found', async () => {
+      (kubectl as any).getPipeline.mockRejectedValue(new Error('not found'));
+      await service.send(base);
+      expect(sent()[2]).toEqual([]);
+    });
   });
 });

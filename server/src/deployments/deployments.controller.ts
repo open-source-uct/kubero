@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Post,
   Put,
@@ -21,14 +22,19 @@ import { IUser } from '../auth/auth.interface';
 import { CreateBuild } from './dto/CreateBuild.dto';
 import { OKDTO } from '../common/dto/ok.dto';
 import { JwtAuthGuard } from '../auth/strategies/jwt.guard';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { Permissions } from '../auth/permissions.decorator';
 import { ReadonlyGuard } from '../common/guards/readonly.guard';
 
 @Controller({ path: 'api/deployments', version: '1' })
 export class DeploymentsController {
+  private readonly logger = new Logger(DeploymentsController.name);
+
   constructor(private readonly deploymentsService: DeploymentsService) {}
 
   @Get('/:pipeline/:phase/:app')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:read', 'app:write')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
     type: OKDTO,
@@ -45,11 +51,17 @@ export class DeploymentsController {
     @Param('app') app: string,
     @Request() req: any,
   ) {
-    return this.deploymentsService.listBuildjobs(pipeline, phase, app, req.user.userGroups);
+    return this.deploymentsService.listBuildjobs(
+      pipeline,
+      phase,
+      app,
+      req.user.userGroups,
+    );
   }
 
   @Post('/build/:pipeline/:phase/:app')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:write')
   @UseGuards(ReadonlyGuard)
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -87,11 +99,13 @@ export class DeploymentsController {
       body.reference,
       body.dockerfilePath,
       user,
+      req.user.userGroups,
     );
   }
 
   @Delete('/:pipeline/:phase/:app/:buildName')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:write')
   @UseGuards(ReadonlyGuard)
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
@@ -122,11 +136,13 @@ export class DeploymentsController {
       app,
       buildName,
       user,
+      req.user.userGroups,
     );
   }
 
   @Get('/:pipeline/:phase/:app/:build/:container/history')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('logs:ok')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -158,7 +174,8 @@ export class DeploymentsController {
   }
 
   @Put('/:pipeline/:phase/:app/:tag')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:write')
   @UseGuards(ReadonlyGuard)
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
@@ -178,7 +195,18 @@ export class DeploymentsController {
     @Param('tag') tag: string,
     @Request() req: any,
   ): Promise<OKDTO> {
-    this.deploymentsService.deployApp(pipeline, phase, app, tag, req.user.userGroups);
+    // el permiso se comprueba antes de responder (403 inmediato); solo el
+    // despliegue en sí corre en segundo plano y un fallo suyo se registra
+    await this.deploymentsService.assertAccess(
+      pipeline,
+      phase,
+      req.user.userGroups,
+    );
+    this.deploymentsService
+      .deployApp(pipeline, phase, app, tag, req.user.userGroups)
+      .catch((error) => {
+        this.logger.error(`deployApp failed for ${app}: ${error}`);
+      });
     return {
       message: `Deployment triggered for ${app} in ${pipeline} phase ${phase} with tag ${tag}`,
       status: 'success',

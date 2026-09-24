@@ -7,12 +7,11 @@
           cols="12"
           md="1"
         >
-          <v-img
-            src="/img/icons/hexagon3-empty-bold-tp.svg"
-            max-width="50"
-            max-height="50"
+          <v-icon
+            size="44"
+            color="primary"
             class="mr-2"
-          ></v-img>
+          >mdi-source-fork</v-icon>
         </v-col>
         <v-col cols="12" sm="11" md="11" lg="11" xl="11">
 
@@ -20,7 +19,7 @@
                 Create a new Pipeline
             </h2>
             <h2 v-if="pipeline!='new'">
-                Edit <span style="color: rgb(var(--v-theme-kubero))">{{ pipelineName }}</span>
+                Edit <span style="color: rgb(var(--v-theme-primary))">{{ pipelineName }}</span>
             </h2>
             <p class="text-justify">
                 A Pipeline may have several stages with apps
@@ -75,8 +74,8 @@
 
 
 
-      <v-card elevation="2" color="cardBackground">
-        <v-card-title>{{ $t('pipeline.form.title.environments') }}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{ $t('pipeline.form.title.environments') }}</v-card-title>
         <v-card-text>
           <div v-for="phase in phases" :key="phase.name" class="my-0">
           <v-row>

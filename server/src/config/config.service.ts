@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Runpack as DBRunpack, PrismaClient } from '@prisma/client';
-import { readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { join, resolve } from 'path';
 import * as YAML from 'yaml';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { INotification } from '../notifications/notifications.interface';
@@ -40,19 +40,17 @@ export class ConfigService {
     private notification: NotificationsService,
   ) {
     this.reloadRunningConfig();
-    this.runFeatureCheck();
+    void this.runFeatureCheck(); // checkForZeropod maneja sus propios errores
     this.setKuberoUIVersion();
   }
 
   private setKuberoUIVersion() {
     if (process.env.npm_package_version == undefined) {
-      const fs = require('fs');
-      const path = require('path');
-      const filePath = path.resolve(__dirname, '../VERSION');
-      if (!fs.existsSync(filePath)) {
+      const filePath = resolve(__dirname, '../VERSION');
+      if (!existsSync(filePath)) {
         process.env.npm_package_version = 'no version';
       } else {
-        process.env.npm_package_version = fs.readFileSync(filePath, 'utf8');
+        process.env.npm_package_version = readFileSync(filePath, 'utf8');
       }
     }
 
@@ -301,7 +299,7 @@ export class ConfigService {
       const namespace = process.env.KUBERO_NAMESPACE || 'kubero';
       const kuberoes = await this.kubectl.getKuberoConfig(namespace);
       registry = kuberoes.spec.registry;
-    } catch (_error) {
+    } catch {
       this.logger.error('Error getting kuberoes config');
     }
     return registry;
@@ -358,6 +356,7 @@ export class ConfigService {
     process.env.KUBERO_NAMESPACE = kuberoNamespace;
     process.env.KUBERO_SESSION_KEY = KuberoSessionKey;
     process.env.KUBECONFIG_BASE64 = kubeConfig;
+    process.env.KUBERO_WEBHOOK_SECRET = kuberoWebhookSecret;
     process.env.KUBERO_SETUP = 'disabled';
 
     this.kubectl.updateKubectlConfig(kubeConfig, kubeContext);
@@ -468,7 +467,7 @@ export class ConfigService {
           enabled = true;
         }
       }
-    } catch (_error) {
+    } catch {
       this.logger.error('❌ getSleepEnabled: could not check for Zeropod');
       return false;
     }

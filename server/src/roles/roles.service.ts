@@ -1,5 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaClient, User as PrismaUser } from '@prisma/client';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class RolesService {
@@ -67,10 +74,29 @@ export class RolesService {
     });
   }
 
+  // Permisos sin los que el rol admin dejaría de poder administrar el sistema
+  private static readonly ADMIN_REQUIRED_PERMISSIONS = [
+    { resource: 'user', action: 'write' },
+    { resource: 'config', action: 'write' },
+  ];
+
   async deleteRole(roleId: string): Promise<any> {
     this.logger.debug(`deleteRole with roleId: ${roleId}`);
     if (!roleId) {
       throw new Error('Role ID is required');
+    }
+    const role = await this.prisma.role.findUnique({ where: { id: roleId } });
+    if (!role) {
+      throw new NotFoundException('Role not found');
+    }
+    if (role.name === 'admin') {
+      throw new ForbiddenException('The admin role cannot be deleted');
+    }
+    const assigned = await this.prisma.user.count({ where: { roleId } });
+    if (assigned > 0) {
+      throw new ConflictException(
+        `The role is assigned to ${assigned} user(s); reassign them first`,
+      );
     }
     return this.prisma.role.delete({
       where: { id: roleId },
@@ -81,6 +107,31 @@ export class RolesService {
     //this.logger.debug(`updateRole with roleId: ${roleId} and data: ${JSON.stringify(roleData)}`);
     if (!roleId) {
       throw new Error('Role ID is required');
+    }
+    // sin esta comprobación un body sin permissions borraba todos los del rol
+    // (deleteMany + create de una lista vacía) o fallaba a medias
+    if (!Array.isArray(roleData?.permissions)) {
+      throw new BadRequestException('permissions must be an array');
+    }
+    const role = await this.prisma.role.findUnique({ where: { id: roleId } });
+    if (!role) {
+      throw new NotFoundException('Role not found');
+    }
+    if (role.name === 'admin') {
+      if (roleData.name !== undefined && roleData.name !== 'admin') {
+        throw new ForbiddenException('The admin role cannot be renamed');
+      }
+      const keeps = RolesService.ADMIN_REQUIRED_PERMISSIONS.every((required) =>
+        roleData.permissions.some(
+          (p: any) =>
+            p.resource === required.resource && p.action === required.action,
+        ),
+      );
+      if (!keeps) {
+        throw new ForbiddenException(
+          'The admin role must keep the user:write and config:write permissions',
+        );
+      }
     }
     return this.prisma.role.update({
       where: { id: roleId },

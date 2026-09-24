@@ -1,3 +1,7 @@
+import {
+  verifyHmacSha256,
+  webhookSecret,
+} from '../../common/utils/webhook.util';
 import debug from 'debug';
 import {
   IWebhook,
@@ -7,7 +11,7 @@ import {
   IPullrequest,
 } from './types';
 import { Repo } from './repo';
-import gitUrlParse = require('git-url-parse');
+import * as gitUrlParse from 'git-url-parse';
 debug('app:kubero:bitbucket:api');
 
 import { Bitbucket, APIClient } from 'bitbucket';
@@ -228,8 +232,10 @@ export class BitbucketApi extends Repo {
         },
       };
     } catch (e) {
-      const res = e as RequestError;
-      this.logger.log('Error adding deploy key: ' + res);
+      this.logger.log(
+        'Error adding deploy key: ' +
+          (e instanceof Error ? e.message : String(e)),
+      );
     }
 
     return ret;
@@ -238,8 +244,17 @@ export class BitbucketApi extends Repo {
   public getWebhook(
     event: string,
     delivery: string,
+    signature: string,
     body: any,
+    rawBody?: Buffer,
   ): IWebhook | boolean {
+    // Antes se marcaba como verificado siempre. Bitbucket Cloud puede firmar
+    // con el secreto del webhook (X-Hub-Signature); ahora es obligatorio.
+    const payload = rawBody ?? JSON.stringify(body);
+    if (!verifyHmacSha256(payload, signature, webhookSecret(), 'sha256=')) {
+      this.logger.log('ERROR: invalid signature for event: ' + delivery);
+      return false;
+    }
     // use github and gitea naming for the event
     let github_event = event;
     if (event === 'repo:push') {
@@ -260,7 +275,8 @@ export class BitbucketApi extends Repo {
       branch = refs[refs.length - 1];
       ssh_url = body.repository.ssh_url;
     } else if (body.pull_request != undefined) {
-      (action = body.action), (branch = body.pull_request.head.ref);
+      action = body.action;
+      branch = body.pull_request.head.ref;
       ssh_url = body.pull_request.head.repo.ssh_url;
     } else {
       ssh_url = body.repository.ssh_url;
@@ -274,7 +290,7 @@ export class BitbucketApi extends Repo {
         delivery: delivery,
         body: body,
         branch: branch,
-        verified: true, // bitbucket does not support verification with signatures :(
+        verified: true,
         repo: {
           ssh_url: ssh_url,
         },

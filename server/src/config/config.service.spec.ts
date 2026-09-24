@@ -53,10 +53,10 @@ jest.mock('yaml', () => ({
   stringify: jest.fn(() => 'yaml-content'),
 }));
 jest.mock('path', () => ({
-  join: (...args: any[]) => '/mock/path/config.yaml',
-  resolve: (...args: any[]) => '/mock/path/VERSION',
-  dirname: (...args: any[]) => '/mock/path',
-  extname: (...args: any[]) => '.so',
+  join: () => '/mock/path/config.yaml',
+  resolve: () => '/mock/path/VERSION',
+  dirname: () => '/mock/path',
+  extname: () => '.so',
 }));
 jest.mock('bcrypt', () => ({
   hashSync: jest.fn(() => 'hashed'),
@@ -211,6 +211,8 @@ describe('ConfigService', () => {
     expect(result.status).toBe('ok');
     expect(kubectl.updateKubectlConfig).toHaveBeenCalled();
     expect(kubectl.createNamespace).toHaveBeenCalled();
+    // el secreto del webhook no se estaba guardando
+    expect(process.env.KUBERO_WEBHOOK_SECRET).toBe('secret');
   });
 
   it('should return error if setup is disabled in updateRunningConfig', async () => {

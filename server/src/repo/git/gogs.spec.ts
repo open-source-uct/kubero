@@ -1,3 +1,4 @@
+import * as gitUrlParse from 'git-url-parse';
 import { GogsApi } from './gogs';
 import { Repo } from './repo';
 
@@ -68,8 +69,10 @@ describe('GogsApi', () => {
     });
 
     it('should handle missing owner or repo', async () => {
-      const gitUrlParse = require('git-url-parse');
-      gitUrlParse.mockReturnValueOnce({ name: undefined, owner: undefined });
+      (gitUrlParse as unknown as jest.Mock).mockReturnValueOnce({
+        name: undefined,
+        owner: undefined,
+      });
       await expect(gogs['getRepository']('invalid')).rejects.toThrow();
     });
   });

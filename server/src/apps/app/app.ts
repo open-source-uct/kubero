@@ -60,7 +60,7 @@ export class App implements IApp {
       hash?: string;
     }[];
   };
-  public envVars: {}[] = [];
+  public envVars: object[] = [];
   public extraVolumes: IExtraVolume[] = [];
   public cronjobs: ICronjob[] = [];
   public addons: IAddon[] = [];
@@ -85,7 +85,7 @@ export class App implements IApp {
     };
   };
 
-  private affinity: {};
+  private affinity: object;
   private autoscaling: {
     enabled: boolean;
   };
@@ -145,11 +145,11 @@ export class App implements IApp {
       | [];
   };
   private nameOverride: '';
-  private nodeSelector: {};
-  private podAnnotations: {};
-  private podSecurityContext: {};
+  private nodeSelector: object;
+  private podAnnotations: object;
+  private podSecurityContext: object;
   private replicaCount: 1;
-  public resources: {};
+  public resources: object;
   private service: {
     port: 80;
     type: 'ClusterIP';
@@ -224,17 +224,17 @@ export class App implements IApp {
     this.autoscaling = {
       enabled: app.autoscale,
     };
-    (this.fullnameOverride = ''),
-      (this.image = {
-        containerPort: app.image.containerPort,
-        pullPolicy: 'Always',
-        repository: app.image.repository || 'ghcr.io/kubero-dev/idler',
-        tag: app.image.tag || 'v1',
-        command: app.image.command,
-        fetch: app.image.fetch,
-        build: app.image.build,
-        run: app.image.run,
-      });
+    this.fullnameOverride = '';
+    this.image = {
+      containerPort: app.image.containerPort,
+      pullPolicy: 'Always',
+      repository: app.image.repository || 'ghcr.io/kubero-dev/idler',
+      tag: app.image.tag || 'v1',
+      command: app.image.command,
+      fetch: app.image.fetch,
+      build: app.image.build,
+      run: app.image.run,
+    };
 
     // function to set security context, required for backwards compatibility
     // Added in v1.11.0
@@ -259,17 +259,17 @@ export class App implements IApp {
       'nginx';
     this.ingress.enabled = true;
 
-    (this.nameOverride = ''),
-      (this.nodeSelector = {}),
-      (this.podAnnotations = {}),
-      (this.podSecurityContext = {}),
-      (this.replicaCount = 1),
-      (this.resources = app.podsize.resources),
-      (this.service = {
-        port: 80,
-        type: 'ClusterIP',
-      }),
-      (this.tolerations = []);
+    this.nameOverride = '';
+    this.nodeSelector = {};
+    this.podAnnotations = {};
+    this.podSecurityContext = {};
+    this.replicaCount = 1;
+    this.resources = app.podsize.resources;
+    this.service = {
+      port: 80,
+      type: 'ClusterIP',
+    };
+    this.tolerations = [];
 
     this.healthcheck = app.healthcheck;
   }

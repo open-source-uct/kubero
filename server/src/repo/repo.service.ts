@@ -255,6 +255,7 @@ export class RepoService {
     //signature: string,
     headers: any,
     body: any,
+    rawBody?: Buffer,
   ) {
     this.logger.debug('handleWebhook: ' + repoProvider);
 
@@ -268,19 +269,37 @@ export class RepoService {
         event = headers['x-github-event'];
         delivery = headers['x-github-delivery'];
         signature = headers['x-hub-signature-256'];
-        webhook = this.githubApi.getWebhook(event, delivery, signature, body);
+        webhook = this.githubApi.getWebhook(
+          event,
+          delivery,
+          signature,
+          body,
+          rawBody,
+        );
         break;
       case 'gitea':
         event = headers['x-gitea-event'];
         delivery = headers['x-gitea-delivery'];
         signature = headers['x-hub-signature-256'];
-        webhook = this.giteaApi.getWebhook(event, delivery, signature, body);
+        webhook = this.giteaApi.getWebhook(
+          event,
+          delivery,
+          signature,
+          body,
+          rawBody,
+        );
         break;
       case 'gogs':
         event = headers['x-gogs-event'];
         delivery = headers['x-gogs-delivery'];
         signature = headers['x-gogs-signature'];
-        webhook = this.gogsApi.getWebhook(event, delivery, signature, body);
+        webhook = this.gogsApi.getWebhook(
+          event,
+          delivery,
+          signature,
+          body,
+          rawBody,
+        );
         break;
       case 'gitlab':
         event = headers['x-gitlab-event'];
@@ -290,7 +309,14 @@ export class RepoService {
       case 'bitbucket':
         event = headers['x-event-key'];
         delivery = headers['x-request-uuid'];
-        webhook = this.bitbucketApi.getWebhook(event, delivery, body);
+        signature = headers['x-hub-signature'];
+        webhook = this.bitbucketApi.getWebhook(
+          event,
+          delivery,
+          signature,
+          body,
+          rawBody,
+        );
         break;
       default:
         this.logger.debug('unknown repoprovider: ' + repoProvider);
@@ -299,11 +325,17 @@ export class RepoService {
 
     if (typeof webhook != 'boolean') {
       switch (webhook.event) {
+        // no se espera: el proveedor git no debe quedar esperando el rebuild,
+        // pero un fallo se registra en vez de quedar como promesa sin manejar
         case 'push':
-          this.handleWebhookPush(webhook);
+          this.handleWebhookPush(webhook).catch((error) => {
+            this.logger.error('handleWebhookPush failed: ' + error);
+          });
           break;
         case 'pull_request':
-          this.handleWebhookPullRequest(webhook);
+          this.handleWebhookPullRequest(webhook).catch((error) => {
+            this.logger.error('handleWebhookPullRequest failed: ' + error);
+          });
           break;
         default:
           this.logger.debug('webhook event not handled: ' + event);
@@ -344,9 +376,14 @@ export class RepoService {
           app: app,
         },
       } as INotification;
-      this.notificationsService.send(m);
+      void this.notificationsService.send(m);
 
-      this.appsService.rebuildApp(app, ['admin']); // return all pipelines to search for the app
+      // un app que falle no debe impedir el rebuild de las demás
+      try {
+        await this.appsService.rebuildApp(app, ['admin']); // return all pipelines to search for the app
+      } catch (error) {
+        this.logger.error('rebuild failed for ' + app.name + ': ' + error);
+      }
     }
   }
 
@@ -356,20 +393,20 @@ export class RepoService {
     switch (webhook.action) {
       case 'opened':
       case 'reopened':
-        this.appsService.createPRApp(
+        await this.appsService.createPRApp(
           webhook.branch,
           webhook.branch,
           webhook.repo.ssh_url,
           undefined,
-          ['admin'] // return all pipelines to search for the app
+          ['admin'], // return all pipelines to search for the app
         ); // "undefined" will create the app in all pipelines
         break;
       case 'closed':
-        this.appsService.deletePRApp(
+        await this.appsService.deletePRApp(
           webhook.branch,
           webhook.branch,
           webhook.repo.ssh_url,
-          ['admin'] // return all pipelines to search for the app
+          ['admin'], // return all pipelines to search for the app
         );
         break;
       default:

@@ -1,13 +1,7 @@
+import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeploymentsController } from './deployments.controller';
 import { DeploymentsService } from './deployments.service';
-import { mock } from 'node:test';
-
-const mockUser = {
-  id: 1,
-  strategy: 'local',
-  username: 'admin',
-};
 
 const mockUserGroups = ['group1', 'group2'];
 
@@ -19,7 +13,7 @@ const mockJWT = {
   userGroups: mockUserGroups,
 };
 
-const mockReq =  { user: mockJWT };
+const mockReq = { user: mockJWT };
 
 describe('DeploymentsController', () => {
   let controller: DeploymentsController;
@@ -31,6 +25,7 @@ describe('DeploymentsController', () => {
       triggerBuildjob: jest.fn().mockResolvedValue({ ok: true }),
       deleteBuildjob: jest.fn().mockResolvedValue({ ok: true }),
       getBuildLogs: jest.fn().mockResolvedValue([{ log: 'line1' }]),
+      assertAccess: jest.fn().mockResolvedValue(undefined),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -51,8 +46,18 @@ describe('DeploymentsController', () => {
   });
 
   it('should get deployments', async () => {
-    const result = await controller.getDeployments('pipe', 'phase', 'app', mockReq);
-    expect(service.listBuildjobs).toHaveBeenCalledWith('pipe', 'phase', 'app', mockUserGroups);
+    const result = await controller.getDeployments(
+      'pipe',
+      'phase',
+      'app',
+      mockReq,
+    );
+    expect(service.listBuildjobs).toHaveBeenCalledWith(
+      'pipe',
+      'phase',
+      'app',
+      mockUserGroups,
+    );
     expect(result).toEqual([{ name: 'build1' }]);
   });
 
@@ -80,6 +85,7 @@ describe('DeploymentsController', () => {
       'main',
       'Dockerfile',
       expect.objectContaining({ username: 'admin' }),
+      mockUserGroups,
     );
     expect(result).toEqual({ ok: true });
   });
@@ -99,6 +105,7 @@ describe('DeploymentsController', () => {
       'app',
       'build1',
       expect.objectContaining({ username: 'admin' }),
+      mockUserGroups,
     );
     expect(result).toEqual({ ok: true });
   });
@@ -125,9 +132,15 @@ describe('DeploymentsController', () => {
 
   it('should deploy tag', async () => {
     // Add deployApp mock to the service
-    service.deployApp = jest.fn();
+    service.deployApp = jest.fn().mockResolvedValue(undefined);
 
-    const result = await controller.deployTag('pipe', 'phase', 'app', 'v1.0.0', mockReq);
+    const result = await controller.deployTag(
+      'pipe',
+      'phase',
+      'app',
+      'v1.0.0',
+      mockReq,
+    );
 
     expect(service.deployApp).toHaveBeenCalledWith(
       'pipe',
@@ -142,5 +155,31 @@ describe('DeploymentsController', () => {
         'Deployment triggered for app in pipe phase phase with tag v1.0.0',
       status: 'success',
     });
+  });
+
+  it('should answer 403 to a user without access and not start any deploy', async () => {
+    // antes respondía 200 "Deployment triggered" y el rechazo solo quedaba en el log
+    service.assertAccess.mockRejectedValue(
+      new ForbiddenException('No access to this pipeline'),
+    );
+    service.deployApp = jest.fn();
+
+    await expect(
+      controller.deployTag('other', 'phase', 'app', 'v1.0.0', mockReq),
+    ).rejects.toThrow(ForbiddenException);
+    expect(service.assertAccess).toHaveBeenCalledWith(
+      'other',
+      'phase',
+      mockUserGroups,
+    );
+    expect(service.deployApp).not.toHaveBeenCalled();
+  });
+
+  it('should not reject when the deploy fails after being triggered', async () => {
+    service.deployApp = jest.fn().mockRejectedValue(new Error('boom'));
+
+    await expect(
+      controller.deployTag('pipe', 'phase', 'app', 'v1.0.0', mockReq),
+    ).resolves.toEqual(expect.objectContaining({ status: 'success' }));
   });
 });

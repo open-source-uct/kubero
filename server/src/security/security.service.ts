@@ -21,7 +21,11 @@ export class SecurityService {
     logdetails: boolean,
     userGroups: string[],
   ) {
-    const contextName = await this.pipelinesService.getContext(pipeline, phase, userGroups);
+    const contextName = await this.pipelinesService.getContext(
+      pipeline,
+      phase,
+      userGroups,
+    );
     const namespace = pipeline + '-' + phase;
 
     const scanResult = {
@@ -43,7 +47,12 @@ export class SecurityService {
       return scanResult;
     }
 
-    const appresult = await this.appsService.getApp(pipeline, phase, appName, userGroups);
+    const appresult = await this.appsService.getApp(
+      pipeline,
+      phase,
+      appName,
+      userGroups,
+    );
 
     const app = appresult as IKubectlApp;
 
@@ -134,11 +143,25 @@ export class SecurityService {
     return summary;
   }
 
-  public async startScan(pipeline: string, phase: string, appName: string, userGroups: string[]) {
-    const contextName = await this.pipelinesService.getContext(pipeline, phase, userGroups);
+  public async startScan(
+    pipeline: string,
+    phase: string,
+    appName: string,
+    userGroups: string[],
+  ) {
+    const contextName = await this.pipelinesService.getContext(
+      pipeline,
+      phase,
+      userGroups,
+    );
     const namespace = pipeline + '-' + phase;
 
-    const appresult = await this.appsService.getApp(pipeline, phase, appName, userGroups);
+    const appresult = await this.appsService.getApp(
+      pipeline,
+      phase,
+      appName,
+      userGroups,
+    );
 
     const app = appresult as IKubectlApp;
 
@@ -151,7 +174,7 @@ export class SecurityService {
       if (app?.spec.gitrepo?.clone_url) {
         if (contextName) {
           this.kubectl.setCurrentContext(contextName);
-          this.kubectl.createScanRepoJob(
+          await this.kubectl.createScanRepoJob(
             namespace,
             appName,
             app.spec.gitrepo.clone_url,
@@ -167,7 +190,7 @@ export class SecurityService {
     ) {
       if (contextName) {
         this.kubectl.setCurrentContext(contextName);
-        this.kubectl.createScanImageJob(
+        await this.kubectl.createScanImageJob(
           namespace,
           appName,
           app.spec.image.repository,
@@ -178,7 +201,7 @@ export class SecurityService {
     } else {
       if (contextName) {
         this.kubectl.setCurrentContext(contextName);
-        this.kubectl.createScanImageJob(
+        await this.kubectl.createScanImageJob(
           namespace,
           appName,
           app.spec.image.repository,

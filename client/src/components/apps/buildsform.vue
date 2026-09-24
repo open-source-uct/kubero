@@ -8,15 +8,17 @@
           <v-btn
             block
             prepend-icon="mdi-wrench"
-            text="Build"
+            :text="$t('builds.build')"
             color="secondary"
             v-bind="activatorProps"
           ></v-btn>
         </template>
   
         <v-card
+          color="cardBackground"
+          class="uct-card"
           prepend-icon="mdi-wrench"
-          title="New Build"
+          :title="$t('builds.newBuild')"
         >
           <v-card-text>
 
@@ -68,15 +70,15 @@
             <v-spacer></v-spacer>
   
             <v-btn
-              text="Cancel"
-              variant="plain"
+              :text="$t('global.cancel')"
+              variant="text"
               @click="dialog = false"
             ></v-btn>
   
             <v-btn
               color="primary"
-              text="Build"
-              variant="tonal"
+              :text="$t('builds.build')"
+              variant="flat"
               @click="saveBuild"
             ></v-btn>
           </v-card-actions>

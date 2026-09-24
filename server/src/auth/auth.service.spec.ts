@@ -1,8 +1,8 @@
+import * as crypto from 'crypto';
 import { AuthService } from './auth.service';
 import { ConfigService } from '../config/config.service';
 import * as bcrypt from 'bcrypt';
-import { HttpException, HttpStatus } from '@nestjs/common';
-import { Strategy } from 'passport-oauth2';
+import { HttpException } from '@nestjs/common';
 
 jest.mock('bcrypt');
 
@@ -21,13 +21,13 @@ describe('AuthService', () => {
       findOneOrCreate: jest.fn().mockResolvedValue({
         userId: 3,
         username: 'oauthuser',
-        emails: [{ value: 'undefined@kubero.dev'  }],
+        emails: [{ value: 'undefined@kubero.dev' }],
       }),
     };
     rolesService = {
       getPermissions: jest.fn().mockResolvedValue([
         { resource: 'app', action: 'read' },
-        { resource: 'app', action: 'write' }
+        { resource: 'app', action: 'write' },
       ]),
     };
     kubectl = {
@@ -74,9 +74,8 @@ describe('AuthService', () => {
         password: 'hashed',
       });
       // Simulates SHA256 Hash
-      const crypto = require('crypto');
       const hash = crypto
-        .createHmac('sha256', process.env.KUBERO_SESSION_KEY)
+        .createHmac('sha256', process.env.KUBERO_SESSION_KEY as string)
         .update('pass')
         .digest('hex');
       usersService.findOneFull.mockResolvedValueOnce({
@@ -169,9 +168,13 @@ describe('AuthService', () => {
 
   describe('generateToken', () => {
     it('should embed the given permissions instead of an empty array', async () => {
-      await service.generateToken('1', 'test', 'student', ['students'], [
-        'app:write',
-      ]);
+      await service.generateToken(
+        '1',
+        'test',
+        'student',
+        ['students'],
+        ['app:write'],
+      );
       expect(jwtService.sign).toHaveBeenCalledWith(
         {
           userId: '1',

@@ -107,7 +107,7 @@ import { mapState } from 'pinia'
 import axios from "axios";
 import Alerts from './alerts.vue';
 
-const colors = ['#8560a9', '#a887c9', '#b99bd6', '#d2bde6']
+const colors = ['#0075B4', '#0090DC', '#EDC500', '#10B981', '#005888', '#878787']
 
 
 export default defineComponent({

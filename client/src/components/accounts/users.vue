@@ -1,5 +1,13 @@
 <template>
   <v-container>
+    <v-alert
+      v-if="actionError"
+      type="error"
+      variant="tonal"
+      closable
+      class="mb-4"
+      @click:close="actionError = ''"
+    >{{ actionError }}</v-alert>
     <v-data-table
       :headers="headers"
       :items="users"
@@ -23,7 +31,7 @@
       </template>
       <template v-slot:[`item.isActive`]="{ item }">
         <v-chip :color="item.isActive ? 'green' : 'red'" dark>
-          {{ item.isActive ? 'Aktive' : 'Disabled' }}
+          {{ item.isActive ? $t('user.active') : $t('user.disabled') }}
         </v-chip>
       </template>
       <template v-slot:[`item.name`]="{ item }">
@@ -142,20 +150,29 @@
 
     <!-- Dialog to edit a user -->
     <v-dialog v-model="editDialog" max-width="500px">
-      <v-card>
-        <v-card-title>{{ $t('user.actions.edit') }}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{ $t('user.actions.edit') }}</v-card-title>
         <v-card-text>
-          <v-text-field v-model="editedUser.username" label="Username"></v-text-field>
-          <v-text-field v-model="editedUser.firstName" label="First Name"></v-text-field>
-          <v-text-field v-model="editedUser.lastName" label="Last Name"></v-text-field>
-          <v-text-field v-model="editedUser.email" label="E-Mail"></v-text-field>
-          <v-switch v-model="editedUser.isActive" label="Aktive"></v-switch>
+          <v-alert
+            v-if="actionError"
+            type="error"
+            variant="tonal"
+            closable
+            density="compact"
+            class="mb-4"
+            @click:close="actionError = ''"
+          >{{ actionError }}</v-alert>
+          <v-text-field v-model="editedUser.username" :label="$t('user.username')"></v-text-field>
+          <v-text-field v-model="editedUser.firstName" :label="$t('user.firstName')"></v-text-field>
+          <v-text-field v-model="editedUser.lastName" :label="$t('user.lastName')"></v-text-field>
+          <v-text-field v-model="editedUser.email" :label="$t('user.email')"></v-text-field>
+          <v-switch v-model="editedUser.isActive" :label="$t('user.active')" color="primary"></v-switch>
           <v-select
             v-model="editedUser.role"
             :items="roles"
             item-title="name"
             item-value="id"
-            label="Role"
+            :label="$t('user.role')"
             clearable
           ></v-select>
           <v-select
@@ -163,7 +180,7 @@
             :items="teams"
             item-title="name"
             item-value="id"
-            label="Teams"
+            :label="$t('user.teams')"
             multiple
             clearable
           >
@@ -182,21 +199,30 @@
 
     <!-- Dialog for a new User -->
     <v-dialog v-model="createDialog" max-width="500px">
-      <v-card>
-        <v-card-title>{{ $t('user.actions.create') }}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{ $t('user.actions.create') }}</v-card-title>
         <v-card-text>
-          <v-text-field v-model="newUser.username" label="Username"></v-text-field>
-          <v-text-field v-model="newUser.firstName" label="First Name"></v-text-field>
-          <v-text-field v-model="newUser.lastName" label="Last Name"></v-text-field>
-          <v-text-field v-model="newUser.email" label="E-Mail"></v-text-field>
-          <v-text-field v-model="newUser.password" label="Password"></v-text-field>
-          <v-switch v-model="newUser.isActive" label="Aktive"></v-switch>
+          <v-alert
+            v-if="actionError"
+            type="error"
+            variant="tonal"
+            closable
+            density="compact"
+            class="mb-4"
+            @click:close="actionError = ''"
+          >{{ actionError }}</v-alert>
+          <v-text-field v-model="newUser.username" :label="$t('user.username')"></v-text-field>
+          <v-text-field v-model="newUser.firstName" :label="$t('user.firstName')"></v-text-field>
+          <v-text-field v-model="newUser.lastName" :label="$t('user.lastName')"></v-text-field>
+          <v-text-field v-model="newUser.email" :label="$t('user.email')"></v-text-field>
+          <v-text-field v-model="newUser.password" :label="$t('user.password')" type="password"></v-text-field>
+          <v-switch v-model="newUser.isActive" :label="$t('user.active')" color="primary"></v-switch>
           <v-select
             v-model="newUser.role"
             :items="roles"
             item-title="name"
             item-value="id"
-            label="Role"
+            :label="$t('user.role')"
             clearable
           ></v-select>
           <v-select
@@ -204,7 +230,7 @@
             :items="teams"
             item-title="name"
             item-value="id"
-            label="Teams"
+            :label="$t('user.teams')"
             multiple
             clearable
           >
@@ -223,8 +249,8 @@
 
     <!-- Dialog to change password -->
     <v-dialog v-model="changePasswordDialog" max-width="500px">
-      <v-card>
-        <v-card-title>{{ $t('user.changePasswordFor', {user: editedUser.username}) }}</v-card-title>
+      <v-card color="cardBackground" class="uct-card">
+        <v-card-title class="text-h6 font-weight-bold">{{ $t('user.changePasswordFor', {user: editedUser.username}) }}</v-card-title>
         <v-card-text>
           <v-text-field
             v-model="editedUser.password"
@@ -335,6 +361,16 @@ export default defineComponent({
       loading.value = false
     }
 
+    // El server explica por qué rechaza una acción (último administrador, equipo
+    // protegido, id que ya no existe...). Antes solo iba a la consola y la
+    // pantalla parecía no hacer nada.
+    const actionError = ref('')
+    const errorText = (e: any): string => {
+      const message = e?.response?.data?.message
+      if (Array.isArray(message)) return message.join(', ')
+      return message || e?.message || 'Error'
+    }
+
     const loadTeams = async () => {
       try {
         const res = await axios.get('/api/groups')
@@ -352,8 +388,12 @@ export default defineComponent({
       }
     }
 
-    const openEditUserDialog = (user: User) => {
+    const openEditUserDialog = async (user: User) => {
       editedUser.value = { ...user }
+      actionError.value = ''
+      // los equipos y roles se pueden haber creado o borrado en otra pestaña
+      // desde que se cargó esta pantalla: se recargan al abrir el formulario
+      await Promise.all([loadTeams(), loadRoles()])
       editDialog.value = true
     }
 
@@ -364,6 +404,7 @@ export default defineComponent({
         editDialog.value = false
       } catch (e) {
         console.error('Error saving user:', e)
+        actionError.value = errorText(e)
       }
     }
 
@@ -373,6 +414,7 @@ export default defineComponent({
         await loadUsers()
       } catch (e) {
         console.error('Error deleting user:', e)
+        actionError.value = errorText(e)
       }
     }
 
@@ -388,7 +430,13 @@ export default defineComponent({
       })
     }
 
-    const openCreateDialog = () => {
+    const openCreateDialog = async () => {
+      actionError.value = ''
+      // Antes la lista de equipos se cargaba solo al abrir la pestaña: si un
+      // equipo se borraba y se volvía a crear (id nuevo), el formulario seguía
+      // ofreciendo el id viejo y el alta fallaba sin ningún mensaje hasta
+      // refrescar la página.
+      await Promise.all([loadTeams(), loadRoles()])
       newUser.value = {
         username: '',
         firstName: '',
@@ -409,6 +457,7 @@ export default defineComponent({
         createDialog.value = false
       } catch (e) {
         console.error('Error creating user:', e)
+        actionError.value = errorText(e)
       }
     }
 
@@ -438,6 +487,7 @@ export default defineComponent({
         await loadUsers()
       } catch (e) {
         console.error('Error removing group from user:', e)
+        actionError.value = errorText(e)
       }
     }
 
@@ -461,6 +511,7 @@ export default defineComponent({
       createDialog,
       newUser,
       openCreateDialog,
+      actionError,
       changePasswordDialog,
       openChangePasswordDialog,
       saveChangePassword,

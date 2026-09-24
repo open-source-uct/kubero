@@ -1,5 +1,5 @@
-import { Plugin, } from './plugin';
-import { IPlugin, IPluginFormFields  } from './plugin.interface';
+import { Plugin } from './plugin';
+import { IPlugin, IPluginFormFields } from './plugin.interface';
 
 // Classname must be same as the CRD's Name
 export class RedisCluster extends Plugin implements IPlugin {
@@ -91,6 +91,6 @@ kubectl apply -f https://raw.githubusercontent.com/OT-CONTAINER-KIT/redis-operat
 
   constructor(availableOperators: any) {
     super();
-    super.init(availableOperators);
+    void super.init(availableOperators);
   }
 }

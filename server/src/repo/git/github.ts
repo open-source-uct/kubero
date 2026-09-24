@@ -1,5 +1,8 @@
+import {
+  verifyHmacSha256,
+  webhookSecret,
+} from '../../common/utils/webhook.util';
 import debug from 'debug';
-import * as crypto from 'crypto';
 import {
   IWebhook,
   IRepository,
@@ -8,7 +11,7 @@ import {
   IPullrequest,
 } from './types';
 import { Repo } from './repo';
-import gitUrlParse = require('git-url-parse');
+import * as gitUrlParse from 'git-url-parse';
 debug('app:kubero:github:api');
 
 //const { Octokit } = require("@octokit/core");
@@ -236,8 +239,10 @@ export class GithubApi extends Repo {
         },
       };
     } catch (e) {
-      const res = e as RequestError;
-      this.logger.log('Error adding deploy key: ' + res);
+      this.logger.log(
+        'Error adding deploy key: ' +
+          (e instanceof Error ? e.message : String(e)),
+      );
     }
 
     return ret;
@@ -248,27 +253,18 @@ export class GithubApi extends Repo {
     delivery: string,
     signature: string,
     body: any,
+    rawBody?: Buffer,
   ): IWebhook | boolean {
     //https://docs.github.com/en/developers/webhooks-and-events/webhooks/securing-your-webhooks
-    const secret = process.env.KUBERO_WEBHOOK_SECRET as string;
-    const hash =
-      'sha256=' +
-      crypto
-        .createHmac('sha256', secret)
-        .update(JSON.stringify(body))
-        .digest('hex');
-
-    let verified = false;
-    if (hash === signature) {
-      debug.debug('Github webhook signature is valid for event: ' + delivery);
-      verified = true;
-    } else {
+    // se firma el cuerpo tal como llegó; JSON.stringify(body) solo es el
+    // respaldo si no hay cuerpo crudo (puede diferir en unicode y espacios)
+    const payload = rawBody ?? JSON.stringify(body);
+    if (!verifyHmacSha256(payload, signature, webhookSecret(), 'sha256=')) {
       this.logger.log('ERROR: invalid signature for event: ' + delivery);
-      this.logger.log('Hash:      ' + hash);
-      this.logger.log('Signature: ' + signature);
-      verified = false;
       return false;
     }
+    debug.debug('Github webhook signature is valid for event: ' + delivery);
+    const verified = true;
 
     let branch: string = 'main';
     let ssh_url: string = '';
@@ -279,7 +275,8 @@ export class GithubApi extends Repo {
       branch = refs[refs.length - 1];
       ssh_url = body.repository.ssh_url;
     } else if (body.pull_request != undefined) {
-      (action = body.action), (branch = body.pull_request.head.ref);
+      action = body.action;
+      branch = body.pull_request.head.ref;
       ssh_url = body.pull_request.head.repo.ssh_url;
     } else {
       ssh_url = body.repository.ssh_url;

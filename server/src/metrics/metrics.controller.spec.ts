@@ -1,12 +1,16 @@
+import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { MetricsController } from './metrics.controller';
 import { MetricsService } from './metrics.service';
+import { PipelinesService } from '../pipelines/pipelines.service';
 import { IMetric } from './metrics.interface';
 import { QueryResult, ResponseType } from 'prometheus-query';
 
 describe('MetricsController', () => {
   let controller: MetricsController;
   let service: jest.Mocked<MetricsService>;
+  let pipelinesService: { getContext: jest.Mock };
+  const mockReq = { user: { userGroups: ['team1'] } };
 
   const mockIMetric: IMetric = {
     name: 'cpu_usage',
@@ -38,9 +42,14 @@ describe('MetricsController', () => {
       getRules: jest.fn(),
     } as any;
 
+    pipelinesService = { getContext: jest.fn().mockResolvedValue('ctx') };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [MetricsController],
-      providers: [{ provide: MetricsService, useValue: service }],
+      providers: [
+        { provide: MetricsService, useValue: service },
+        { provide: PipelinesService, useValue: pipelinesService },
+      ],
     }).compile();
 
     controller = module.get<MetricsController>(MetricsController);
@@ -52,14 +61,14 @@ describe('MetricsController', () => {
 
   it('should get metrics for a specific app', async () => {
     service.getPodMetrics.mockResolvedValue({ cpu: 1, mem: 2 });
-    const result = await controller.getMetrics('pipe', 'dev', 'app1');
+    const result = await controller.getMetrics('pipe', 'dev', 'app1', mockReq);
     expect(service.getPodMetrics).toHaveBeenCalledWith('pipe', 'dev', 'app1');
     expect(result).toEqual({ cpu: 1, mem: 2 });
   });
 
   it('should get uptimes', async () => {
     service.getUptimes.mockResolvedValue([{ pod: 'a', uptime: 123 }]);
-    const result = await controller.getUptimes('pipe', 'dev');
+    const result = await controller.getUptimes('pipe', 'dev', mockReq);
     expect(service.getUptimes).toHaveBeenCalledWith('pipe', 'dev');
     expect(result).toEqual([{ pod: 'a', uptime: 123 }]);
   });
@@ -94,6 +103,7 @@ describe('MetricsController', () => {
       '24h',
       'rate',
       'host1',
+      mockReq,
     );
     expect(service.getMemoryMetrics).toHaveBeenCalledWith({
       scale: '24h',
@@ -124,6 +134,7 @@ describe('MetricsController', () => {
       '2h',
       'rate',
       'host1',
+      mockReq,
     );
     expect(service.getCPUMetrics).toHaveBeenCalledWith({
       scale: '2h',
@@ -155,6 +166,7 @@ describe('MetricsController', () => {
       '7d',
       'increase',
       'host1',
+      mockReq,
     );
     expect(service.getHttpStatusCodesMetrics).toHaveBeenCalledWith({
       scale: '7d',
@@ -177,7 +189,7 @@ describe('MetricsController', () => {
 
   it('should get rules', async () => {
     service.getRules.mockResolvedValue(['rule1']);
-    const result = await controller.getRules('pipe', 'dev', 'app1');
+    const result = await controller.getRules('pipe', 'dev', 'app1', mockReq);
     expect(service.getRules).toHaveBeenCalledWith({
       pipeline: 'pipe',
       phase: 'dev',
@@ -195,7 +207,52 @@ describe('MetricsController', () => {
       '7d',
       'increase',
       'host1',
+      mockReq,
     );
     expect(result).toBe('Invalid type');
+  });
+  describe('team access', () => {
+    beforeEach(() => {
+      pipelinesService.getContext.mockRejectedValue(
+        new ForbiddenException('No access to this pipeline'),
+      );
+    });
+
+    it('should not return metrics of a pipeline the user cannot access', async () => {
+      await expect(
+        controller.getMetrics('other', 'dev', 'app1', mockReq),
+      ).rejects.toThrow(ForbiddenException);
+      expect(service.getPodMetrics).not.toHaveBeenCalled();
+    });
+
+    it('should not return uptimes of a pipeline the user cannot access', async () => {
+      await expect(
+        controller.getUptimes('other', 'dev', mockReq),
+      ).rejects.toThrow(ForbiddenException);
+      expect(service.getUptimes).not.toHaveBeenCalled();
+    });
+
+    it('should not return timeseries of a pipeline the user cannot access', async () => {
+      await expect(
+        controller.getWideMetrics(
+          'memory',
+          'other',
+          'dev',
+          'app1',
+          '24h',
+          'rate',
+          'host1',
+          mockReq,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(service.getMemoryMetrics).not.toHaveBeenCalled();
+    });
+
+    it('should not return rules of a pipeline the user cannot access', async () => {
+      await expect(
+        controller.getRules('other', 'dev', 'app1', mockReq),
+      ).rejects.toThrow(ForbiddenException);
+      expect(service.getRules).not.toHaveBeenCalled();
+    });
   });
 });

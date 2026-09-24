@@ -15,7 +15,7 @@ export class LogsService {
     private kubectl: KubernetesService,
     private pipelinesService: PipelinesService,
     private EventsGateway: EventsGateway,
-  ) { }
+  ) {}
 
   private logcolor(str: string) {
     let hash = 0;
@@ -36,7 +36,7 @@ export class LogsService {
     appName: string,
     podName: string,
     container: string,
-    userGroups: string[]
+    userGroups: string[],
   ) {
     const logStream = new Stream.PassThrough();
 
@@ -120,27 +120,26 @@ export class LogsService {
     const namespace = pipelineName + '-' + phaseName;
 
     if (contextName) {
-      this.kubectl.getPods(namespace, contextName).then((pods: any[]) => {
-        for (const pod of pods) {
-          if (pod.metadata.name.startsWith(appName + '-kuberoapp')) {
-            for (const container of pod.spec.containers) {
-              this.emitLogs(
-                pipelineName,
-                phaseName,
-                appName,
-                pod.metadata.name,
-                container.name,
-                userGroups,
-              );
-            }
-            /* TODO needs some improvements since it wont load web anymore
-            for (const initcontainer of pod.spec.initContainers) {
-                this.emitLogs(pipelineName, phaseName, appName, pod.metadata.name, initcontainer.name);
-            }
-            */
+      const pods = await this.kubectl.getPods(namespace, contextName);
+      for (const pod of pods) {
+        if (pod.metadata?.name?.startsWith(appName + '-kuberoapp')) {
+          for (const container of pod.spec?.containers || []) {
+            await this.emitLogs(
+              pipelineName,
+              phaseName,
+              appName,
+              pod.metadata.name,
+              container.name,
+              userGroups,
+            );
           }
+          /* TODO needs some improvements since it wont load web anymore
+          for (const initcontainer of pod.spec.initContainers) {
+              this.emitLogs(pipelineName, phaseName, appName, pod.metadata.name, initcontainer.name);
+          }
+          */
         }
-      });
+      }
     }
   }
 
@@ -251,7 +250,7 @@ export class LogsService {
         pretty: false,
         timestamps: true,
       });
-    } catch (_error) {
+    } catch {
       console.log('error getting logs for ' + podName + ' ' + containerName);
       return [];
     }

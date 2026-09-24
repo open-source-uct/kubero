@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaClient, User as PrismaUser } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { AuthService } from '../auth/auth.service';
 import { UsersService } from '../users/users.service';
 import { RolesService } from '../roles/roles.service';
@@ -65,16 +65,6 @@ export class TokenService {
       (p: any) => `${p.resource}:${p.action}`,
     );
 
-    //create a new JWT Token
-    const token = await this.authService.generateToken(
-      userId,
-      user.username,
-      role,
-      userGroups.map((group: any) => group.name),
-      permissionStrings,
-      expiresAt,
-    );
-
     const userGroupsString = userGroups
       .map((group: any) => group.name)
       .join(',');
@@ -87,7 +77,9 @@ export class TokenService {
         connect: { id: userId },
       },
     };
-    await this.prisma.token.create({
+    // La fila se crea primero para firmar el JWT con su id (jti): al borrar el
+    // token, ese id deja de existir y el JWT deja de valer.
+    const row = await this.prisma.token.create({
       data: newToken,
       include: {
         user: {
@@ -101,6 +93,23 @@ export class TokenService {
         },
       },
     });
+
+    let token: string;
+    try {
+      token = await this.authService.generateToken(
+        userId,
+        user.username,
+        role,
+        userGroups.map((group: any) => group.name),
+        permissionStrings,
+        expiresAt,
+        row.id,
+      );
+    } catch (error) {
+      // no dejar una fila sin JWT
+      await this.prisma.token.delete({ where: { id: row.id } });
+      throw error;
+    }
 
     return {
       name: name,

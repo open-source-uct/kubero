@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { IKuberoBuildjob } from './deployments.interface';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
-import { IKubectlApp } from '../kubernetes/kubernetes.interface';
 import { NotificationsService } from '../notifications/notifications.service';
 import { INotification } from '../notifications/notifications.interface';
 import { IUser } from '../auth/auth.interface';
@@ -35,18 +34,18 @@ export class DeploymentsService {
     pipelineName: string,
     phaseName: string,
     appName: string,
-    userGroups: string[]
+    userGroups: string[],
   ): Promise<any> {
-    const namespace = pipelineName + '-' + phaseName;
-    const jobs = (await this.kubectl.getJobs(namespace)) as V1JobList;
-    const appresult = await this.appsService.getApp(
+    // getContext lanza 403 si el usuario no tiene acceso al pipeline; antes se
+    // listaban los jobs de cualquier namespace sin comprobar el equipo
+    const contextName = await this.pipelinesService.getContext(
       pipelineName,
       phaseName,
-      appName,
       userGroups,
     );
-
-    const app = appresult as IKubectlApp;
+    this.kubectl.setCurrentContext(contextName);
+    const namespace = pipelineName + '-' + phaseName;
+    const jobs = (await this.kubectl.getJobs(namespace)) as V1JobList;
 
     if (!jobs) {
       this.logger.log('No deployments found');
@@ -108,6 +107,18 @@ export class DeploymentsService {
     return retJobs.reverse();
   }
 
+  // Comprueba que el usuario tenga acceso al pipeline y lanza 403 si no. El
+  // controller lo llama ANTES de responder: el despliegue corre en segundo
+  // plano, y sin esto un usuario sin acceso recibía "Deployment triggered" y el
+  // rechazo solo quedaba en el log.
+  public async assertAccess(
+    pipeline: string,
+    phase: string,
+    userGroups: string[],
+  ): Promise<void> {
+    await this.pipelinesService.getContext(pipeline, phase, userGroups);
+  }
+
   public async triggerBuildjob(
     pipeline: string,
     phase: string,
@@ -117,6 +128,7 @@ export class DeploymentsService {
     reference: string,
     dockerfilePath: string,
     user: IUser,
+    userGroups: string[],
   ): Promise<any> {
     //this.logger.debug('triggerBuildjob: ' + pipeline + ' ' + phase + ' ' + app + ' ' + buildstrategy + ' ' + gitrepo + ' ' + reference + ' ' + dockerfilePath + ' ' + user.username);
 
@@ -130,6 +142,12 @@ export class DeploymentsService {
       return;
     }
 
+    const contextName = await this.pipelinesService.getContext(
+      pipeline,
+      phase,
+      userGroups,
+    );
+    this.kubectl.setCurrentContext(contextName);
     const namespace = pipeline + '-' + phase;
 
     if (process.env.KUBERO_READONLY == 'true') {
@@ -175,7 +193,7 @@ export class DeploymentsService {
         pipeline: pipeline,
       },
     } as INotification;
-    this.notificationService.send(m);
+    void this.notificationService.send(m);
 
     return {
       message: 'Build started',
@@ -188,6 +206,7 @@ export class DeploymentsService {
     app: string,
     buildName: string,
     user: IUser,
+    userGroups: string[],
   ): Promise<any> {
     if (process.env.KUBERO_READONLY == 'true') {
       this.logger.log(
@@ -199,6 +218,12 @@ export class DeploymentsService {
       return;
     }
 
+    const contextName = await this.pipelinesService.getContext(
+      pipeline,
+      phase,
+      userGroups,
+    );
+    this.kubectl.setCurrentContext(contextName);
     const namespace = pipeline + '-' + phase;
     await this.kubectl.deleteKuberoBuildJob(namespace, buildName);
 
@@ -216,7 +241,7 @@ export class DeploymentsService {
         pipeline: pipeline,
       },
     } as INotification;
-    this.notificationService.send(m);
+    void this.notificationService.send(m);
 
     return {
       message: 'Deployment deleted',
@@ -304,7 +329,7 @@ export class DeploymentsService {
         appName: appName,
         data: {},
       } as INotification;
-      this.notificationService.send(m);
+      void this.notificationService.send(m);
     }
   }
 }

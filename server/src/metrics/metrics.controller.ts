@@ -1,4 +1,11 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
@@ -6,15 +13,33 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { MetricsService } from './metrics.service';
+import { PipelinesService } from '../pipelines/pipelines.service';
 import { JwtAuthGuard } from '../auth/strategies/jwt.guard';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { Permissions } from '../auth/permissions.decorator';
 import { OKDTO } from '../common/dto/ok.dto';
 
 @Controller({ path: 'api/metrics', version: '1' })
 export class MetricsController {
-  constructor(private metricsService: MetricsService) {}
+  constructor(
+    private metricsService: MetricsService,
+    private pipelinesService: PipelinesService,
+  ) {}
+
+  // Las métricas se consultan a Prometheus por nombre de pipeline/fase/app, sin
+  // pasar por Kubernetes, así que hay que comprobar el equipo a mano: getContext
+  // lanza 403 si el usuario no tiene acceso al pipeline.
+  private async assertAccess(pipeline: string, phase: string, req: any) {
+    await this.pipelinesService.getContext(
+      pipeline,
+      phase,
+      req.user.userGroups,
+    );
+  }
 
   @Get('/resources/:pipeline/:phase/:app')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:read', 'app:write')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -29,12 +54,15 @@ export class MetricsController {
     @Param('pipeline') pipeline: string,
     @Param('phase') phase: string,
     @Param('app') app: string,
+    @Request() req: any,
   ) {
+    await this.assertAccess(pipeline, phase, req);
     return this.metricsService.getPodMetrics(pipeline, phase, app);
   }
 
   @Get('/uptimes/:pipeline/:phase')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:read', 'app:write')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -47,12 +75,15 @@ export class MetricsController {
   async getUptimes(
     @Param('pipeline') pipeline: string,
     @Param('phase') phase: string,
+    @Request() req: any,
   ) {
+    await this.assertAccess(pipeline, phase, req);
     return this.metricsService.getUptimes(pipeline, phase);
   }
 
   @Get('/timeseries')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('config:write') // devuelve el estado de todo el cluster; el client no la usa
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -65,7 +96,8 @@ export class MetricsController {
   }
 
   @Get('/timeseries/:type/:pipeline/:phase/:app')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:read', 'app:write')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -105,7 +137,9 @@ export class MetricsController {
     @Query('scale') scale: '24h' | '2h' | '7d',
     @Query('calc') calc: 'rate' | 'increase' | undefined,
     @Query('host') host: string,
+    @Request() req: any,
   ) {
+    await this.assertAccess(pipeline, phase, req);
     let ret: any;
 
     switch (type) {
@@ -169,7 +203,8 @@ export class MetricsController {
   }
 
   @Get('/rules/:pipeline/:phase/:app')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:read', 'app:write')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -184,7 +219,9 @@ export class MetricsController {
     @Param('pipeline') pipeline: string,
     @Param('phase') phase: string,
     @Param('app') app: string,
+    @Request() req: any,
   ) {
+    await this.assertAccess(pipeline, phase, req);
     return this.metricsService.getRules({
       pipeline: pipeline,
       phase: phase,

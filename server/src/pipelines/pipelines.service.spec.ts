@@ -1,3 +1,4 @@
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PipelinesService } from './pipelines.service';
 import { IUser } from 'src/auth/auth.interface';
 import { IPipeline } from './pipelines.interface';
@@ -136,15 +137,22 @@ describe('PipelinesService', () => {
       expect(ctx).toBe('ctx1');
     });
 
-    it('should return missing context if not found', async () => {
+    it('should throw Forbidden if the user has no access to the pipeline', async () => {
       service.listPipelines = jest.fn().mockResolvedValue({
         items: [],
       });
-      const ctx = await service.getContext('pipe1', 'dev', [
-        'group1',
-        'group2',
-      ]);
-      expect(ctx).toBe('missing-pipe1-dev');
+      await expect(
+        service.getContext('pipe1', 'dev', ['group1', 'group2']),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw NotFound if the phase does not exist', async () => {
+      service.listPipelines = jest.fn().mockResolvedValue({
+        items: [{ name: 'pipe1', phases: [{ name: 'dev', context: 'ctx1' }] }],
+      });
+      await expect(
+        service.getContext('pipe1', 'prod', ['group1']),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -220,7 +228,7 @@ describe('PipelinesService', () => {
       process.env.KUBERO_READONLY = 'true';
       const user = { username: 'test' } as IUser;
       const spy = jest.spyOn(console, 'log').mockImplementation(() => {});
-      service.deletePipeline('pipe1', user);
+      await service.deletePipeline('pipe1', user);
       expect(spy).toHaveBeenCalledWith(
         'KUBERO_READONLY is set to true, not deleting pipeline pipe1',
       );
@@ -234,7 +242,16 @@ describe('PipelinesService', () => {
       const user = { username: 'test' } as IUser;
       await service.deletePipeline('pipe1', user);
       expect(kubectl.deletePipeline).toHaveBeenCalledWith('pipe1');
-      //expect(notificationsService.send).toHaveBeenCalled();
+      expect(notificationsService.send).toHaveBeenCalled();
+    });
+
+    it('should propagate errors when deleting fails', async () => {
+      kubectl.getPipeline.mockResolvedValue({ name: 'pipe1' });
+      kubectl.deletePipeline.mockRejectedValue(new Error('boom'));
+      const user = { username: 'test' } as IUser;
+      await expect(service.deletePipeline('pipe1', user)).rejects.toThrow(
+        'boom',
+      );
     });
   });
 

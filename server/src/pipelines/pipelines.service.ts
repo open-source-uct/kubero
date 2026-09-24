@@ -1,5 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { IPipelineList, IPipeline, IKubectlPipelineList } from './pipelines.interface';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { IPipelineList, IPipeline } from './pipelines.interface';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { Buildpack } from '../config/buildpack/buildpack';
 import { IUser } from '../auth/auth.interface';
@@ -16,9 +21,11 @@ export class PipelinesService {
     private notificationsService: NotificationsService,
   ) {}
 
-  public async listPipelines(userGroups: string[] = []): Promise<IPipelineList> {
+  public async listPipelines(
+    userGroups: string[] = [],
+  ): Promise<IPipelineList> {
     //this.logger.debug('listPipelines for userGroups: ' + userGroups.join(', '));
-    let pipelines = await this.kubectl.getPipelinesList(userGroups);
+    const pipelines = await this.kubectl.getPipelinesList(userGroups);
 
     const ret: IPipelineList = {
       items: [],
@@ -29,12 +36,13 @@ export class PipelinesService {
     return ret;
   }
 
-  public async getPipelineWithApps(pipelineName: string, userGroups: string[] = []): Promise<IPipeline | undefined> {
+  public async getPipelineWithApps(
+    pipelineName: string,
+    userGroups: string[] = [],
+  ): Promise<IPipeline | undefined> {
     this.logger.debug('listApps in ' + pipelineName);
 
-    await this.kubectl.setCurrentContext(
-      process.env.KUBERO_CONTEXT || 'default',
-    );
+    this.kubectl.setCurrentContext(process.env.KUBERO_CONTEXT || 'default');
     const kpipeline = await this.kubectl.getPipeline(pipelineName);
 
     if (!kpipeline.spec || !kpipeline.spec.git || !kpipeline.spec.git.keys) {
@@ -49,7 +57,11 @@ export class PipelinesService {
     if (pipeline) {
       for (const phase of pipeline.phases) {
         if (phase.enabled == true) {
-          const contextName = await this.getContext(pipelineName, phase.name, userGroups);
+          const contextName = await this.getContext(
+            pipelineName,
+            phase.name,
+            userGroups,
+          );
           if (contextName) {
             const namespace = pipelineName + '-' + phase.name;
             const apps = await this.kubectl.getAppsList(namespace, contextName);
@@ -67,25 +79,29 @@ export class PipelinesService {
     return pipeline;
   }
 
+  // Devuelve el contexto de kubernetes de la fase, o lanza si el usuario no
+  // tiene acceso al pipeline (403) o la fase no existe (404). Antes devolvía
+  // 'missing-<pipeline>-<fase>' (un string truthy), con lo que los
+  // `if (contextName)` de los callers nunca bloqueaban a nadie.
   public async getContext(
     pipelineName: string,
     phaseName: string,
     userGroups: string[],
   ): Promise<string> {
-    let context: string = 'missing-' + pipelineName + '-' + phaseName;
     const pipelinesList = await this.listPipelines(userGroups);
 
-    for (const pipeline of pipelinesList.items) {
-      if (pipeline.name == pipelineName) {
-        for (const phase of pipeline.phases) {
-          if (phase.name == phaseName) {
-            //this.kubectl.setCurrentContext(phase.context);
-            context = phase.context;
-          }
-        }
-      }
+    const pipeline = pipelinesList.items.find((p) => p.name == pipelineName);
+    if (!pipeline) {
+      throw new ForbiddenException('No access to this pipeline');
     }
-    return context;
+
+    const phase = pipeline.phases.find((ph) => ph.name == phaseName);
+    if (!phase) {
+      throw new NotFoundException(
+        `Phase "${phaseName}" not found in pipeline "${pipelineName}"`,
+      );
+    }
+    return phase.context;
   }
 
   public async getPipeline(
@@ -144,7 +160,7 @@ export class PipelinesService {
   }
 
   // delete a pipeline and all its namespaces/phases
-  public deletePipeline(pipelineName: string, user: IUser) {
+  public async deletePipeline(pipelineName: string, user: IUser) {
     this.logger.debug('deletePipeline: ' + pipelineName);
 
     if (process.env.KUBERO_READONLY == 'true') {
@@ -154,36 +170,35 @@ export class PipelinesService {
       return;
     }
 
-    this.kubectl
-      .getPipeline(pipelineName)
-      .then(async (pipeline) => {
-        if (pipeline) {
-          await this.kubectl.deletePipeline(pipelineName);
+    // antes esto era fire-and-forget: el controller respondía OK aunque el
+    // borrado fallara. Ahora el error llega al cliente.
+    const pipeline = await this.kubectl.getPipeline(pipelineName);
+    if (!pipeline) {
+      return;
+    }
 
-          await new Promise((resolve) => setTimeout(resolve, 1000)); // needs some extra time to delete the namespace
-          //this.updateState();
+    await this.kubectl.deletePipeline(pipelineName);
 
-          const m = {
-            name: 'updatePipeline',
-            user: user.id,
-            resource: 'pipeline',
-            action: 'delete',
-            severity: 'normal',
-            message: 'Deleted pipeline: ' + pipelineName,
-            pipelineName: pipelineName,
-            phaseName: '',
-            appName: '',
-            data: {
-              pipeline: pipeline,
-            },
-          } as INotification;
-          this.notificationsService.send(m);
-        }
-      })
-      .catch((error) => {
-        this.logger.error(error);
-      });
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // needs some extra time to delete the namespace
+    //this.updateState();
+
+    const m = {
+      name: 'updatePipeline',
+      user: user.id,
+      resource: 'pipeline',
+      action: 'delete',
+      severity: 'normal',
+      message: 'Deleted pipeline: ' + pipelineName,
+      pipelineName: pipelineName,
+      phaseName: '',
+      appName: '',
+      data: {
+        pipeline: pipeline,
+      },
+    } as INotification;
+    void this.notificationsService.send(m);
   }
+
   public async updatePipeline(
     pipeline: IPipeline,
     resourceVersion: string,
@@ -227,7 +242,7 @@ export class PipelinesService {
         pipeline: pipeline,
       },
     } as INotification;
-    this.notificationsService.send(m);
+    void this.notificationsService.send(m);
   }
 
   public async createPipeline(pipeline: IPipeline, user: IUser) {
@@ -258,7 +273,7 @@ export class PipelinesService {
         pipeline: pipeline,
       },
     } as INotification;
-    this.notificationsService.send(m);
+    void this.notificationsService.send(m);
 
     return { status: 'ok', message: 'Pipeline created: ' + pipeline.name };
   }

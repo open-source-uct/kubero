@@ -1,6 +1,17 @@
 <template>
-  <v-app-bar dense max-height="50" :color="banner.bgcolor" v-if="banner.show && popup!='true'">
-      <v-toolbar-title :style="'width: 100%; text-align: center; color: '+banner.fontcolor+';'">{{ banner.message }}</v-toolbar-title>
+  <v-app-bar
+    density="compact"
+    max-height="50"
+    :color="banner.bgcolor || 'primary'"
+    v-if="banner.show && popup != 'true'"
+    elevation="0"
+    class="border-b"
+  >
+      <v-toolbar-title
+        :style="'width: 100%; text-align: center; font-weight: 600; font-size: 0.875rem; letter-spacing: 0.02em; color: ' + (banner.fontcolor || '#FFFFFF') + ';'"
+      >
+        {{ banner.message }}
+      </v-toolbar-title>
   </v-app-bar>
 </template>
 

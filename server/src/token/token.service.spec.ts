@@ -48,7 +48,7 @@ describe('TokenService', () => {
     }).compile();
 
     service = module.get<TokenService>(TokenService);
-    // @ts-ignore
+    // @ts-expect-error prisma es privado; se reemplaza por un mock
     service['prisma'] = mockPrisma;
     jest.clearAllMocks();
     mockUsersService.findById.mockResolvedValue({
@@ -80,7 +80,11 @@ describe('TokenService', () => {
       const result = await service.create('token1', '2025-01-01', 'u1');
       expect(mockUsersService.findById).toHaveBeenCalledWith('u1');
       expect(mockPrisma.token.create).toHaveBeenCalled();
-      expect(result).toEqual({"expiresAt": "2025-01-01", "name": "token1", "token": "mocked-jwt-token" });
+      expect(result).toEqual({
+        expiresAt: '2025-01-01',
+        name: 'token1',
+        token: 'mocked-jwt-token',
+      });
     });
 
     it('should read the role, groups and permissions from the database, not from arguments', async () => {
@@ -93,10 +97,21 @@ describe('TokenService', () => {
         ['everyone'],
         ['app:write'],
         '2025-01-01',
+        '1', // id de la fila: el JWT se firma con él (jti) para poder revocarlo
       );
       const createCall = mockPrisma.token.create.mock.calls[0][0];
       expect(createCall.data.role).toBe('admin');
       expect(createCall.data.groups).toBe('everyone');
+    });
+
+    it('should remove the row if the JWT could not be signed', async () => {
+      mockAuthService.generateToken.mockRejectedValueOnce(new Error('boom'));
+      await expect(
+        service.create('token1', '2025-01-01', 'u1'),
+      ).rejects.toThrow('boom');
+      expect(mockPrisma.token.delete).toHaveBeenCalledWith({
+        where: { id: '1' },
+      });
     });
 
     it('should throw if the user does not exist', async () => {
@@ -110,11 +125,10 @@ describe('TokenService', () => {
   describe('delete', () => {
     it('should delete a token by id', async () => {
       const result = await service.delete('1');
-      expect(mockPrisma.token.delete).toHaveBeenCalledWith({ where: { id: '1' } });
+      expect(mockPrisma.token.delete).toHaveBeenCalledWith({
+        where: { id: '1' },
+      });
       expect(result).toEqual({ id: '1', deleted: true });
     });
   });
 });
-
-
-

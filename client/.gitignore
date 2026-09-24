@@ -8,8 +8,6 @@ node_modules
 
 # Log files
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
 
 # Editor directories and files
@@ -20,3 +18,9 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright & E2E Test Artifacts
+test-results/
+playwright-report/
+e2e/.auth/
+.env

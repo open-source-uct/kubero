@@ -6,7 +6,7 @@ import { IKubectlMetadata } from '../kubernetes/kubernetes.interface';
 export class Template implements ITemplate {
   public name: string;
   public deploymentstrategy: 'git' | 'docker';
-  public envVars: {}[] = [];
+  public envVars: object[] = [];
   /*
   public serviceAccount: {
       annotations: Object

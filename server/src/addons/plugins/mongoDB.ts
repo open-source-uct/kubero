@@ -1,5 +1,5 @@
-import { Plugin, } from './plugin';
-import { IPlugin, IPluginFormFields  } from './plugin.interface';
+import { Plugin } from './plugin';
+import { IPlugin, IPluginFormFields } from './plugin.interface';
 
 // Classname must be same as the CRD's Name
 export class PerconaServerMongoDB extends Plugin implements IPlugin {
@@ -84,6 +84,6 @@ kubectl apply -n mongodb-operator-system --server-side -f https://raw.githubuser
 
   constructor(availableOperators: any) {
     super();
-    super.init(availableOperators);
+    void super.init(availableOperators);
   }
 }

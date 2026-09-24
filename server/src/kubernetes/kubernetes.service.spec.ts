@@ -10,7 +10,9 @@ jest.mock('@kubernetes/client-node', () => {
       loadFromCluster: jest.fn(),
       setCurrentContext: jest.fn(),
       getCurrentContext: jest.fn().mockReturnValue('default'),
-      getContexts: jest.fn().mockReturnValue([{ name: 'default' }]),
+      getContexts: jest
+        .fn()
+        .mockReturnValue([{ name: 'default' }, { name: 'ctx' }]),
       makeApiClient: jest.fn(() => ({
         getCode: jest
           .fn()
@@ -95,7 +97,10 @@ describe('KubernetesService', () => {
   });
 
   it('should getContexts', () => {
-    expect(service.getContexts()).toEqual([{ name: 'default' }]);
+    expect(service.getContexts()).toEqual([
+      { name: 'default' },
+      { name: 'ctx' },
+    ]);
   });
 
   it('should getCurrentContext', () => {
@@ -191,6 +196,21 @@ describe('KubernetesService', () => {
 
   it('should getPods', async () => {
     await expect(service.getPods('ns', 'ctx')).resolves.toBeDefined();
+  });
+
+  it('should switch context before getting pods', async () => {
+    // antes no cambiaba de contexto y siempre leía del último usado
+    await service.getPods('ns', 'ctx');
+    expect((service as any).kc.setCurrentContext).toHaveBeenCalledWith('ctx');
+  });
+
+  it('should refuse an unknown context without touching the shared kubeconfig', async () => {
+    // un contexto inexistente dejaba el KubeConfig compartido sin credenciales
+    (service as any).kc.setCurrentContext.mockClear();
+    await expect(service.getPods('ns', 'missing-x-y')).rejects.toThrow(
+      'Unknown kubernetes context',
+    );
+    expect((service as any).kc.setCurrentContext).not.toHaveBeenCalled();
   });
 
   it('should createEvent', async () => {

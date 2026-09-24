@@ -18,10 +18,10 @@ export class CustomConsoleLogger extends ConsoleLogger {
     'WebSocketsController',
   ];
 
-  log(_: any, context?: string): void {
-    context = context || '';
+  log(message: any, ...optionalParams: any[]): void {
+    const context = optionalParams[0] || '';
     if (!CustomConsoleLogger.contextsToIgnore.includes(context)) {
-      super.log.apply(this, arguments);
+      super.log(message, ...optionalParams);
     }
   }
 }

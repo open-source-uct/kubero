@@ -125,8 +125,8 @@
             v-model="dialog"
             max-width="890"
             >
-            <v-card>
-                <v-card-title class="text-h4">
+            <v-card color="cardBackground" class="uct-card">
+                <v-card-title class="text-h5 font-weight-bold">
                     <span>{{clickedTemplate.name}}</span>
                 </v-card-title>
                 <v-card-text>

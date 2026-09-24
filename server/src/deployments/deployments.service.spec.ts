@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { DeploymentsService } from './deployments.service';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { AppsService } from '../apps/apps.service';
@@ -9,14 +10,6 @@ import { ILoglines } from 'src/logs/logs.interface';
 import { mockKubectlApp as app } from '../apps/apps.controller.spec';
 
 const mockUserGroups = ['group1', 'group2'];
-
-const mockUser: IUser = {
-  username: 'testuser',
-  userId: 'testuser',
-  role: 'user',
-  userGroups: mockUserGroups,
-} as any;
-
 
 describe('DeploymentsService', () => {
   let service: DeploymentsService;
@@ -33,6 +26,7 @@ describe('DeploymentsService', () => {
       createBuildJob: jest.fn(),
       deleteKuberoBuildJob: jest.fn(),
       getPods: jest.fn(),
+      setCurrentContext: jest.fn(),
     } as any;
 
     appsService = {
@@ -81,7 +75,12 @@ describe('DeploymentsService', () => {
     it('should return empty items if no jobs', async () => {
       kubectl.getJobs.mockResolvedValue(undefined);
       appsService.getApp.mockResolvedValue(app);
-      const result = await service.listBuildjobs('pipe', 'phase', 'app', mockUserGroups);
+      const result = await service.listBuildjobs(
+        'pipe',
+        'phase',
+        'app',
+        mockUserGroups,
+      );
       expect(result).toEqual({ items: [] });
     });
 
@@ -133,7 +132,12 @@ describe('DeploymentsService', () => {
         ],
       });
       appsService.getApp.mockResolvedValue(app);
-      const result = await service.listBuildjobs('pipe', 'phase', 'app', mockUserGroups);
+      const result = await service.listBuildjobs(
+        'pipe',
+        'phase',
+        'app',
+        mockUserGroups,
+      );
       expect(Array.isArray(result)).toBe(true);
       expect(result[0].name).toBe('job1');
       expect(result[0].app).toBe('app');
@@ -181,7 +185,12 @@ describe('DeploymentsService', () => {
         ],
       });
       appsService.getApp.mockResolvedValue(app);
-      const result = await service.listBuildjobs('pipe', 'phase', 'app', mockUserGroups);
+      const result = await service.listBuildjobs(
+        'pipe',
+        'phase',
+        'app',
+        mockUserGroups,
+      );
       expect(result).toEqual([]);
     });
   });
@@ -199,6 +208,7 @@ describe('DeploymentsService', () => {
         'main',
         'Dockerfile',
         user,
+        mockUserGroups,
       );
       expect(result).toBeUndefined();
       delete process.env.KUBERO_READONLY;
@@ -216,6 +226,7 @@ describe('DeploymentsService', () => {
         'main',
         'Dockerfile',
         user,
+        mockUserGroups,
       );
       expect(kubectl.createBuildJob).toHaveBeenCalled();
       expect(notificationsService.send).toHaveBeenCalled();
@@ -233,6 +244,7 @@ describe('DeploymentsService', () => {
         'app',
         'build1',
         user,
+        mockUserGroups,
       );
       expect(result).toBeUndefined();
       delete process.env.KUBERO_READONLY;
@@ -240,9 +252,81 @@ describe('DeploymentsService', () => {
 
     it('should delete build and send notification', async () => {
       const user: IUser = { username: 'test' } as any;
-      await service.deleteBuildjob('pipe', 'phase', 'app', 'build1', user);
+      await service.deleteBuildjob(
+        'pipe',
+        'phase',
+        'app',
+        'build1',
+        user,
+        mockUserGroups,
+      );
       expect(kubectl.deleteKuberoBuildJob).toHaveBeenCalled();
       expect(notificationsService.send).toHaveBeenCalled();
+    });
+  });
+
+  describe('assertAccess', () => {
+    it('resolves when the user can access the pipeline', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      await expect(
+        service.assertAccess('pipe', 'phase', mockUserGroups),
+      ).resolves.toBeUndefined();
+      expect(pipelinesService.getContext).toHaveBeenCalledWith(
+        'pipe',
+        'phase',
+        mockUserGroups,
+      );
+    });
+
+    it('rejects with 403 when the user cannot access it', async () => {
+      pipelinesService.getContext.mockRejectedValue(new ForbiddenException());
+      await expect(
+        service.assertAccess('pipe', 'phase', ['other']),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('team access', () => {
+    const user: IUser = { username: 'test' } as any;
+
+    beforeEach(() => {
+      // getContext lanza 403 cuando el usuario no pertenece al equipo del pipeline
+      pipelinesService.getContext.mockRejectedValue(
+        new ForbiddenException('No access to this pipeline'),
+      );
+    });
+
+    it('should not list the build jobs of a pipeline the user cannot access', async () => {
+      await expect(
+        service.listBuildjobs('pipe', 'phase', 'app', ['other-team']),
+      ).rejects.toThrow(ForbiddenException);
+      expect(kubectl.getJobs).not.toHaveBeenCalled();
+    });
+
+    it('should not trigger a build in a pipeline the user cannot access', async () => {
+      await expect(
+        service.triggerBuildjob(
+          'pipe',
+          'phase',
+          'app',
+          'dockerfile',
+          'repo',
+          'main',
+          'Dockerfile',
+          user,
+          ['other-team'],
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(kubectl.createBuildJob).not.toHaveBeenCalled();
+    });
+
+    it('should not delete a build job of a pipeline the user cannot access', async () => {
+      await expect(
+        service.deleteBuildjob('pipe', 'phase', 'app', 'build1', user, [
+          'other-team',
+        ]),
+      ).rejects.toThrow(ForbiddenException);
+      expect(kubectl.deleteKuberoBuildJob).not.toHaveBeenCalled();
     });
   });
 
