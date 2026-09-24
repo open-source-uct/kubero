@@ -199,14 +199,28 @@ export class KubernetesService {
 
   // El KubeConfig es compartido entre todos los requests: fijarle un contexto
   // que no existe lo deja sin credenciales para el resto de los usuarios hasta
-  // que otro request lo repare. Por eso solo se acepta un contexto conocido.
+  // que otro request lo repare. Por eso solo se fija un contexto conocido.
+  //
+  // Si el nombre no existe pero el kubeconfig tiene un único contexto (el caso
+  // normal de un cluster único, o del modo in-cluster), no hay ambigüedad: se
+  // usa ese, como pasaba antes con los pipelines que declaran otro nombre. Con
+  // varios contextos un nombre desconocido sí se rechaza, para no operar sobre
+  // otro cluster por error.
   private useContext(context: string) {
-    const known = this.kc.getContexts().some((c) => c.name === context);
-    if (!known) {
-      this.logger.warn('Unknown kubernetes context: ' + context);
-      throw new NotFoundException(`Unknown kubernetes context "${context}"`);
+    const contexts = this.kc.getContexts();
+    if (contexts.some((c) => c.name === context)) {
+      this.kc.setCurrentContext(context);
+      return;
     }
-    this.kc.setCurrentContext(context);
+    if (contexts.length === 1) {
+      this.logger.warn(
+        `Unknown kubernetes context "${context}": using the only one available ("${contexts[0].name}")`,
+      );
+      this.kc.setCurrentContext(contexts[0].name);
+      return;
+    }
+    this.logger.warn('Unknown kubernetes context: ' + context);
+    throw new NotFoundException(`Unknown kubernetes context "${context}"`);
   }
 
   public getCurrentContext() {

@@ -30,12 +30,85 @@ describe('ConfigController', () => {
     controller = module.get<ConfigController>(ConfigController);
   });
 
+  describe('settings secrets', () => {
+    const full = (): any => ({
+      settings: {
+        kubero: { banner: 'hola' },
+        registry: {
+          host: 'r.example',
+          account: { username: 'u', password: 'pw', hash: 'h' },
+        },
+      },
+      secrets: {
+        GITHUB_BASEURL: 'https://api.github.com',
+        GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_secret',
+        GITEA_PERSONAL_ACCESS_TOKEN: '',
+        BITBUCKET_USERNAME: 'bb-user',
+        BITBUCKET_APP_PASSWORD: 'bb-pass',
+        KUBERO_WEBHOOK_SECRET: 'whsec',
+        OAUTH2_CLIENT_SECRET: 'oa',
+      },
+    });
+
+    it('gives the real values to whoever has config:write', async () => {
+      service.getSettings.mockResolvedValue(full());
+      const res: any = await controller.getSettings({
+        user: { permissions: ['config:write', 'config:read'] },
+      });
+      expect(res.secrets.GITHUB_PERSONAL_ACCESS_TOKEN).toBe('ghp_secret');
+      expect(res.secrets.KUBERO_WEBHOOK_SECRET).toBe('whsec');
+      expect(res.settings.registry.account.password).toBe('pw');
+    });
+
+    it('masks every credential for a config:read-only user (student role)', async () => {
+      service.getSettings.mockResolvedValue(full());
+      const res: any = await controller.getSettings({
+        user: { permissions: ['config:read'] },
+      });
+      const text = JSON.stringify(res);
+      for (const secret of ['ghp_secret', 'bb-pass', 'whsec', 'pw"', '"h"']) {
+        expect(text).not.toContain(secret);
+      }
+      expect(res.secrets.GITHUB_PERSONAL_ACCESS_TOKEN).toBe('********');
+      expect(res.secrets.OAUTH2_CLIENT_SECRET).toBe('********');
+      expect(res.settings.registry.account.password).toBe('********');
+    });
+
+    it('keeps what is not secret and leaves empty values empty', async () => {
+      service.getSettings.mockResolvedValue(full());
+      const res: any = await controller.getSettings({
+        user: { permissions: ['config:read'] },
+      });
+      expect(res.secrets.GITHUB_BASEURL).toBe('https://api.github.com');
+      expect(res.secrets.BITBUCKET_USERNAME).toBe('bb-user');
+      expect(res.secrets.GITEA_PERSONAL_ACCESS_TOKEN).toBe('');
+      expect(res.settings.kubero.banner).toBe('hola');
+      expect(res.settings.registry.host).toBe('r.example');
+      expect(res.settings.registry.account.username).toBe('u');
+    });
+
+    it('masks everything when the request carries no permissions', async () => {
+      service.getSettings.mockResolvedValue(full());
+      const res: any = await controller.getSettings({});
+      expect(JSON.stringify(res)).not.toContain('ghp_secret');
+    });
+
+    it('does not mutate what the service returned', async () => {
+      const original = full();
+      service.getSettings.mockResolvedValue(original);
+      await controller.getSettings({ user: { permissions: ['config:read'] } });
+      expect(original.secrets.GITHUB_PERSONAL_ACCESS_TOKEN).toBe('ghp_secret');
+    });
+  });
+
   it('should be defined', () => {
     expect(controller).toBeDefined();
   });
 
   it('should get settings', async () => {
-    await expect(controller.getSettings()).resolves.toBe('settings');
+    await expect(
+      controller.getSettings({ user: { permissions: ['config:write'] } }),
+    ).resolves.toBe('settings');
     expect(service.getSettings).toHaveBeenCalled();
   });
 

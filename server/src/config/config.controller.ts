@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Put,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 //import { ApiTags } from '@nestjs/swagger';
@@ -47,8 +48,49 @@ export class ConfigController {
     type: OKDTO,
     isArray: false,
   })
-  async getSettings() {
-    return this.configService.getSettings();
+  async getSettings(@Request() req: any) {
+    const settings: any = await this.configService.getSettings();
+    return this.redactSettings(settings, req);
+  }
+
+  // GET /api/config devuelve los tokens de acceso de GitHub/Gitea/GitLab/Gogs,
+  // la contraseña de Bitbucket, el secreto del webhook y los secretos de
+  // cliente. Antes los recibía cualquiera con config:read, permiso que un rol de
+  // estudiante necesita para ver podsizes y runpacks al crear una app. Ahora
+  // solo los ve quien tiene config:write; el resto recibe los valores
+  // enmascarados (las URLs base y el usuario de Bitbucket no son secretos).
+  private redactSettings(settings: any, req: any) {
+    const permissions: string[] = req?.user?.permissions ?? [];
+    if (!settings || permissions.includes('config:write')) {
+      return settings;
+    }
+    const mask = (value: unknown) => (value ? '********' : value);
+    const clean = { ...settings };
+    if (settings.secrets) {
+      clean.secrets = Object.fromEntries(
+        Object.entries(settings.secrets).map(([key, value]) => [
+          key,
+          key.endsWith('_BASEURL') || key === 'BITBUCKET_USERNAME'
+            ? value
+            : mask(value),
+        ]),
+      );
+    }
+    const account = settings.settings?.registry?.account;
+    if (account) {
+      clean.settings = {
+        ...settings.settings,
+        registry: {
+          ...settings.settings.registry,
+          account: {
+            ...account,
+            password: mask(account.password),
+            hash: mask(account.hash),
+          },
+        },
+      };
+    }
+    return clean;
   }
 
   @Post('/')
@@ -105,7 +147,8 @@ export class ConfigController {
 
   @Get('/registry')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:read', 'config:write')
+  // trae las credenciales del registry y el client no la usa: solo config:write
+  @Permissions('config:write')
   @ApiBearerAuth('bearerAuth')
   @ApiOperation({ summary: 'Get the registry settings' })
   @ApiForbiddenResponse({
