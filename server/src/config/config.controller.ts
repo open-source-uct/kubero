@@ -352,7 +352,8 @@ export class ConfigController {
   }
 
   @Get('/setup/check/:component')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('config:read', 'config:write')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -366,7 +367,8 @@ export class ConfigController {
   }
 
   @Post('/setup/kubeconfig/validate')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('config:write')
   @UseGuards(ReadonlyGuard)
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
@@ -400,7 +402,8 @@ export class ConfigController {
   }
 
   @Post('/setup/save')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('config:write')
   @UseGuards(ReadonlyGuard)
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({

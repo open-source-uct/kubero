@@ -1,5 +1,5 @@
 import * as YAML from 'yaml';
-import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PipelinesService } from '../pipelines/pipelines.service';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -85,13 +85,6 @@ export class AppsService {
       app.phase,
       userGroups,
     );
-    if (contextName.startsWith('missing-')) {
-      throw new HttpException(
-        `Pipeline "${app.pipeline}" or phase "${app.phase}" not found`,
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
     await this.kubectl.createApp(app, contextName);
 
     const m = {

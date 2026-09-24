@@ -1,3 +1,4 @@
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PipelinesService } from './pipelines.service';
 import { IUser } from 'src/auth/auth.interface';
 import { IPipeline } from './pipelines.interface';
@@ -136,15 +137,22 @@ describe('PipelinesService', () => {
       expect(ctx).toBe('ctx1');
     });
 
-    it('should return missing context if not found', async () => {
+    it('should throw Forbidden if the user has no access to the pipeline', async () => {
       service.listPipelines = jest.fn().mockResolvedValue({
         items: [],
       });
-      const ctx = await service.getContext('pipe1', 'dev', [
-        'group1',
-        'group2',
-      ]);
-      expect(ctx).toBe('missing-pipe1-dev');
+      await expect(
+        service.getContext('pipe1', 'dev', ['group1', 'group2']),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw NotFound if the phase does not exist', async () => {
+      service.listPipelines = jest.fn().mockResolvedValue({
+        items: [{ name: 'pipe1', phases: [{ name: 'dev', context: 'ctx1' }] }],
+      });
+      await expect(
+        service.getContext('pipe1', 'prod', ['group1']),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

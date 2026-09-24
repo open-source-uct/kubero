@@ -1,5 +1,13 @@
 <template>
   <v-container>
+    <v-alert
+      v-if="actionError"
+      type="error"
+      variant="tonal"
+      closable
+      class="mb-4"
+      @click:close="actionError = ''"
+    >{{ actionError }}</v-alert>
     <v-data-table
       :headers="headers"
       :items="users"
@@ -145,6 +153,15 @@
       <v-card color="cardBackground" class="uct-card">
         <v-card-title class="text-h6 font-weight-bold">{{ $t('user.actions.edit') }}</v-card-title>
         <v-card-text>
+          <v-alert
+            v-if="actionError"
+            type="error"
+            variant="tonal"
+            closable
+            density="compact"
+            class="mb-4"
+            @click:close="actionError = ''"
+          >{{ actionError }}</v-alert>
           <v-text-field v-model="editedUser.username" :label="$t('user.username')"></v-text-field>
           <v-text-field v-model="editedUser.firstName" :label="$t('user.firstName')"></v-text-field>
           <v-text-field v-model="editedUser.lastName" :label="$t('user.lastName')"></v-text-field>
@@ -185,6 +202,15 @@
       <v-card color="cardBackground" class="uct-card">
         <v-card-title class="text-h6 font-weight-bold">{{ $t('user.actions.create') }}</v-card-title>
         <v-card-text>
+          <v-alert
+            v-if="actionError"
+            type="error"
+            variant="tonal"
+            closable
+            density="compact"
+            class="mb-4"
+            @click:close="actionError = ''"
+          >{{ actionError }}</v-alert>
           <v-text-field v-model="newUser.username" :label="$t('user.username')"></v-text-field>
           <v-text-field v-model="newUser.firstName" :label="$t('user.firstName')"></v-text-field>
           <v-text-field v-model="newUser.lastName" :label="$t('user.lastName')"></v-text-field>
@@ -335,6 +361,16 @@ export default defineComponent({
       loading.value = false
     }
 
+    // El server explica por qué rechaza una acción (último administrador, equipo
+    // protegido, id que ya no existe...). Antes solo iba a la consola y la
+    // pantalla parecía no hacer nada.
+    const actionError = ref('')
+    const errorText = (e: any): string => {
+      const message = e?.response?.data?.message
+      if (Array.isArray(message)) return message.join(', ')
+      return message || e?.message || 'Error'
+    }
+
     const loadTeams = async () => {
       try {
         const res = await axios.get('/api/groups')
@@ -352,8 +388,12 @@ export default defineComponent({
       }
     }
 
-    const openEditUserDialog = (user: User) => {
+    const openEditUserDialog = async (user: User) => {
       editedUser.value = { ...user }
+      actionError.value = ''
+      // los equipos y roles se pueden haber creado o borrado en otra pestaña
+      // desde que se cargó esta pantalla: se recargan al abrir el formulario
+      await Promise.all([loadTeams(), loadRoles()])
       editDialog.value = true
     }
 
@@ -364,6 +404,7 @@ export default defineComponent({
         editDialog.value = false
       } catch (e) {
         console.error('Error saving user:', e)
+        actionError.value = errorText(e)
       }
     }
 
@@ -373,6 +414,7 @@ export default defineComponent({
         await loadUsers()
       } catch (e) {
         console.error('Error deleting user:', e)
+        actionError.value = errorText(e)
       }
     }
 
@@ -388,7 +430,13 @@ export default defineComponent({
       })
     }
 
-    const openCreateDialog = () => {
+    const openCreateDialog = async () => {
+      actionError.value = ''
+      // Antes la lista de equipos se cargaba solo al abrir la pestaña: si un
+      // equipo se borraba y se volvía a crear (id nuevo), el formulario seguía
+      // ofreciendo el id viejo y el alta fallaba sin ningún mensaje hasta
+      // refrescar la página.
+      await Promise.all([loadTeams(), loadRoles()])
       newUser.value = {
         username: '',
         firstName: '',
@@ -409,6 +457,7 @@ export default defineComponent({
         createDialog.value = false
       } catch (e) {
         console.error('Error creating user:', e)
+        actionError.value = errorText(e)
       }
     }
 
@@ -438,6 +487,7 @@ export default defineComponent({
         await loadUsers()
       } catch (e) {
         console.error('Error removing group from user:', e)
+        actionError.value = errorText(e)
       }
     }
 
@@ -461,6 +511,7 @@ export default defineComponent({
       createDialog,
       newUser,
       openCreateDialog,
+      actionError,
       changePasswordDialog,
       openChangePasswordDialog,
       saveChangePassword,

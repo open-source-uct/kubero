@@ -62,8 +62,56 @@ describe('NotificationsController', () => {
     service = module.get(NotificationsDbService);
   });
 
+  const adminReq = { user: { permissions: ['config:write', 'config:read'] } };
+  const readerReq = { user: { permissions: ['config:read'] } };
+
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('credentials', () => {
+    const secretNotification: any = {
+      ...mockNotificationConfig,
+      type: 'webhook',
+      config: {
+        url: 'https://hooks.example/abc',
+        secret: 's3cret',
+        foo: 'bar',
+      },
+    };
+
+    it('shows the url and secret to whoever has config:write', async () => {
+      service.getNotificationConfigs.mockResolvedValue([secretNotification]);
+      const result = await controller.findAll(adminReq);
+      expect(result.data?.[0].config).toMatchObject({
+        url: 'https://hooks.example/abc',
+        secret: 's3cret',
+      });
+    });
+
+    it('hides the url and secret from a config:read-only user', async () => {
+      service.getNotificationConfigs.mockResolvedValue([secretNotification]);
+      const result = await controller.findAll(readerReq);
+      const config: any = result.data?.[0].config;
+      expect(config.url).toBe('********');
+      expect(config.secret).toBe('********');
+      expect(config.foo).toBe('bar');
+      expect(JSON.stringify(result)).not.toContain('s3cret');
+      expect(JSON.stringify(result)).not.toContain('hooks.example');
+    });
+
+    it('also hides them when fetching a single notification', async () => {
+      service.findById.mockResolvedValue(mockNotificationDb);
+      service.toNotificationConfig.mockReturnValue(secretNotification);
+      const result = await controller.findOne('1', readerReq);
+      expect(JSON.stringify(result)).not.toContain('s3cret');
+    });
+
+    it('hides them when the request carries no permissions at all', async () => {
+      service.getNotificationConfigs.mockResolvedValue([secretNotification]);
+      const result = await controller.findAll({});
+      expect(JSON.stringify(result)).not.toContain('s3cret');
+    });
   });
 
   describe('findAll', () => {
@@ -71,7 +119,7 @@ describe('NotificationsController', () => {
       const mockNotifications = [mockNotificationConfig];
       service.getNotificationConfigs.mockResolvedValue(mockNotifications);
 
-      const result = await controller.findAll();
+      const result = await controller.findAll(adminReq);
 
       expect(result).toEqual({
         success: true,
@@ -85,7 +133,7 @@ describe('NotificationsController', () => {
         new Error('Database error'),
       );
 
-      await expect(controller.findAll()).rejects.toThrow(
+      await expect(controller.findAll(adminReq)).rejects.toThrow(
         new HttpException(
           'Failed to fetch notifications',
           HttpStatus.INTERNAL_SERVER_ERROR,
@@ -101,7 +149,7 @@ describe('NotificationsController', () => {
       service.findById.mockResolvedValue(mockNotificationDb);
       service.toNotificationConfig.mockReturnValue(mockNotificationConfig);
 
-      const result = await controller.findOne(notificationId);
+      const result = await controller.findOne(notificationId, adminReq);
 
       expect(result).toEqual({
         success: true,
@@ -116,7 +164,9 @@ describe('NotificationsController', () => {
     it('should throw NotFound when notification does not exist', async () => {
       service.findById.mockResolvedValue(null);
 
-      await expect(controller.findOne(notificationId)).rejects.toThrow(
+      await expect(
+        controller.findOne(notificationId, adminReq),
+      ).rejects.toThrow(
         new HttpException('Notification not found', HttpStatus.NOT_FOUND),
       );
     });
@@ -128,15 +178,17 @@ describe('NotificationsController', () => {
       );
       service.findById.mockRejectedValue(httpError);
 
-      await expect(controller.findOne(notificationId)).rejects.toThrow(
-        httpError,
-      );
+      await expect(
+        controller.findOne(notificationId, adminReq),
+      ).rejects.toThrow(httpError);
     });
 
     it('should throw Internal Server Error for other errors', async () => {
       service.findById.mockRejectedValue(new Error('Database error'));
 
-      await expect(controller.findOne(notificationId)).rejects.toThrow(
+      await expect(
+        controller.findOne(notificationId, adminReq),
+      ).rejects.toThrow(
         new HttpException(
           'Failed to fetch notification',
           HttpStatus.INTERNAL_SERVER_ERROR,

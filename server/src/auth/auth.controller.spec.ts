@@ -1,3 +1,5 @@
+import { HttpException } from '@nestjs/common';
+import { LoginThrottleService } from './login-throttle.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
@@ -7,6 +9,7 @@ import { AuthService } from './auth.service';
 
 describe('AuthController', () => {
   let controller: AuthController;
+  const req = { ip: '203.0.113.7' };
   let service: jest.Mocked<AuthService>;
 
   beforeEach(async () => {
@@ -20,7 +23,10 @@ describe('AuthController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
-      providers: [{ provide: AuthService, useValue: service }],
+      providers: [
+        { provide: AuthService, useValue: service },
+        LoginThrottleService,
+      ],
     }).compile();
 
     controller = module.get<AuthController>(AuthController);
@@ -43,12 +49,42 @@ describe('AuthController', () => {
 
     it('should call authService.login with username and password', async () => {
       service.login.mockResolvedValueOnce({ access_token: 'token' });
-      const result = await controller.login({
-        username: 'user',
-        password: 'pw',
-      });
+      const result = await controller.login(
+        { username: 'user', password: 'pw' },
+        req,
+      );
       expect(service.login).toHaveBeenCalledWith('user', 'pw');
       expect(result).toEqual({ access_token: 'token' });
+    });
+
+    it('should answer 429 after too many failed logins and stop calling the auth service', async () => {
+      service.login.mockRejectedValue(new HttpException('Forbidden', 403));
+      for (let i = 0; i < LoginThrottleService.MAX_PER_IP_AND_USER; i++) {
+        await expect(
+          controller.login({ username: 'ana', password: 'x' }, req),
+        ).rejects.toMatchObject({ status: 403 });
+      }
+      service.login.mockClear();
+      await expect(
+        controller.login({ username: 'ana', password: 'x' }, req),
+      ).rejects.toMatchObject({ status: 429 });
+      expect(service.login).not.toHaveBeenCalled();
+    });
+
+    it('should not count a successful login as a failure and clear previous ones', async () => {
+      service.login.mockRejectedValueOnce(new HttpException('Forbidden', 403));
+      await expect(
+        controller.login({ username: 'ana', password: 'bad' }, req),
+      ).rejects.toBeDefined();
+      service.login.mockResolvedValue({ access_token: 't' });
+      await controller.login({ username: 'ana', password: 'ok' }, req);
+      // tras el acierto el contador quedó en cero: caben otros intentos fallidos
+      service.login.mockRejectedValue(new HttpException('Forbidden', 403));
+      for (let i = 0; i < LoginThrottleService.MAX_PER_IP_AND_USER; i++) {
+        await expect(
+          controller.login({ username: 'ana', password: 'x' }, req),
+        ).rejects.toMatchObject({ status: 403 });
+      }
     });
   });
 

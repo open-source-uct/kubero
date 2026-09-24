@@ -255,6 +255,7 @@ export class RepoService {
     //signature: string,
     headers: any,
     body: any,
+    rawBody?: Buffer,
   ) {
     this.logger.debug('handleWebhook: ' + repoProvider);
 
@@ -268,19 +269,37 @@ export class RepoService {
         event = headers['x-github-event'];
         delivery = headers['x-github-delivery'];
         signature = headers['x-hub-signature-256'];
-        webhook = this.githubApi.getWebhook(event, delivery, signature, body);
+        webhook = this.githubApi.getWebhook(
+          event,
+          delivery,
+          signature,
+          body,
+          rawBody,
+        );
         break;
       case 'gitea':
         event = headers['x-gitea-event'];
         delivery = headers['x-gitea-delivery'];
         signature = headers['x-hub-signature-256'];
-        webhook = this.giteaApi.getWebhook(event, delivery, signature, body);
+        webhook = this.giteaApi.getWebhook(
+          event,
+          delivery,
+          signature,
+          body,
+          rawBody,
+        );
         break;
       case 'gogs':
         event = headers['x-gogs-event'];
         delivery = headers['x-gogs-delivery'];
         signature = headers['x-gogs-signature'];
-        webhook = this.gogsApi.getWebhook(event, delivery, signature, body);
+        webhook = this.gogsApi.getWebhook(
+          event,
+          delivery,
+          signature,
+          body,
+          rawBody,
+        );
         break;
       case 'gitlab':
         event = headers['x-gitlab-event'];
@@ -290,7 +309,14 @@ export class RepoService {
       case 'bitbucket':
         event = headers['x-event-key'];
         delivery = headers['x-request-uuid'];
-        webhook = this.bitbucketApi.getWebhook(event, delivery, body);
+        signature = headers['x-hub-signature'];
+        webhook = this.bitbucketApi.getWebhook(
+          event,
+          delivery,
+          signature,
+          body,
+          rawBody,
+        );
         break;
       default:
         this.logger.debug('unknown repoprovider: ' + repoProvider);

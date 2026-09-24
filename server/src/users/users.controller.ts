@@ -145,8 +145,8 @@ export class UsersController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Delete User by ID' })
-  async deleteUser(@Param('id') id: string) {
-    return this.usersService.delete(id);
+  async deleteUser(@Param('id') id: string, @Request() req: any) {
+    return this.usersService.delete(id, req.user.userId);
   }
 
   @Put('/id/:id/password/')
@@ -220,7 +220,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Create a new User' })
   async createUser(@Body() body: CreateUserDto) {
     try {
-      return this.usersService.create(body);
+      return await this.usersService.create(body);
     } catch (error) {
       throw new HttpException(
         `Error creating user: ${error.message}`,

@@ -1,8 +1,15 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { PrismaClient, User as PrismaUser } from '@prisma/client';
 import * as dotenv from 'dotenv';
 dotenv.config();
-//import * as crypto from 'crypto';
+import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import axios from 'axios';
 
@@ -19,6 +26,11 @@ export class UsersService {
 
   async findOne(username: string): Promise<PrismaUser | null> {
     return this.prisma.user.findUnique({ where: { username } });
+  }
+
+  // Fila del token personal (para comprobar que no fue revocado)
+  async findToken(id: string) {
+    return this.prisma.token.findUnique({ where: { id } });
   }
 
   async findOneFull(username: string): Promise<PartialPrismaUser | null> {
@@ -92,8 +104,9 @@ export class UsersService {
         throw new Error(`Default user group not found: ${defaultUserGroup}`);
       }
 
-      // Generate a random password (not most secure, but enough for a temporary password)
-      const password = Math.random().toString(36).slice(-8); // Generate a random password
+      // Contraseña aleatoria que nadie conoce (el usuario entra por OAuth).
+      // Antes eran 8 caracteres de Math.random(), adivinables por fuerza bruta.
+      const password = crypto.randomBytes(24).toString('hex');
       const imageData = image
         ? await this.generateUserDataFromImageUrl(image)
         : null;
@@ -111,6 +124,16 @@ export class UsersService {
       });
       this.logger.debug(`User ${username} created successfully.`);
     } else {
+      // Sin esto, una cuenta OAuth cuyo nombre coincida con el de un usuario
+      // local (por ejemplo "admin") entraba como ese usuario y con su rol.
+      if (user.provider && user.provider !== provider) {
+        this.logger.warn(
+          `Refused ${provider} login: username ${username} belongs to a ${user.provider} account.`,
+        );
+        throw new ForbiddenException(
+          'This username is already used by another account',
+        );
+      }
       this.logger.debug(`User ${username} found.`);
     }
     return user;
@@ -245,6 +268,21 @@ export class UsersService {
       ...data
     } = user;
 
+    // no dejar el sistema sin administrador: desactivar al último o cambiarle
+    // el rol a uno que no sea admin
+    if (data.isActive === false) {
+      await this.assertAnotherAdminRemains(userId);
+    }
+    if (role && typeof role === 'string') {
+      const newRole = await this.prisma.role.findUnique({
+        where: { id: role },
+        select: { name: true },
+      });
+      if (newRole && newRole.name !== 'admin') {
+        await this.assertAnotherAdminRemains(userId);
+      }
+    }
+
     // fix relations
     if (role && typeof role === 'string') {
       data.role = { connect: { id: role } };
@@ -374,7 +412,29 @@ export class UsersService {
     }
   }
 
-  async delete(userId: string): Promise<void> {
+  // Impide dejar el sistema sin ningún administrador activo (borrar, desactivar
+  // o cambiar de rol al último).
+  private async assertAnotherAdminRemains(userId: string): Promise<void> {
+    const target = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isActive: true, role: { select: { name: true } } },
+    });
+    if (!target || target.role?.name !== 'admin' || target.isActive === false) {
+      return;
+    }
+    const others = await this.prisma.user.count({
+      where: { id: { not: userId }, isActive: true, role: { name: 'admin' } },
+    });
+    if (others === 0) {
+      throw new ConflictException('This is the last active administrator');
+    }
+  }
+
+  async delete(userId: string, actingUserId?: string): Promise<void> {
+    if (actingUserId && actingUserId === userId) {
+      throw new ForbiddenException('You cannot delete your own account');
+    }
+    await this.assertAnotherAdminRemains(userId);
     try {
       await this.prisma.user.delete({ where: { id: userId } });
     } catch {

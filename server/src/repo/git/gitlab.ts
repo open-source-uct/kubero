@@ -1,5 +1,9 @@
 // https://www.nerd.vision/post/nerdvision-gitlab-js-an-easier-way-to-access-the-gitlab-api-in-javascript
 // https://www.npmjs.com/package/@nerdvision/gitlab-js
+import {
+  verifySharedToken,
+  webhookSecret,
+} from '../../common/utils/webhook.util';
 import debug from 'debug';
 import {
   IWebhook,
@@ -233,19 +237,14 @@ export class GitlabApi extends Repo {
     token: string,
     body: any,
   ): IWebhook | boolean {
-    const secret = process.env.KUBERO_WEBHOOK_SECRET as string;
-
-    let verified = false;
-    if (secret === token) {
-      debug.debug('Gitlab webhook signature is valid for event: ' + delivery);
-      verified = true;
-    } else {
+    // antes: `secret === token` daba true con ambos undefined y además se
+    // escribía el secreto en el log cuando no coincidía
+    if (!verifySharedToken(token, webhookSecret())) {
       this.logger.log('ERROR: invalid token/secret for event: ' + delivery);
-      this.logger.log('Secret:      ' + secret);
-      this.logger.log('Token :      ' + token);
-      verified = false;
       return false;
     }
+    debug.debug('Gitlab webhook signature is valid for event: ' + delivery);
+    const verified = true;
 
     // use github and gitea naming for the event
     let github_event = event;

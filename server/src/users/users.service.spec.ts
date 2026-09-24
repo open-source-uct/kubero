@@ -1,3 +1,4 @@
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { User as PrismaUser } from '@prisma/client';
 import { HttpException } from '@nestjs/common';
@@ -26,6 +27,7 @@ describe('UsersService', () => {
     role: {
       findFirst: jest.Mock;
       findMany: jest.Mock;
+      findUnique: jest.Mock;
     };
     userGroup: {
       findFirst: jest.Mock;
@@ -47,6 +49,7 @@ describe('UsersService', () => {
       role: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
+        findUnique: jest.fn(),
       },
       userGroup: {
         findFirst: jest.fn(),
@@ -699,6 +702,115 @@ describe('UsersService', () => {
 
       // Should not throw, but handle gracefully
       await expect(service.delete('nonexistent')).resolves.toBeUndefined();
+    });
+  });
+});
+
+describe('UsersService safeguards', () => {
+  let service: UsersService;
+  let prisma: any;
+
+  const admin = { isActive: true, role: { name: 'admin' } };
+
+  beforeEach(() => {
+    prisma = {
+      user: {
+        findUnique: jest.fn(),
+        count: jest.fn().mockResolvedValue(1), // queda otro admin
+        delete: jest.fn().mockResolvedValue({}),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      role: { findUnique: jest.fn() },
+    };
+    service = new UsersService();
+    // @ts-expect-error prisma es privado; se reemplaza por un mock
+    service['prisma'] = prisma;
+  });
+
+  describe('delete', () => {
+    it('refuses to delete your own account', async () => {
+      await expect(service.delete('u1', 'u1')).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(prisma.user.delete).not.toHaveBeenCalled();
+    });
+
+    it('refuses to delete the last active administrator', async () => {
+      prisma.user.findUnique.mockResolvedValue(admin);
+      prisma.user.count.mockResolvedValue(0);
+      await expect(service.delete('u1', 'someone-else')).rejects.toThrow(
+        ConflictException,
+      );
+      expect(prisma.user.delete).not.toHaveBeenCalled();
+    });
+
+    it('deletes an administrator when another one remains', async () => {
+      prisma.user.findUnique.mockResolvedValue(admin);
+      await service.delete('u1', 'someone-else');
+      expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'u1' } });
+    });
+
+    it('does not count a non-admin as a protected account', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        isActive: true,
+        role: { name: 'student' },
+      });
+      prisma.user.count.mockResolvedValue(0);
+      await service.delete('u2', 'u1');
+      expect(prisma.user.delete).toHaveBeenCalled();
+    });
+  });
+
+  describe('update', () => {
+    it('refuses to deactivate the last active administrator', async () => {
+      prisma.user.findUnique.mockResolvedValue(admin);
+      prisma.user.count.mockResolvedValue(0);
+      await expect(service.update('u1', { isActive: false })).rejects.toThrow(
+        ConflictException,
+      );
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('refuses to move the last administrator to another role', async () => {
+      prisma.user.findUnique.mockResolvedValue(admin);
+      prisma.user.count.mockResolvedValue(0);
+      prisma.role.findUnique.mockResolvedValue({ name: 'student' });
+      await expect(service.update('u1', { role: 'r-student' })).rejects.toThrow(
+        ConflictException,
+      );
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('lets the last administrator keep the admin role', async () => {
+      prisma.user.findUnique.mockResolvedValue(admin);
+      prisma.user.count.mockResolvedValue(0);
+      prisma.role.findUnique.mockResolvedValue({ name: 'admin' });
+      await service.update('u1', { role: 'r-admin', firstName: 'Ana' });
+      expect(prisma.user.update).toHaveBeenCalled();
+    });
+  });
+
+  describe('findOneOrCreate (OAuth)', () => {
+    it('refuses to log in as a local user that has the same username', async () => {
+      // findOneFull devuelve al admin local; el login viene de GitHub
+      jest.spyOn(service, 'findOneFull').mockResolvedValue({
+        id: 'u1',
+        username: 'admin',
+        provider: 'local',
+      } as any);
+      await expect(
+        service.findOneOrCreate('admin', 'a@b.c', 'github', ''),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('lets a user of the same provider log in again', async () => {
+      jest.spyOn(service, 'findOneFull').mockResolvedValue({
+        id: 'u2',
+        username: 'ana',
+        provider: 'github',
+      } as any);
+      const user = await service.findOneOrCreate('ana', 'a@b.c', 'github', '');
+      expect(user).toMatchObject({ username: 'ana' });
     });
   });
 });

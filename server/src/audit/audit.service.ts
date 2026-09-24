@@ -80,13 +80,18 @@ export class AuditService {
     }
   }
 
+  // `pipelines` restringe el resultado a esos pipelines (para usuarios que no
+  // son admin); sin él devuelve todo el registro.
   public async get(
     limit: number = 100,
+    pipelines?: string[],
   ): Promise<{ audit: AuditEntry[]; count: number; limit: number }> {
     if (!this.enabled) {
       return { audit: [], count: 0, limit: limit };
     }
+    const where = pipelines ? { pipeline: { in: pipelines } } : {};
     const audit = await this.prisma.audit.findMany({
+      where,
       orderBy: { timestamp: 'desc' },
       take: limit,
       include: {
@@ -95,7 +100,7 @@ export class AuditService {
         },
       },
     });
-    const count = await this.prisma.audit.count();
+    const count = await this.prisma.audit.count({ where });
     return { audit, count, limit };
   }
 

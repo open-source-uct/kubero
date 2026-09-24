@@ -26,7 +26,7 @@ import { OKDTO } from '../common/dto/ok.dto';
 import { JwtAuthGuard } from '../auth/strategies/jwt.guard';
 import { ReadonlyGuard } from '../common/guards/readonly.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
-import { Permissions } from '../auth/permissions.decorator';
+import { Permissions, PermissionsAll } from '../auth/permissions.decorator';
 import { ExecConsoleDto } from './dto/exec-console.dto';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
@@ -188,7 +188,8 @@ export class AppsController {
   }
 
   @Post('/pullrequest')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:write')
   @UseGuards(ReadonlyGuard)
   @ApiOperation({ summary: 'Start a Pull Request App' })
   @ApiForbiddenResponse({
@@ -284,7 +285,9 @@ export class AppsController {
 
   @Post('/:pipeline/:phase/:app/console')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('app:write')
+  // console:ok se siembra y se edita en la UI de roles pero no se comprobaba en
+  // ningún lado: un rol con "console: none" y app:write igual abría la consola
+  @PermissionsAll('app:write', 'console:ok')
   @UseGuards(ReadonlyGuard)
   @ApiOperation({ summary: 'Start a container console' })
   @ApiForbiddenResponse({

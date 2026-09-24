@@ -155,6 +155,7 @@ export abstract class Repo {
     delivery: string,
     signature: string,
     body: any,
+    rawBody?: Buffer,
   ): IWebhook | boolean;
   //protected abstract removeWebhook(owner: string, repo: string, id: number): Promise<boolean>;
   protected abstract getBranches(repo: string): Promise<string[]> | undefined;

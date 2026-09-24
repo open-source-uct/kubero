@@ -1,5 +1,13 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  ForbiddenException,
+  Get,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { KubernetesService } from './kubernetes.service';
+import { PipelinesService } from '../pipelines/pipelines.service';
 import {
   ApiOperation,
   ApiOkResponse,
@@ -14,13 +22,19 @@ import {
 } from './dto/kubernetes.dto';
 import { OKDTO } from '../common/dto/ok.dto';
 import { JwtAuthGuard } from '../auth/strategies/jwt.guard';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { Permissions } from '../auth/permissions.decorator';
 
 @Controller({ path: 'api/kubernetes', version: '1' })
 export class KubernetesController {
-  constructor(private readonly kubernetesService: KubernetesService) {}
+  constructor(
+    private readonly kubernetesService: KubernetesService,
+    private readonly pipelinesService: PipelinesService,
+  ) {}
 
   @Get('events')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:read', 'app:write')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -36,12 +50,36 @@ export class KubernetesController {
   @ApiOperation({
     summary: 'Get the Kubernetes events in a specific namespace',
   })
-  async getEvents(@Query('namespace') namespace: string) {
+  async getEvents(@Query('namespace') namespace: string, @Request() req: any) {
+    // Antes cualquier usuario podía leer los eventos de cualquier namespace del
+    // cluster. Solo el equipo admin puede pedir uno arbitrario; el resto, solo
+    // los namespaces (<pipeline>-<fase>) de los pipelines a los que tiene acceso.
+    const userGroups: string[] = req.user.userGroups ?? [];
+    if (!userGroups.includes('admin')) {
+      const pipelines = await this.pipelinesService.listPipelines(userGroups);
+      let context: string | undefined;
+      let allowed = false;
+      for (const pipeline of pipelines.items) {
+        for (const phase of pipeline.phases) {
+          if (`${pipeline.name}-${phase.name}` === namespace) {
+            allowed = true;
+            context = phase.context;
+          }
+        }
+      }
+      if (!allowed) {
+        throw new ForbiddenException('No access to this namespace');
+      }
+      if (context) {
+        this.kubernetesService.setCurrentContext(context);
+      }
+    }
     return this.kubernetesService.getEvents(namespace);
   }
 
   @Get('storageclasses')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:read', 'app:write')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -59,7 +97,8 @@ export class KubernetesController {
   }
 
   @Get('domains')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:read', 'app:write')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
@@ -79,7 +118,8 @@ export class KubernetesController {
   }
 
   @Get('/contexts')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('pipeline:write')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',
     type: OKDTO,

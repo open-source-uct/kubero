@@ -97,10 +97,21 @@ describe('TokenService', () => {
         ['everyone'],
         ['app:write'],
         '2025-01-01',
+        '1', // id de la fila: el JWT se firma con él (jti) para poder revocarlo
       );
       const createCall = mockPrisma.token.create.mock.calls[0][0];
       expect(createCall.data.role).toBe('admin');
       expect(createCall.data.groups).toBe('everyone');
+    });
+
+    it('should remove the row if the JWT could not be signed', async () => {
+      mockAuthService.generateToken.mockRejectedValueOnce(new Error('boom'));
+      await expect(
+        service.create('token1', '2025-01-01', 'u1'),
+      ).rejects.toThrow('boom');
+      expect(mockPrisma.token.delete).toHaveBeenCalledWith({
+        where: { id: '1' },
+      });
     });
 
     it('should throw if the user does not exist', async () => {
