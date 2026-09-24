@@ -199,7 +199,13 @@ describe('LogsService', () => {
         },
       ]);
       const spy = jest.spyOn(service, 'fetchLogs').mockResolvedValue([]);
-      await service.getLogsHistory('pipe', 'phase', 'app', 'web', mockUserGroups);
+      await service.getLogsHistory(
+        'pipe',
+        'phase',
+        'app',
+        'web',
+        mockUserGroups,
+      );
       expect(spy).toHaveBeenCalledTimes(1);
       expect(spy.mock.calls[0][1]).toBe('app-kuberoapp-web-abc-123');
     });

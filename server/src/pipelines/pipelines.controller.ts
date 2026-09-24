@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpException,
@@ -105,7 +106,8 @@ export class PipelinesController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Get a specific pipeline' })
-  async getPipeline(@Param('pipeline') pipeline: string) {
+  async getPipeline(@Param('pipeline') pipeline: string, @Request() req: any) {
+    await this.assertPipelineAccess(pipeline, req.user);
     return this.pipelinesService.getPipeline(pipeline);
   }
 
@@ -125,6 +127,7 @@ export class PipelinesController {
     @Request() req: any,
     @Param('pipeline') pipelineName: string,
   ) {
+    await this.assertPipelineAccess(pipelineName, req.user);
     this.assertTeamAccess(pl, req.user);
     const user: IUser = {
       id: req.user.userId,
@@ -155,6 +158,7 @@ export class PipelinesController {
     @Param('pipeline') pipeline: string,
     @Request() req: any,
   ): Promise<OKDTO> {
+    await this.assertPipelineAccess(pipeline, req.user);
     const user: IUser = {
       id: req.user.userId,
       strategy: req.user.strategy,
@@ -178,10 +182,28 @@ export class PipelinesController {
     @Param('pipeline') pipeline: string,
     @Request() req: any,
   ) {
+    await this.assertPipelineAccess(pipeline, req.user);
     return this.pipelinesService.getPipelineWithApps(
       pipeline,
       req.user.userGroups,
     );
+  }
+
+  // Antes solo el listado (/api/pipelines) filtraba por equipo; ver, editar
+  // y borrar una pipeline puntual por nombre no revisaban nada más que el
+  // permiso del rol, así que cualquier usuario con pipeline:write podía
+  // tocar la pipeline de cualquier otro equipo si sabía o adivinaba su nombre.
+  private async assertPipelineAccess(
+    pipelineName: string,
+    user: { userGroups?: string[] },
+  ) {
+    const hasAccess = await this.pipelinesService.userHasAccessToPipeline(
+      pipelineName,
+      user.userGroups ?? [],
+    );
+    if (!hasAccess) {
+      throw new ForbiddenException('No access to this pipeline');
+    }
   }
 
   // Un pipeline con la lista de equipos vacía solo lo ven los admins (ver
