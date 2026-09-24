@@ -80,7 +80,11 @@ describe('TokenService', () => {
       const result = await service.create('token1', '2025-01-01', 'u1');
       expect(mockUsersService.findById).toHaveBeenCalledWith('u1');
       expect(mockPrisma.token.create).toHaveBeenCalled();
-      expect(result).toEqual({"expiresAt": "2025-01-01", "name": "token1", "token": "mocked-jwt-token" });
+      expect(result).toEqual({
+        expiresAt: '2025-01-01',
+        name: 'token1',
+        token: 'mocked-jwt-token',
+      });
     });
 
     it('should read the role, groups and permissions from the database, not from arguments', async () => {
@@ -110,11 +114,10 @@ describe('TokenService', () => {
   describe('delete', () => {
     it('should delete a token by id', async () => {
       const result = await service.delete('1');
-      expect(mockPrisma.token.delete).toHaveBeenCalledWith({ where: { id: '1' } });
+      expect(mockPrisma.token.delete).toHaveBeenCalledWith({
+        where: { id: '1' },
+      });
       expect(result).toEqual({ id: '1', deleted: true });
     });
   });
 });
-
-
-
