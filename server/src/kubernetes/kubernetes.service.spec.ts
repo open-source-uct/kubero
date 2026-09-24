@@ -213,6 +213,32 @@ describe('KubernetesService', () => {
     expect((service as any).kc.setCurrentContext).not.toHaveBeenCalled();
   });
 
+  it('should use the only context available when the requested one does not exist', async () => {
+    // cluster único / modo in-cluster: los pipelines pueden declarar otro nombre
+    // de contexto y antes funcionaba; sigue sin envenenar el KubeConfig
+    (service as any).kc.getContexts.mockReturnValueOnce([
+      { name: 'inClusterContext' },
+    ]);
+    (service as any).kc.setCurrentContext.mockClear();
+    await service.getPods('ns', 'kind-kubero');
+    expect((service as any).kc.setCurrentContext).toHaveBeenCalledWith(
+      'inClusterContext',
+    );
+    expect((service as any).kc.setCurrentContext).not.toHaveBeenCalledWith(
+      'kind-kubero',
+    );
+  });
+
+  it('should still refuse an unknown context when there are several', async () => {
+    // con varios contextos no se adivina: operar sobre otro cluster por error
+    // es peor que un 404
+    (service as any).kc.setCurrentContext.mockClear();
+    await expect(service.getPods('ns', 'no-existe')).rejects.toThrow(
+      'Unknown kubernetes context',
+    );
+    expect((service as any).kc.setCurrentContext).not.toHaveBeenCalled();
+  });
+
   it('should createEvent', async () => {
     await expect(
       service.createEvent('Normal', 'reason', 'event', 'msg'),
