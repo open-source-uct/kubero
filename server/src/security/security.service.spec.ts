@@ -122,6 +122,74 @@ describe('SecurityService', () => {
       expect(result.status).toBe('failed');
     });
 
+    it('should NOT show a failed scan as a clean result (trivy error text is not a result)', async () => {
+      // trivy falla y su mensaje de error es texto plano: antes contaba como
+      // "hay logs" y se devolvía ok con cero vulnerabilidades
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      appsService.getApp.mockResolvedValue(app);
+      kubectl.getLatestPodByLabel.mockResolvedValue({
+        name: 'pod1',
+        status: 'Failed',
+      });
+      kubectl.getVulnerabilityScanLogs.mockResolvedValue(
+        'FATAL image scan error: unable to find the specified image',
+      );
+      const result = await service.getScanResult('pipe', 'phase', 'app', true, [
+        'group1',
+      ]);
+      expect(result.status).toBe('failed');
+      expect(result.logsummary).toEqual({});
+      // no se filtra el texto interno del error al client
+      expect(JSON.stringify(result)).not.toContain('unable to find');
+    });
+
+    it('should treat non-JSON logs as still running while the pod is running', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      appsService.getApp.mockResolvedValue(app);
+      kubectl.getLatestPodByLabel.mockResolvedValue({
+        name: 'pod1',
+        status: 'Running',
+      });
+      kubectl.getVulnerabilityScanLogs.mockResolvedValue(
+        '2026 INFO downloading db',
+      );
+      const result = await service.getScanResult('pipe', 'phase', 'app', true, [
+        'group1',
+      ]);
+      expect(result.status).toBe('running');
+    });
+
+    it('should report failed for non-JSON logs once the pod finished', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      appsService.getApp.mockResolvedValue(app);
+      kubectl.getLatestPodByLabel.mockResolvedValue({
+        name: 'pod1',
+        status: 'Succeeded',
+      });
+      kubectl.getVulnerabilityScanLogs.mockResolvedValue('garbage');
+      const result = await service.getScanResult('pipe', 'phase', 'app', true, [
+        'group1',
+      ]);
+      expect(result.status).toBe('failed');
+    });
+
+    it('should accept a trivy result that has no vulnerabilities section', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      appsService.getApp.mockResolvedValue(app);
+      kubectl.getLatestPodByLabel.mockResolvedValue({
+        name: 'pod1',
+        status: 'Succeeded',
+      });
+      kubectl.getVulnerabilityScanLogs.mockResolvedValue({
+        SchemaVersion: 2,
+        ArtifactName: 'img:tag',
+      });
+      const result = await service.getScanResult('pipe', 'phase', 'app', true, [
+        'group1',
+      ]);
+      expect(result.status).toBe('ok');
+    });
+
     it('should return ok if logs and summary found', async () => {
       pipelinesService.getContext.mockResolvedValue('ctx');
       const app1 = {
