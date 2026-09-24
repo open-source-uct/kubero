@@ -74,7 +74,7 @@
                 <Builds :pipeline="pipeline" :phase="phase" :app="app" :appData="appData" :pipelineData="pipelineData"/>
             </v-window-item>
             <v-window-item transition="false" reverse-transition="false" class="background">
-                <Metrics :pipeline="pipeline" :phase="phase" :app="app" :host="appData.spec.ingress.hosts[0].host"/>
+                <Metrics :pipeline="pipeline" :phase="phase" :app="app" :host="appData.spec.ingress.hosts[0].host" :active="tab == 2"/>
             </v-window-item>
             <v-window-item transition="false" reverse-transition="false" class="background">
                 <LogsTab :pipeline="pipeline" :phase="phase" :app="app" :deploymentstrategy="appData.spec.deploymentstrategy" :buildstrategy="appData.spec.buildstrategy" :hasAddons="(appData.spec.addons?.length ?? 0) > 0"/>

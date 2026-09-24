@@ -128,6 +128,13 @@ export default defineComponent({
         type: String,
         default: "a.a.localhost"
       },
+      // false cuando la pestaña de métricas no está a la vista: el v-window
+      // mantiene montado el componente y antes seguía consultando Prometheus
+      // cada 4 s desde cualquier otra pestaña
+      active: {
+        type: Boolean,
+        default: true
+      },
     },
     data: () => ({
       memoryOptions: {
@@ -604,6 +611,8 @@ export default defineComponent({
       }[],
       scale: '2h' as '2h'| '24h' | '7d',
       timer: null as any,
+      // consultas de un ciclo de refresco que aún no terminaron
+      pending: 0,
     }),
     components: {
         VueApexCharts,
@@ -614,11 +623,18 @@ export default defineComponent({
         this.startTimer();
     },
     unmounted() {
-        clearInterval(this.timer);
+        this.stopTimer();
     },
     watch: {
         scale: function (val) {
           this.refreshMetrics();
+          // el intervalo depende del rango: se reinicia con el nuevo
+          this.startTimer();
+        },
+        active: function (val) {
+          if (val) {
+            this.refreshMetrics();
+          }
         }
     },
     computed: {
@@ -635,27 +651,50 @@ export default defineComponent({
             return metrics;
         },
         */
+        // Cada ciclo son 5 consultas de rango a Prometheus. Antes se repetían cada
+        // 4 s con cualquier rango, sin esperar a que terminara la anterior: con
+        // 24 h o 7 d tardan más de 4 s, las peticiones se apilaban y la
+        // interfaz (y el server) se quedaban pegados. Ahora el intervalo crece
+        // con el rango, no se lanza otro ciclo mientras hay uno en curso, y se
+        // pausa con la pestaña oculta o en otra pestaña de la app.
+        refreshIntervalMs(): number {
+            return { '2h': 15000, '24h': 60000, '7d': 300000 }[this.scale];
+        },
         startTimer() {
+            this.stopTimer();
             this.timer = setInterval(() => {
-                console.log("refreshing metrics");
+                if (document.hidden || !this.active || this.pending > 0) {
+                    return;
+                }
                 this.refreshMetrics();
-            }, 4000);
+            }, this.refreshIntervalMs());
+        },
+        stopTimer() {
+            if (this.timer != null) {
+                clearInterval(this.timer);
+                this.timer = null;
+            }
         },
         refreshMetrics() {
           if (this.kubero.metricsEnabled) {
-            this.getMemoryMetrics();
-            //this.getLoadMetrics();
-            //this.getCpuMetrics();
-            this.getCpuMetricsRate();
-            this.getHttpStatusCodeMetrics();
-            this.getResponseTimeMetrics();
-            this.getHttpStatusCodeIncreaseMetrics();
-            this.getResponseTrafficMetrics();
+            this.pending++;
+            Promise.allSettled([
+                this.getMemoryMetrics(),
+                //this.getLoadMetrics(),
+                //this.getCpuMetrics(),
+                this.getCpuMetricsRate(),
+                // la misma consulta alimenta las dos gráficas de códigos HTTP
+                this.getHttpStatusCodeMetrics(),
+                this.getResponseTimeMetrics(),
+                this.getResponseTrafficMetrics(),
+            ]).finally(() => {
+                this.pending--;
+            });
           }
         },
         getMemoryMetrics() {
             
-            axios.get(`/api/metrics/timeseries/memory/${this.pipeline}/${this.phase}/${this.app}`, {
+            return axios.get(`/api/metrics/timeseries/memory/${this.pipeline}/${this.phase}/${this.app}`, {
                 params: {
                     scale: this.scale
                 }
@@ -668,7 +707,7 @@ export default defineComponent({
             });
         },
         getLoadMetrics() {
-            axios.get(`/api/metrics/timeseries/load/${this.pipeline}/${this.phase}/${this.app}`, {
+            return axios.get(`/api/metrics/timeseries/load/${this.pipeline}/${this.phase}/${this.app}`, {
                 params: {
                     scale: this.scale
                 }
@@ -681,7 +720,7 @@ export default defineComponent({
             });
         },
         getHttpStatusCodeMetrics() {
-            axios.get(`/api/metrics/timeseries/httpstatuscodes/${this.pipeline}/${this.phase}/${this.app}`, {
+            return axios.get(`/api/metrics/timeseries/httpstatuscodes/${this.pipeline}/${this.phase}/${this.app}`, {
                 params: {
                     scale: this.scale,
                     host: this.host,
@@ -690,13 +729,14 @@ export default defineComponent({
             })
             .then((response) => {
               this.httpStusCodeData = response.data;
+              this.httpStusCodeDataIncrease = response.data;
             })
             .catch((error) => {
                 console.log(error);
             });
         },
         getHttpStatusCodeIncreaseMetrics() {
-            axios.get(`/api/metrics/timeseries/httpstatuscodes/${this.pipeline}/${this.phase}/${this.app}`, {
+            return axios.get(`/api/metrics/timeseries/httpstatuscodes/${this.pipeline}/${this.phase}/${this.app}`, {
                 params: {
                     scale: this.scale,
                     host: this.host,
@@ -711,7 +751,7 @@ export default defineComponent({
             });
         },
         getResponseTimeMetrics() {
-            axios.get(`/api/metrics/timeseries/responsetime/${this.pipeline}/${this.phase}/${this.app}`, {
+            return axios.get(`/api/metrics/timeseries/responsetime/${this.pipeline}/${this.phase}/${this.app}`, {
                 params: {
                     scale: this.scale,
                     host: this.host,
@@ -726,7 +766,7 @@ export default defineComponent({
             });
         },
         getResponseTrafficMetrics() {
-            axios.get(`/api/metrics/timeseries/traffic/${this.pipeline}/${this.phase}/${this.app}`, {
+            return axios.get(`/api/metrics/timeseries/traffic/${this.pipeline}/${this.phase}/${this.app}`, {
                 params: {
                     scale: this.scale,
                     host: this.host,
@@ -742,7 +782,7 @@ export default defineComponent({
         },
         getCpuMetrics() {
             // use 'rate' instead of 'increase' when comparing to limit and request
-            axios.get(`/api/metrics/timeseries/cpu/${this.pipeline}/${this.phase}/${this.app}`, {
+            return axios.get(`/api/metrics/timeseries/cpu/${this.pipeline}/${this.phase}/${this.app}`, {
                 params: {
                     scale: this.scale,
                     calc: 'rate'
@@ -757,7 +797,7 @@ export default defineComponent({
         },
         getCpuMetricsRate() {
             // use 'rate' instead of 'increase' when comparing to limit and request
-            axios.get(`/api/metrics/timeseries/cpu/${this.pipeline}/${this.phase}/${this.app}`, {
+            return axios.get(`/api/metrics/timeseries/cpu/${this.pipeline}/${this.phase}/${this.app}`, {
                 params: {
                     scale: this.scale,
                     calc: 'rate'

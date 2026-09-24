@@ -25,6 +25,15 @@
                 </v-btn>
             </v-col>
         </v-row>
+        <v-alert
+            v-if="scanMessage"
+            type="warning"
+            variant="tonal"
+            closable
+            density="compact"
+            class="mb-4"
+            @click:close="scanMessage = ''"
+        >{{ scanMessage }}</v-alert>
         <v-layout class="flex-column">
 
                 <v-row v-if="renderVulnerabilities">
@@ -38,50 +47,50 @@
                                     <tbody>
                                         <tr>
                                             <th>{{ $t('app.vulnerabilities.lastScan') }}</th>
-                                            <td>{{ vulnScanResult.logPod.startTime }}</td>
+                                            <td>{{ vulnScanResult?.logPod?.startTime }}</td>
                                         </tr>
                                         <tr>
                                             <th>Artefact</th>
                                             <td>
                                                 <span
-                                                    v-if="vulnScanResult.logs.ArtifactType == 'repository'"
+                                                    v-if="vulnScanResult?.logs?.ArtifactType == 'repository'"
                                                     class="mx-0"
                                                 >
                                                     <v-icon left small>mdi-git</v-icon>
                                                 </span>
                                                 <span
-                                                    v-if="vulnScanResult.logs.ArtifactType == 'container_image'"
+                                                    v-if="vulnScanResult?.logs?.ArtifactType == 'container_image'"
                                                     class="mx-0"
                                                 >
                                                     <v-icon left small>mdi-docker</v-icon>
                                                 </span>
-                                                {{ vulnScanResult.logs.ArtifactName }}</td>
+                                                {{ vulnScanResult?.logs?.ArtifactName }}</td>
                                         </tr>
-                                        <tr v-if="vulnScanResult.logs.ArtifactType == 'container_image'">
+                                        <tr v-if="vulnScanResult?.logs?.ArtifactType == 'container_image'">
                                             <th>{{ $t('app.vulnerabilities.arch') }}</th>
-                                            <td>{{ vulnScanResult.logs.Metadata.ImageConfig.architecture }}</td>
+                                            <td>{{ vulnScanResult?.logs?.Metadata?.ImageConfig?.architecture }}</td>
                                         </tr>
-                                        <tr v-if="vulnScanResult.logs.ArtifactType == 'container_image'">
+                                        <tr v-if="vulnScanResult?.logs?.ArtifactType == 'container_image'">
                                             <th>{{ $t('app.vulnerabilities.created') }}</th>
-                                            <td>{{ vulnScanResult.logs.Metadata.ImageConfig.created }}</td>
+                                            <td>{{ vulnScanResult?.logs?.Metadata?.ImageConfig?.created }}</td>
                                         </tr>
-                                        <tr v-if="vulnScanResult.logs.ArtifactType == 'container_image'">
+                                        <tr v-if="vulnScanResult?.logs?.ArtifactType == 'container_image'">
                                             <th>{{ $t('app.vulnerabilities.os') }}</th>
-                                            <td>{{ vulnScanResult.logs.Metadata.OS.Family }} {{ vulnScanResult.logs.Metadata.OS.Name }}</td>
+                                            <td>{{ vulnScanResult?.logs?.Metadata?.OS?.Family }} {{ vulnScanResult?.logs?.Metadata?.OS?.Name }}</td>
                                         </tr>
-                                        <tr v-if="vulnScanResult.logs.ArtifactType == 'container_image'">
+                                        <tr v-if="vulnScanResult?.logs?.ArtifactType == 'container_image'">
                                             <th>{{ $t('app.vulnerabilities.layers') }}</th>
-                                            <td>{{ vulnScanResult.logs.Metadata.ImageConfig.rootfs.diff_ids.length }}</td>
+                                            <td>{{ vulnScanResult?.logs?.Metadata?.ImageConfig?.rootfs?.diff_ids?.length }}</td>
                                         </tr>
-                                        <tr v-if="vulnScanResult.logs.ArtifactType == 'container_image'">
+                                        <tr v-if="vulnScanResult?.logs?.ArtifactType == 'container_image'">
                                             <th>{{ $t('app.vulnerabilities.workingDir') }}</th>
-                                            <td>{{ vulnScanResult.logs.Metadata.ImageConfig.config.WorkingDir }}</td>
+                                            <td>{{ vulnScanResult?.logs?.Metadata?.ImageConfig?.config?.WorkingDir }}</td>
                                         </tr>
-                                        <tr v-if="vulnScanResult.logs.ArtifactType == 'container_image'">
+                                        <tr v-if="vulnScanResult?.logs?.ArtifactType == 'container_image'">
                                             <th>{{ $t('app.vulnerabilities.exposedPorts') }}</th>
                                             <td>
                                                 <v-chip
-                                                    v-for="(item, key) in vulnScanResult.logs.Metadata.ImageConfig.config.ExposedPorts" :key="key"
+                                                    v-for="(item, key) in vulnScanResult?.logs?.Metadata?.ImageConfig?.config?.ExposedPorts" :key="key"
                                                     small
                                                     label
                                                     class="ma-1"
@@ -113,7 +122,7 @@
                 </v-row>
                 <v-row>
                     <v-col cols="12" sm="12" md="12" lg="12" xl="12" v-if="renderVulnerabilities" >
-                        <span v-for="target in vulnScanResult.logs.Results" :key="target.Target">
+                        <span v-for="target in vulnScanResult?.logs?.Results" :key="target.Target">
                             <v-card class="mb-6" v-if="target.Class != 'secret'" elevation="2" outlined color="cardBackground">
                                 <v-card-title>
                                     <h3 class="headline mb-0">{{ target.Target }}</h3>
@@ -265,8 +274,16 @@ export default defineComponent({
     mounted() {
         this.loadVulnerabilities();
     },
+    beforeUnmount() {
+        // sin esto el polling seguía pidiendo el resultado cada 2 s aunque se
+        // saliera de la pestaña
+        this.stopPolling();
+    },
     data: () => ({
         scanning: false,
+        // momento en que se pidió el reescaneo (ms) y último aviso al usuario
+        scanStartedAt: null as number | null,
+        scanMessage: '',
         vulnScanResult: {} as ScanResult,
         renderVulnerabilities: false,
         vulnExpanded: [],
@@ -318,56 +335,112 @@ export default defineComponent({
       }
     },
     methods: {
+      stopPolling() {
+        if (this.interval != null) {
+            clearInterval(this.interval);
+            this.interval = null;
+        }
+      },
+      startPolling() {
+        // uno solo: antes cada escaneo nuevo apilaba otro intervalo
+        this.stopPolling();
+        this.interval = setInterval(this.loadVulnerabilities, 2000);
+      },
+      // Un reescaneo tarda: hay que crear el job, arrancar el pod de trivy, bajar su
+      // base de datos y la imagen. Mientras tanto el server puede contestar "no hay
+      // pod todavía" o devolver el resultado del escaneo anterior. Antes se dejaba
+      // de sondear en cuanto llegaba algo distinto de "running": el botón se
+      // volvía a habilitar, el segundo clic reiniciaba el escaneo desde cero y
+      // parecía que nunca terminaba.
+      finishScan(message: string = '') {
+        this.scanning = false;
+        this.scanStartedAt = null;
+        this.scanMessage = message;
+        this.stopPolling();
+      },
       async loadVulnerabilities() {
+        const waiting = this.scanStartedAt != null;
+        const elapsed = waiting ? Date.now() - (this.scanStartedAt as number) : 0;
+
         axios.get(`/api/security/${this.pipeline}/${this.phase}/${this.app}/scan/result`, {
             params : {
                 logdetails : true,
             }
         } )
         .then(response => {
+            const result = response.data;
+            this.vulnScanResult = result;
 
-            this.scanning = false;
-            this.vulnScanResult = response.data;
-
-            if (this.vulnScanResult.status == "running") {
+            if (result.status == "running") {
                 this.scanning = true;
                 this.renderVulnerabilities = false;
                 if (this.interval == null) {
-                    this.interval = setInterval(this.loadVulnerabilities, 2000);
+                    this.startPolling();
+                }
+                return;
+            }
+
+            if (waiting) {
+                // el resultado es de un pod anterior al clic: sigue esperando
+                const podStart = result.logPod?.startTime ? new Date(result.logPod.startTime).getTime() : 0;
+                const stale = result.status == "ok" && podStart < (this.scanStartedAt as number) - 30000;
+                // el pod del escaneo nuevo todavía no existe
+                const notCreatedYet = result.status == "error" && elapsed < 120000;
+                if ((stale || notCreatedYet) && elapsed < 15 * 60 * 1000) {
+                    this.scanning = true;
+                    this.renderVulnerabilities = false;
+                    return;
+                }
+                if (elapsed >= 15 * 60 * 1000) {
+                    this.finishScan(this.$t('app.vulnerabilities.scanTimeout') as string);
+                    return;
                 }
             }
 
-            if (this.vulnScanResult.status == "ok") {
+            if (result.status == "failed") {
+                this.renderVulnerabilities = false;
+                this.finishScan(this.$t('app.vulnerabilities.scanFailed') as string);
+                return;
+            }
+
+            // solo se dibuja el resultado si trae lo que la plantilla necesita
+            if (result.status == "ok" && result.logs && result.logsummary) {
                 this.renderVulnerabilities = true;
 
                 this.vulnerabilitiesDoughnut.datasets[0].data = [
-                    this.vulnScanResult.logsummary.critical,
-                    this.vulnScanResult.logsummary.high,
-                    this.vulnScanResult.logsummary.medium,
-                    this.vulnScanResult.logsummary.low,
-                    this.vulnScanResult.logsummary.unknown,
+                    result.logsummary.critical,
+                    result.logsummary.high,
+                    result.logsummary.medium,
+                    result.logsummary.low,
+                    result.logsummary.unknown,
                 ];
             }
 
-            if (this.vulnScanResult.status != "running") {
-                clearInterval(this.interval);
-            }
+            this.finishScan();
         })
         .catch(error => {
             console.log(error);
+            // un fallo de red o un 5xx puntual no debe cortar la espera de un
+            // escaneo en curso; sí se corta si ya pasó demasiado tiempo
+            if (!waiting || elapsed >= 15 * 60 * 1000) {
+                this.finishScan();
+            }
         });
 
       },
       startVulnScan() {
         this.renderVulnerabilities = false;
+        this.scanMessage = '';
+        this.scanStartedAt = Date.now();
         axios.get(`/api/security/${this.pipeline}/${this.phase}/${this.app}/scan`)
         .then(() => {
             this.scanning = true;
-            this.interval = setInterval(this.loadVulnerabilities, 2000);
+            this.startPolling();
 
         })
         .catch(error => {
             console.log(error);
+            this.finishScan(this.$t('app.vulnerabilities.scanFailed') as string);
         });
       },
       /*

@@ -63,6 +63,65 @@ describe('SecurityService', () => {
       expect(result.message).toBe('no vulnerability scan logs found');
     });
 
+    it.each(['Pending', 'Running'])(
+      'should keep saying running while the scan pod is %s and has no logs yet',
+      async (phase) => {
+        pipelinesService.getContext.mockResolvedValue('ctx');
+        appsService.getApp.mockResolvedValue(app);
+        kubectl.getLatestPodByLabel.mockResolvedValue({
+          name: 'pod1',
+          status: phase,
+        });
+        kubectl.getVulnerabilityScanLogs.mockResolvedValue('');
+        const result = await service.getScanResult(
+          'pipe',
+          'phase',
+          'app',
+          false,
+          ['group1'],
+        );
+        expect(result.status).toBe('running');
+      },
+    );
+
+    it('should report failed (not running forever) when the scan pod failed', async () => {
+      // antes respondía 'running' y la pantalla sondeaba cada 2 s sin fin
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      appsService.getApp.mockResolvedValue(app);
+      kubectl.getLatestPodByLabel.mockResolvedValue({
+        name: 'pod1',
+        status: 'Failed',
+      });
+      kubectl.getVulnerabilityScanLogs.mockResolvedValue('');
+      const result = await service.getScanResult(
+        'pipe',
+        'phase',
+        'app',
+        false,
+        ['group1'],
+      );
+      expect(result.status).toBe('failed');
+      expect(result.message).toContain('failed');
+    });
+
+    it('should report failed when the scan pod finished without any output', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      appsService.getApp.mockResolvedValue(app);
+      kubectl.getLatestPodByLabel.mockResolvedValue({
+        name: 'pod1',
+        status: 'Succeeded',
+      });
+      kubectl.getVulnerabilityScanLogs.mockResolvedValue('');
+      const result = await service.getScanResult(
+        'pipe',
+        'phase',
+        'app',
+        false,
+        ['group1'],
+      );
+      expect(result.status).toBe('failed');
+    });
+
     it('should return ok if logs and summary found', async () => {
       pipelinesService.getContext.mockResolvedValue('ctx');
       const app1 = {

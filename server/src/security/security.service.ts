@@ -77,6 +77,18 @@ export class SecurityService {
     }
 
     if (!logs) {
+      // Sin logs el escaneo puede seguir corriendo o haber terminado mal. Antes
+      // se respondía siempre 'running': si el pod había fallado (imagen que no se
+      // baja, registry privado...) la pantalla sondeaba para siempre.
+      if (logPod.status === 'Failed' || logPod.status === 'Succeeded') {
+        scanResult.status = 'failed';
+        scanResult.message =
+          logPod.status === 'Failed'
+            ? 'the vulnerability scan failed'
+            : 'the vulnerability scan finished without results';
+        scanResult.logPod = logPod;
+        return scanResult;
+      }
       scanResult.status = 'running';
       scanResult.message = 'no vulnerability scan logs found';
       return scanResult;
