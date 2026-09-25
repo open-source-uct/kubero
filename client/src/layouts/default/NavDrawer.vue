@@ -145,12 +145,31 @@
                 prepend-icon="mdi-api"
                 :title="$t('navigation.kuberoAPI')">
             </v-list-item>
-            <v-list-item 
-                link href="https://www.kubero.dev/docs" 
-                target="_blank"
-                prepend-icon="mdi-book-open-variant"
-                :title="$t('navigation.documentation')">
-            </v-list-item>
+            <v-list-group
+                value="documentation"
+                prepend-icon="mdi-book-open-variant">
+                <template #activator="{ props }">
+                    <v-list-item v-bind="props" :title="$t('navigation.documentation')"></v-list-item>
+                </template>
+                <v-list-item
+                    link href="https://www.kubero.dev/docs"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    prepend-icon="mdi-book-open-variant"
+                    density="compact"
+                    class="nav-subitem"
+                    :title="$t('navigation.kuberoDocumentation')">
+                </v-list-item>
+                <v-list-item
+                    link href="https://benjaminespinozafk.github.io/kubero-uct-docs/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    prepend-icon="mdi-school"
+                    density="compact"
+                    class="nav-subitem"
+                    :title="$t('navigation.workflowsUCT')">
+                </v-list-item>
+            </v-list-group>
             <v-list-item 
                 link href="https://github.com/kubero-dev/kubero" 
                 target="_blank"
