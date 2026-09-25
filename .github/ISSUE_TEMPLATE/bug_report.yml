@@ -1,68 +1,66 @@
-name: Bug report
-description: Create a bug report to help us improve
-#title: "[BUG]: "
+name: Reportar un error
+description: Informa un fallo reproducible en Kubero UCT
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        ## Please read before submitting a bug report
-        Thanks for taking the time to fill out this bug report. Your feedback helps us improve Kubero.
-        Before you submit, please make sure you have read our [Troubleshooting](https://docs.kubero.dev/Installation/troubleshooting) guide.
+        Describe el problema sin publicar contraseñas, tokens, kubeconfigs ni datos privados.
+        Si sospechas una vulnerabilidad, coordina un canal privado con los mantenedores antes de compartir detalles.
   - type: dropdown
     id: component
     attributes:
-      label: Which component(s) is affected?
+      label: Componente afectado
       multiple: true
       options:
-        - Kubero UI
-        - Kubero CLI
-        - Operator
-        - Documentation
-  - type: textarea
-    id: description
-    attributes:
-      label: Describe the bug
-      description: A clear and concise description of what the bug is.
+        - Cliente / UI
+        - Servidor / API
+        - Plantillas de servicios
+        - Integración con CLI u operador
+        - Documentación
     validations:
       required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Versión y entorno
+      description: Versión de Kubero, navegador y Kubernetes si corresponde.
+      placeholder: "Ej.: Kubero 2.x, Chrome, Kubernetes 1.x"
+    validations:
+      required: false
   - type: textarea
     id: steps
     attributes:
-      label: Steps to reproduce
-      description: If applicable, explain what needs to be done to experience the bug.
+      label: Pasos para reproducir
       placeholder: |
-        1. Go to '...'
-        2. Click on '....'
-        3. Scroll down to '....'
-        4. See error
-    validations:
-      required: false
-  - type: textarea
-    id: expected_bhv
-    attributes:
-      label: Expected behavior
-      description: A clear and concise description of what you expected to happen.
+        1. Abre...
+        2. Ejecuta...
+        3. Observa...
     validations:
       required: true
   - type: textarea
-    id: screenshots
+    id: expected
     attributes:
-      label: Screenshots
-      description: Provide any screenshots (if applicable) to describe your problem.
+      label: Resultado esperado
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Resultado real
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidencia depurada
+      description: Adjunta capturas o fragmentos de logs solo después de eliminar datos sensibles.
     validations:
       required: false
   - type: textarea
-    id: context
+    id: impact
     attributes:
-      label: Additional information
-      description: Is there anything else we should know about this bug report?
-    validations:
-      required: false
-  - type: textarea
-    id: debug
-    attributes:
-      label: Debug information
-      description: Run `kubero debug` and provide the output. (remove sensitive information)
+      label: Impacto
+      description: Indica a quién afecta, frecuencia y si existe una solución temporal. No publiques detalles de explotación.
     validations:
       required: false

@@ -1,33 +1,57 @@
-name: Feature request
-description: Suggest features, propose improvements, discuss new ideas
-#title: "[FEATURE]: "
+name: Proponer una funcionalidad
+description: Sugiere una mejora para Kubero UCT
 labels: ["Idea/discussion"]
 body:
-  - type: textarea
-    id: description
+  - type: markdown
     attributes:
-      label: Description
-      description: Provide a detailed description of the change or addition you are proposing.
+      value: |
+        Explica la necesidad y el resultado deseado. No incluyas secretos ni datos privados.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema o necesidad
+      description: Describe quién tiene este problema y en qué situación aparece.
     validations:
       required: true
   - type: textarea
-    id: possible_sol
+    id: proposal
     attributes:
-      label: Possible solution
-      description: A clear and concise description of what you want to happen.
+      label: Propuesta
+      description: Describe el comportamiento esperado desde la perspectiva del usuario.
     validations:
       required: true
   - type: textarea
-    id: alternatives
+    id: acceptance
     attributes:
-      label: Alternatives
-      description: List any possible alternatives to your current request.
+      label: Criterios de aceptación
+      placeholder: |
+        - Dado..., cuando..., entonces...
+        - ...
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Componentes que podrían cambiar
+      multiple: true
+      options:
+        - Cliente / UI
+        - Servidor / API
+        - Plantillas de servicios
+        - Integración con CLI u operador
+        - Documentación
+    validations:
+      required: true
+  - type: textarea
+    id: integration
+    attributes:
+      label: Impacto en contratos o integración
+      description: Indica si se espera cambiar API, autenticación, datos, despliegue, CLI, operador o CRDs.
     validations:
       required: false
   - type: textarea
-    id: context
+    id: alternatives
     attributes:
-      label: Additional information
-      description: Is there anything else we should know about this feature request?
+      label: Alternativas consideradas
     validations:
       required: false
