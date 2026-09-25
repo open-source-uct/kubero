@@ -16,6 +16,8 @@ const messages = {
     theme: 'Modo Oscuro/Claro',
     kuberoAPI: 'API de Kubero',
     documentation: 'Documentación',
+    kuberoDocumentation: 'Documentación de Kubero',
+    workflowsUCT: 'Workflows UCT',
     github: 'GitHub',
     discord: 'Discord',
     logout: 'Cerrar sesión',
