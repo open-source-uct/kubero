@@ -194,6 +194,7 @@ const messages = {
           deleteTeam: { title: 'The team could not be deleted', message: 'The team remains available and may have assigned users.' },
           createTeam: { title: 'The team could not be created', message: 'The team was not created.' },
           deleteToken: { title: 'The token could not be revoked', message: 'The token remains active.' },
+          createToken: { title: 'The token could not be created', message: 'Check the name and the expiration date.' },
           saveSettings: { title: 'The settings could not be saved', message: 'The configuration changes were not applied.' },
           loadSettings: { title: 'The settings could not be loaded', message: 'Do not edit or save until the current configuration is available.' },
           loadNotifications: { title: 'Notifications could not be loaded', message: 'The list may be incomplete or out of date.' },
@@ -510,6 +511,7 @@ const messages = {
           copyToken: 'Copy Token',
           copiedMessage: 'Token copied to clipboard!',
           close: 'Close',
+          fieldRequired: 'This field is required.',
         },
         actions: {
           editProfile: 'Edit Profile',

@@ -194,6 +194,7 @@ const messages = {
       deleteTeam: { title: 'No se pudo eliminar el equipo', message: 'El equipo continúa disponible y puede tener usuarios asociados.' },
       createTeam: { title: 'No se pudo crear el equipo', message: 'El equipo no fue creado.' },
       deleteToken: { title: 'No se pudo revocar el token', message: 'El token continúa activo.' },
+      createToken: { title: 'No se pudo crear el token', message: 'Revisa el nombre y la fecha de expiración.' },
       saveSettings: { title: 'No se pudo guardar la configuración', message: 'Los cambios de configuración no fueron aplicados.' },
       loadSettings: { title: 'No se pudo cargar la configuración', message: 'No edites ni guardes hasta recuperar la configuración actual.' },
       loadNotifications: { title: 'No se pudieron cargar las notificaciones', message: 'La lista puede estar incompleta o desactualizada.' },
@@ -509,6 +510,7 @@ const messages = {
       copyToken: 'Copiar token',
       copiedMessage: '¡Token copiado al portapapeles!',
       close: 'Cerrar',
+      fieldRequired: 'Este campo es obligatorio.',
     },
     actions: {
       editProfile: 'Editar perfil',
