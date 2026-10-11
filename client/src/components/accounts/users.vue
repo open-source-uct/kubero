@@ -182,7 +182,15 @@
           <v-text-field v-model="newUser.firstName" :label="$t('user.firstName')"></v-text-field>
           <v-text-field v-model="newUser.lastName" :label="$t('user.lastName')"></v-text-field>
           <v-text-field v-model="newUser.email" :label="$t('user.email')"></v-text-field>
-          <v-text-field v-model="newUser.password" :label="$t('user.password')" type="password"></v-text-field>
+          <v-text-field
+            v-model="newUser.password"
+            :label="$t('user.password')"
+            :type="showNewUserPassword ? 'text' : 'password'"
+            :append-inner-icon="showNewUserPassword ? 'mdi-eye-off' : 'mdi-eye'"
+            append-icon="mdi-key-variant"
+            @click:append-inner="showNewUserPassword = !showNewUserPassword"
+            @click:append="generateNewUserPassword"
+          ></v-text-field>
           <v-switch v-model="newUser.isActive" :label="$t('user.active')" color="primary"></v-switch>
           <v-select
             v-model="newUser.role"
@@ -222,12 +230,18 @@
           <v-text-field
             v-model="editedUser.password"
             :label="$t('user.newPassword')"
-            type="password"
+            :type="showChangePassword ? 'text' : 'password'"
+            :append-inner-icon="showChangePassword ? 'mdi-eye-off' : 'mdi-eye'"
+            append-icon="mdi-key-variant"
+            @click:append-inner="showChangePassword = !showChangePassword"
+            @click:append="generateEditedUserPassword"
           ></v-text-field>
           <v-text-field
             v-model="editedUser.confirmPassword"
             :label="$t('user.confirmPassword')"
-            type="password"
+            :type="showConfirmPassword ? 'text' : 'password'"
+            :append-inner-icon="showConfirmPassword ? 'mdi-eye-off' : 'mdi-eye'"
+            @click:append-inner="showConfirmPassword = !showConfirmPassword"
           ></v-text-field>
         </v-card-text>
         <v-card-actions>
@@ -307,6 +321,37 @@ export default defineComponent({
       role: null,
       userGroups: [],
     })
+
+    const showNewUserPassword = ref(false)
+    const showChangePassword = ref(false)
+    const showConfirmPassword = ref(false)
+
+    const PASSWORD_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    const generateRandomPassword = (length = 12): string => {
+      const limit = 256 - (256 % PASSWORD_CHARS.length)
+      let result = ''
+      while (result.length < length) {
+        const bytes = new Uint8Array(length)
+        crypto.getRandomValues(bytes)
+        for (const byte of bytes) {
+          if (byte < limit && result.length < length) {
+            result += PASSWORD_CHARS[byte % PASSWORD_CHARS.length]
+          }
+        }
+      }
+      return result
+    }
+    const generateNewUserPassword = () => {
+      newUser.value.password = generateRandomPassword()
+      showNewUserPassword.value = true
+    }
+    const generateEditedUserPassword = () => {
+      const password = generateRandomPassword()
+      editedUser.value.password = password
+      editedUser.value.confirmPassword = password
+      showChangePassword.value = true
+      showConfirmPassword.value = true
+    }
 
     const teams = ref<Team[]>([])
     const roles = ref<Role[]>([])
@@ -579,6 +624,11 @@ export default defineComponent({
       changePasswordDialog,
       openChangePasswordDialog,
       saveChangePassword,
+      showNewUserPassword,
+      showChangePassword,
+      showConfirmPassword,
+      generateNewUserPassword,
+      generateEditedUserPassword,
       deleteGroupFromUser,
       saveCreate,
       roles,

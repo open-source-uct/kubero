@@ -24,14 +24,22 @@
       </div>
       <div v-if="kubero.metricsEnabled">
         <v-row class="justify-space-between mb-2">
-            <v-col cols="12" sm="12" md="8">
+            <v-col cols="12" sm="12" md="6">
               <Alerts :app="app" :phase="phase" :pipeline="pipeline"/>
             </v-col>
-            <v-col cols="12" sm="12" md="2">
+            <v-col cols="12" sm="6" md="2">
               <v-select
-                label="Select"
+                label="Rango"
                 v-model="scale"
-                :items="[ '2h', '24h', '7d' ]"
+                :items="[ '2h', '24h' ]"
+                density="compact"
+              ></v-select>
+            </v-col>
+            <v-col cols="12" sm="6" md="2">
+              <v-select
+                label="Zona horaria"
+                v-model="timezone"
+                :items="timezoneItems"
                 density="compact"
               ></v-select>
             </v-col>
@@ -42,14 +50,14 @@
                     color="secondary"
                     >
                     <v-icon>mdi-refresh</v-icon>
-                    <span>Refresh</span>  
+                    <span>Refresh</span>
                 </v-btn>
             </v-col>
         </v-row>
         <v-row>
             <v-col cols="12" sm="12" md="12">
                 Memory Usage
-                <VueApexCharts type="area" height="180" :options="memoryOptions" :series="memoryData"></VueApexCharts>
+                <VueApexCharts :key="'memory-' + scale + '-' + timezone + '-' + memoryDecimals" type="area" height="180" :options="memoryOptions" :series="memoryData"></VueApexCharts>
             </v-col>
         </v-row>
         <v-row>
@@ -61,7 +69,7 @@
           -->
             <v-col cols="12" sm="12" md="12">
                 CPU usage
-                <VueApexCharts type="line" height="180" :options="cpuOptions" :series="cpuDataRate"></VueApexCharts>
+                <VueApexCharts :key="'cpu-' + scale + '-' + timezone + '-' + cpuDecimals" type="line" height="180" :options="cpuOptions" :series="cpuDataRate"></VueApexCharts>
             </v-col>
         </v-row>
         <!--
@@ -75,23 +83,23 @@
         <v-row>
             <v-col cols="12" sm="12" md="12">
                 Responset Time
-                <VueApexCharts type="area" height="180" :options="ResponsetimeOptions" :series="responsetimeData"></VueApexCharts>
+                <VueApexCharts :key="'responsetime-' + scale + '-' + timezone + '-' + responsetimeDecimals" type="area" height="180" :options="ResponsetimeOptions" :series="responsetimeData"></VueApexCharts>
             </v-col>
         </v-row>
         <v-row>
             <v-col cols="12" sm="12" md="12">
                 Throughput
-                <VueApexCharts type="line" height="180" :options="httpStusCodeOptions" :series="httpStusCodeData"></VueApexCharts>
+                <VueApexCharts :key="'throughput-' + scale + '-' + timezone + '-' + throughputDecimals" type="line" height="180" :options="httpStusCodeOptions" :series="httpStusCodeData"></VueApexCharts>
             </v-col>
         </v-row>
         <v-row>
             <v-col cols="12" sm="12" md="12">
-                <VueApexCharts type="area" height="180" :options="httpStusCodeIncreaseOptions" :series="httpStusCodeDataIncrease"></VueApexCharts>
+                <VueApexCharts :key="'httpcode-increase-' + scale + '-' + timezone + '-' + throughputDecimals" type="area" height="180" :options="httpStusCodeIncreaseOptions" :series="httpStusCodeDataIncrease"></VueApexCharts>
             </v-col>
         </v-row>
         <v-row>
             <v-col cols="12" sm="12" md="12">
-                <VueApexCharts type="area" height="180" :options="httpResponseTrafficOptions" :series="httpResponseTrafficData"></VueApexCharts>
+                <VueApexCharts :key="'traffic-' + scale + '-' + timezone + '-' + trafficDecimals" type="area" height="180" :options="httpResponseTrafficOptions" :series="httpResponseTrafficData"></VueApexCharts>
             </v-col>
         </v-row>
       </div>
@@ -609,7 +617,21 @@ export default defineComponent({
             name: string,
             data: number[][],
       }[],
-      scale: '2h' as '2h'| '24h' | '7d',
+      scale: '2h' as '2h'| '24h',
+      // zona horaria para mostrar las fechas de los gráficos; se guarda por
+      // si la persona prefiere ver otra distinta a Santiago
+      timezone: localStorage.getItem('kubero.metricsTimezone') || 'America/Santiago',
+      timezoneItems: [
+        { title: 'Santiago (Chile continental)', value: 'America/Santiago' },
+        { title: 'UTC', value: 'UTC' },
+      ] as { title: string, value: string }[],
+      // decimales del eje Y de cada gráfico; se recalculan solos según la
+      // magnitud real de sus datos (ver pickDecimals), no los elige la persona
+      memoryDecimals: 1,
+      cpuDecimals: 1,
+      responsetimeDecimals: 1,
+      throughputDecimals: 1,
+      trafficDecimals: 1,
       timer: null as any,
       // consultas de un ciclo de refresco que aún no terminaron
       pending: 0,
@@ -617,6 +639,12 @@ export default defineComponent({
     components: {
         VueApexCharts,
         Alerts,
+    },
+    created() {
+        // las funciones de formato se asignan acá (y no en los objetos de
+        // arriba) porque necesitan "this" para leer this.timezone y
+        // this.scale en cada dibujo del gráfico, no solo al crearlo
+        this.applyTimezoneFormatters();
     },
     mounted() {
         this.refreshMetrics();
@@ -635,7 +663,13 @@ export default defineComponent({
           if (val) {
             this.refreshMetrics();
           }
-        }
+        },
+        timezone: function (val) {
+          // la key de cada VueApexCharts incluye timezone: cambiarla fuerza a
+          // Vue a recrear los 6 gráficos juntos, así no quedan algunos con la
+          // hora vieja y otros con la nueva
+          localStorage.setItem('kubero.metricsTimezone', val);
+        },
     },
     computed: {
       ...mapState(useKuberoStore, ['kubero']),
@@ -658,7 +692,89 @@ export default defineComponent({
         // con el rango, no se lanza otro ciclo mientras hay uno en curso, y se
         // pausa con la pestaña oculta o en otra pestaña de la app.
         refreshIntervalMs(): number {
-            return { '2h': 15000, '24h': 60000, '7d': 300000 }[this.scale];
+            return { '2h': 15000, '24h': 60000 }[this.scale];
+        },
+        // formatea un timestamp (ms) en la zona horaria elegida; se usa tanto
+        // en el eje X como en el tooltip de los 6 gráficos
+        formatInTimezone(value: number, options: Intl.DateTimeFormatOptions): string {
+            return new Intl.DateTimeFormat('es-CL', {
+                timeZone: this.timezone,
+                ...options,
+            }).format(new Date(Number(value)));
+        },
+        axisLabelFormat(value: number): string {
+            // solo hora y minuto en los dos rangos: con fecha, el texto se
+            // superpone y tapa las marcas del eje
+            return this.formatInTimezone(value, { hour: '2-digit', minute: '2-digit' });
+        },
+        tooltipLabelFormat(value: number): string {
+            return this.formatInTimezone(value, {
+                day: '2-digit',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                timeZoneName: 'short',
+            });
+        },
+        // Se asigna acá y no en los data() de arriba: ApexCharts solo
+        // redibuja cuando cambian options/series, y cambiar this.timezone no
+        // altera esos objetos. La key del componente (ver template) sí fuerza
+        // el redibujado; estas funciones leen this.timezone/this.scale frescos
+        // en cada llamada, así que no hace falta volver a asignarlas después.
+        applyTimezoneFormatters() {
+            const chartOptions: any[] = [
+                this.memoryOptions,
+                this.cpuOptions,
+                this.ResponsetimeOptions,
+                this.httpStusCodeOptions,
+                this.httpStusCodeIncreaseOptions,
+                this.httpResponseTrafficOptions,
+            ];
+            for (const options of chartOptions) {
+                options.xaxis.labels.formatter = (value: number) => this.axisLabelFormat(value);
+                options.tooltip.x.formatter = (value: number) => this.tooltipLabelFormat(value);
+            }
+        },
+        // Fija el eje X al rango completo pedido (p. ej. las 24 h), en vez de
+        // dejar que ApexCharts lo recorte al tramo donde hay datos. Si
+        // Prometheus solo tiene la última hora, se ve esa hora con datos y el
+        // resto vacío, en vez de que el gráfico de "24h" se vea igual que el
+        // de "2h" por puro zoom automático.
+        applyAxisRange() {
+            const rangeMs = { '2h': 2 * 60 * 60 * 1000, '24h': 24 * 60 * 60 * 1000 }[this.scale];
+            const max = Date.now();
+            const min = max - rangeMs;
+            const chartOptions: any[] = [
+                this.memoryOptions,
+                this.cpuOptions,
+                this.ResponsetimeOptions,
+                this.httpStusCodeOptions,
+                this.httpStusCodeIncreaseOptions,
+                this.httpResponseTrafficOptions,
+            ];
+            for (const options of chartOptions) {
+                options.xaxis.min = min;
+                options.xaxis.max = max;
+            }
+        },
+        // con apps casi sin tráfico los millicores de CPU quedan en 0.0 con un
+        // solo decimal; esto deja elegir cuántos mostrar en el eje Y
+        // cuántos decimales hacen falta para que el valor más grande de la
+        // serie no se vea plano en 0.0 (pasa con apps casi sin tráfico, cuyo
+        // uso de CPU es de milésimas de millicore)
+        pickDecimals(series: { data: number[][] }[]): number {
+            let maxAbs = 0;
+            for (const serie of series || []) {
+                for (const point of serie.data || []) {
+                    maxAbs = Math.max(maxAbs, Math.abs(point[1]));
+                }
+            }
+            if (maxAbs === 0) return 1;
+            if (maxAbs >= 10) return 1;
+            if (maxAbs >= 1) return 2;
+            if (maxAbs >= 0.01) return 3;
+            return 4;
         },
         startTimer() {
             this.stopTimer();
@@ -677,6 +793,7 @@ export default defineComponent({
         },
         refreshMetrics() {
           if (this.kubero.metricsEnabled) {
+            this.applyAxisRange();
             this.pending++;
             Promise.allSettled([
                 this.getMemoryMetrics(),
@@ -701,6 +818,8 @@ export default defineComponent({
             })
             .then((response) => {
                 this.memoryData = markRaw(response.data);
+                this.memoryDecimals = this.pickDecimals(response.data);
+                this.memoryOptions.yaxis.decimalsInFloat = this.memoryDecimals;
             })
             .catch((error) => {
                 console.log(error);
@@ -730,6 +849,9 @@ export default defineComponent({
             .then((response) => {
               this.httpStusCodeData = markRaw(response.data);
               this.httpStusCodeDataIncrease = markRaw(response.data);
+              this.throughputDecimals = this.pickDecimals(response.data);
+              this.httpStusCodeOptions.yaxis.decimalsInFloat = this.throughputDecimals;
+              this.httpStusCodeIncreaseOptions.yaxis.decimalsInFloat = this.throughputDecimals;
             })
             .catch((error) => {
                 console.log(error);
@@ -760,6 +882,8 @@ export default defineComponent({
             })
             .then((response) => {
               this.responsetimeData = response.data;
+              this.responsetimeDecimals = this.pickDecimals(response.data);
+              this.ResponsetimeOptions.yaxis.decimalsInFloat = this.responsetimeDecimals;
             })
             .catch((error) => {
                 console.log(error);
@@ -775,6 +899,8 @@ export default defineComponent({
             })
             .then((response) => {
               this.httpResponseTrafficData = markRaw(response.data);
+              this.trafficDecimals = this.pickDecimals(response.data);
+              this.httpResponseTrafficOptions.yaxis.decimalsInFloat = this.trafficDecimals;
             })
             .catch((error) => {
                 console.log(error);
@@ -805,6 +931,8 @@ export default defineComponent({
             })
             .then((response) => {
               this.cpuDataRate = markRaw(response.data);
+              this.cpuDecimals = this.pickDecimals(response.data);
+              this.cpuOptions.yaxis.decimalsInFloat = this.cpuDecimals;
             })
             .catch((error) => {
                 console.log(error);

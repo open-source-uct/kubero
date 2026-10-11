@@ -2,11 +2,28 @@ import { LogsService } from './logs.service';
 
 const mockUserGroups = ['group1', 'group2'];
 
+// App mock con addons; el nombre de la instancia va en el recurso principal
+const appWithAddons = (app: string, instanceNames: string[]) => ({
+  spec: {
+    addons: instanceNames.map((name) => ({
+      kind: 'KuberoAddonPostgres',
+      displayName: 'PostgreSQL',
+      resourceDefinitions: {
+        KuberoAddonPostgres: {
+          kind: 'KuberoAddonPostgres',
+          metadata: { name },
+        },
+      },
+    })),
+  },
+});
+
 describe('LogsService', () => {
   let service: LogsService;
   let kubectl: any;
   let pipelinesService: any;
   let eventsGateway: any;
+  let appsService: any;
 
   beforeEach(() => {
     kubectl = {
@@ -22,7 +39,15 @@ describe('LogsService', () => {
     eventsGateway = {
       sendLogline: jest.fn(),
     };
-    service = new LogsService(kubectl, pipelinesService, eventsGateway);
+    appsService = {
+      getApp: jest.fn().mockResolvedValue({ spec: { addons: [] } }),
+    };
+    service = new LogsService(
+      kubectl,
+      pipelinesService,
+      eventsGateway,
+      appsService,
+    );
   });
 
   it('should be defined', () => {
@@ -211,6 +236,9 @@ describe('LogsService', () => {
     });
 
     it('should return only addon pod logs for addons container', async () => {
+      appsService.getApp.mockResolvedValue(
+        appWithAddons('app', ['app-postgres']),
+      );
       pipelinesService.getContext.mockResolvedValue('ctx');
       kubectl.getPods.mockResolvedValue([
         {
@@ -233,6 +261,53 @@ describe('LogsService', () => {
       expect(spy).toHaveBeenCalledTimes(1);
       expect(spy.mock.calls[0][1]).toBe('app-postgres-0');
       expect(spy.mock.calls[0][2]).toBe('postgres');
+    });
+
+    it('should not include pods of another app whose name shares the prefix', async () => {
+      appsService.getApp.mockResolvedValue(
+        appWithAddons('server', ['server-postgres']),
+      );
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      kubectl.getPods.mockResolvedValue([
+        {
+          metadata: { name: 'server-postgres-0', labels: {} },
+          spec: { containers: [{ name: 'postgres' }] },
+        },
+        {
+          metadata: { name: 'server-api-postgres-0', labels: {} },
+          spec: { containers: [{ name: 'postgres' }] },
+        },
+      ]);
+      const spy = jest.spyOn(service, 'fetchLogs').mockResolvedValue([]);
+      await service.getLogsHistory(
+        'pipe',
+        'phase',
+        'server',
+        'addons',
+        mockUserGroups,
+      );
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0][1]).toBe('server-postgres-0');
+    });
+
+    it('should return nothing for addons when the app has no addons', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      kubectl.getPods.mockResolvedValue([
+        {
+          metadata: { name: 'app-postgres-0', labels: {} },
+          spec: { containers: [{ name: 'postgres' }] },
+        },
+      ]);
+      const spy = jest.spyOn(service, 'fetchLogs').mockResolvedValue([]);
+      const result = await service.getLogsHistory(
+        'pipe',
+        'phase',
+        'app',
+        'addons',
+        mockUserGroups,
+      );
+      expect(result).toEqual([]);
+      expect(spy).not.toHaveBeenCalled();
     });
 
     it('should sort loglines by time descending', async () => {

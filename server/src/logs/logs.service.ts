@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ILoglines } from './logs.interface';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { PipelinesService } from '../pipelines/pipelines.service';
+import { AppsService } from '../apps/apps.service';
 import { EventsGateway } from '../events/events.gateway';
 import { Stream } from 'stream';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,7 +16,25 @@ export class LogsService {
     private kubectl: KubernetesService,
     private pipelinesService: PipelinesService,
     private EventsGateway: EventsGateway,
+    private appsService: AppsService,
   ) {}
+
+  // Nombre de la instancia de cada addon de la app (es el prefijo de sus pods).
+  // Se toma del recurso principal, igual que en la pestaña de logs del cliente.
+  private addonInstanceNames(app: any): string[] {
+    const names: string[] = [];
+    for (const addon of app?.spec?.addons || []) {
+      const definitions = addon.resourceDefinitions || {};
+      const crd =
+        definitions[addon.kind] ??
+        Object.values(definitions).find((r: any) => r?.kind !== 'Secret');
+      const name = crd?.metadata?.name;
+      if (name) {
+        names.push(name);
+      }
+    }
+    return names;
+  }
 
   private logcolor(str: string) {
     let hash = 0;
@@ -168,6 +187,19 @@ export class LogsService {
 
     let loglines: ILoglines[] = [];
     if (contextName) {
+      // Los pods de addon se identifican por el nombre exacto de cada addon de
+      // esta app. Un prefijo no alcanza: "server-api" empieza con "server-".
+      const addonNames =
+        container == 'addons'
+          ? this.addonInstanceNames(
+              await this.appsService.getApp(
+                pipelineName,
+                phaseName,
+                appName,
+                userGroups,
+              ),
+            )
+          : [];
       const pods = await this.kubectl.getPods(namespace, contextName);
       for (const pod of pods) {
         const podName = pod.metadata?.name;
@@ -204,9 +236,9 @@ export class LogsService {
           loglines = loglines.concat(ll);
         } else if (
           container == 'addons' &&
-          podName.startsWith(appName + '-') &&
           !podName.includes('-kuberoapp-') &&
-          !isJob
+          !isJob &&
+          addonNames.some((name) => podName.startsWith(name + '-'))
         ) {
           for (const c of pod.spec?.containers || []) {
             const ll = await this.fetchLogs(

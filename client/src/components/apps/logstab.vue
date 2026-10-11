@@ -21,7 +21,7 @@
         </v-row>
         <v-row>
             <v-col cols="12" sm="12" md="12" style="height: calc(100vh - 400px);">
-                <Logs :pipeline=pipeline :phase=phase :app=app :deploymentstrategy=deploymentstrategy :buildstrategy=buildstrategy :hasAddons=hasAddons logType="runlogs" height="600px"/>
+                <Logs :pipeline=pipeline :phase=phase :app=app :deploymentstrategy=deploymentstrategy :buildstrategy=buildstrategy :hasAddons=hasAddons :addons=addons logType="runlogs" height="600px"/>
             </v-col>
         </v-row>
 
@@ -57,6 +57,10 @@ export default defineComponent({
       hasAddons: {
         type: Boolean,
         default: false
+      },
+      addons: {
+        type: Array,
+        default: () => []
       },
     },
     data: () => ({

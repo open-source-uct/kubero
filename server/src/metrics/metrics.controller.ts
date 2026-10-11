@@ -119,7 +119,7 @@ export class MetricsController {
   @ApiParam({ name: 'pipeline', type: 'string' })
   @ApiParam({ name: 'phase', type: 'string' })
   @ApiParam({ name: 'app', type: 'string' })
-  @ApiParam({ name: 'scale', enum: ['24h', '2h', '7d'], required: false })
+  @ApiParam({ name: 'scale', enum: ['24h', '2h'], required: false })
   @ApiParam({ name: 'calc', enum: ['rate', 'increase'], required: false })
   @ApiParam({ name: 'host', type: 'string', required: false })
   async getWideMetrics(
@@ -134,7 +134,7 @@ export class MetricsController {
     @Param('pipeline') pipeline: string,
     @Param('phase') phase: string,
     @Param('app') app: string,
-    @Query('scale') scale: '24h' | '2h' | '7d',
+    @Query('scale') scale: '24h' | '2h',
     @Query('calc') calc: 'rate' | 'increase' | undefined,
     @Query('host') host: string,
     @Request() req: any,

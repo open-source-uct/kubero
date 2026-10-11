@@ -147,6 +147,7 @@ describe('UsersService', () => {
     const user = await service.create(newUser);
     expect(user).toBe(createdUser);
     expect(prismaMock.user.create).toHaveBeenCalledWith({
+      omit: { password: true, twoFaSecret: true },
       data: expect.objectContaining({
         username: 'user3',
         password: expect.any(String), // password will be hashed
@@ -166,7 +167,7 @@ describe('UsersService', () => {
     expect(prismaMock.user.update).toHaveBeenCalledWith({
       where: { id: '1' },
       data: { username: 'user2' },
-      omit: { password: true },
+      omit: { password: true, twoFaSecret: true },
     });
   });
 
@@ -186,9 +187,28 @@ describe('UsersService', () => {
     const user = await service.updatePassword('1', 'newpass');
     expect(user).toBe(updatedUser);
     expect(prismaMock.user.update).toHaveBeenCalledWith({
+      omit: { password: true, twoFaSecret: true },
       where: { id: '1' },
       data: { password: expect.any(String) }, // password will be hashed
     });
+  });
+
+  it('should not pass unexpected fields to create', async () => {
+    prismaMock.user.create.mockResolvedValueOnce({ id: '4' } as PrismaUser);
+    await service.create({
+      username: 'user4',
+      password: 'pass4',
+      roleId: 'admin-role-id',
+      twoFaEnabled: true,
+      twoFaSecret: 'secret',
+      id: 'forced-id',
+    });
+    const data = prismaMock.user.create.mock.calls[0][0].data;
+    expect(data).not.toHaveProperty('roleId');
+    expect(data).not.toHaveProperty('twoFaEnabled');
+    expect(data).not.toHaveProperty('twoFaSecret');
+    expect(data).not.toHaveProperty('id');
+    expect(data.username).toBe('user4');
   });
 
   it('should return undefined if updatePassword fails', async () => {
@@ -682,7 +702,7 @@ describe('UsersService', () => {
 
       expect(result).toBe(updatedUser);
       expect(prismaMock.user.update).toHaveBeenCalledWith({
-        omit: { password: true },
+        omit: { password: true, twoFaSecret: true },
         where: { id: '1' },
         data: {
           username: 'newusername',

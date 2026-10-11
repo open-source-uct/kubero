@@ -17,10 +17,12 @@
   <v-navigation-drawer
       v-model="primaryOpen"
       class="primary-navigation-drawer"
+      :class="{ 'primary-navigation-drawer--pinned': mdAndUp && secondaryOpen, 'v-navigation-drawer--is-hovering': mdAndUp && secondaryOpen }"
       color="navBG"
       :permanent="mdAndUp"
       :temporary="!mdAndUp"
       :rail="mdAndUp"
+      :expand-on-hover="mdAndUp"
       :width="mdAndUp ? 256 : 320"
       :rail-width="56"
   >
@@ -336,11 +338,11 @@ const secondaryStyle = computed(() => ({
   bottom: 'auto',
   height: mdAndUp.value ? `${secondaryHeight.value}px` : '100dvh',
   '--secondary-nav-header-height': mdAndUp.value ? `${secondaryHeaderHeight.value}px` : '56px',
-  '--secondary-nav-left': mdAndUp.value ? '56px' : '0px',
+  '--secondary-nav-left': mdAndUp.value ? '256px' : '0px',
   '--secondary-nav-width': mdAndUp.value ? '256px' : 'min(100vw, 320px)',
 }))
 const secondaryScrimStyle = computed(() => ({
-  left: mdAndUp.value ? '312px' : 'min(100vw, 320px)',
+  left: mdAndUp.value ? '512px' : 'min(100vw, 320px)',
 }))
 const secondaryTitle = computed(() => {
   if (activeSecondary.value === 'pipelines') return t('navigation.pipelines')
@@ -555,6 +557,10 @@ export default defineComponent({
 </script>
 
 <style scoped>
+
+.primary-navigation-drawer--pinned {
+  width: 256px !important;
+}
 
 .mobile-navigation-title {
   font-size: 0.9375rem;

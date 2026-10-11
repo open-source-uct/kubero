@@ -133,7 +133,13 @@
           <v-dialog v-model="createDialog" max-width="500px">
             <v-card color="cardBackground" class="profile-dialog uct-card">
               <v-card-title class="profile-dialog__title"><v-icon icon="mdi-key-plus" color="primary" />{{ $t('profile.token.create') }}</v-card-title>
-              <v-card-text><v-text-field v-model="newToken.name" :label="$t('global.name')" variant="outlined" /><v-text-field v-model="newToken.expiresAt" :label="$t('profile.token.expiresAt')" type="datetime-local" variant="outlined" /></v-card-text>
+              <v-card-text>
+                <v-form ref="createTokenForm">
+                  <v-text-field v-model="newToken.name" :label="$t('global.name')" variant="outlined" :rules="[requiredRule]" />
+                  <!-- el input nativo datetime-local deja el valor vacío si no se completa cada segmento (día, hora, minuto, etc.), sin avisar -->
+                  <v-text-field v-model="newToken.expiresAt" :label="$t('profile.token.expiresAt')" type="datetime-local" variant="outlined" :rules="[requiredRule]" />
+                </v-form>
+              </v-card-text>
               <v-card-actions><v-spacer /><v-btn variant="text" @click="createDialog = false">{{ $t('global.abort') }}</v-btn><v-btn color="primary" variant="flat" @click="saveCreate">{{ $t('global.create') }}</v-btn></v-card-actions>
             </v-card>
           </v-dialog>
@@ -170,6 +176,7 @@ import axios from 'axios'
 import { useAuthStore } from '../../stores/auth'
 import { useI18n } from 'vue-i18n'
 import { confirmDestructiveAction } from '../../utils/destructiveConfirmation'
+import { handledApiErrorConfig, notifyApiError } from '../../utils/apiFeedback'
 const authStore = useAuthStore();
 
 export default defineComponent({
@@ -213,6 +220,8 @@ export default defineComponent({
     const generatedToken = ref<any>({ name: '', expiresAt: '', token: '' })
     const newToken = ref<any>({ name: '', expiresAt: '' })
     const textareaFlash = ref(false)
+    const createTokenForm = ref<any>(null)
+    const requiredRule = (value: string) => !!value || t('profile.token.fieldRequired')
 
     const loadProfile = async () => {
       try {
@@ -247,10 +256,10 @@ export default defineComponent({
       if (!confirmed) return
 
       try {
-        await axios.delete(`/api/tokens/my/${token.id}`)
+        await axios.delete(`/api/tokens/my/${token.id}`, handledApiErrorConfig)
         await loadTokens()
       } catch (e) {
-        // error handling
+        notifyApiError(e, 'deleteToken')
       }
     }
 
@@ -330,15 +339,20 @@ export default defineComponent({
     }
 
     const saveCreate = async () => {
+      // el datetime-local queda vacío por dentro si no se completa cada segmento
+      // (día, hora, minuto...), sin aviso del navegador; esto lo bloquea antes
+      // de mandarlo al servidor
+      const { valid } = await createTokenForm.value?.validate() ?? { valid: true }
+      if (!valid) return
+
       try {
-        const response = await axios.post('/api/tokens/my', newToken.value)
+        const response = await axios.post('/api/tokens/my', newToken.value, handledApiErrorConfig)
         generatedToken.value = response.data
         await loadTokens()
         createDialog.value = false
         tokenDialog.value = true
-        //console.log('Token created:', newToken)
       } catch (e) {
-        // error handling
+        notifyApiError(e, 'createToken')
       }
     }
 
@@ -388,6 +402,8 @@ export default defineComponent({
       saveCreate,
       copyToken,
       textareaFlash,
+      createTokenForm,
+      requiredRule,
       authStore,
       profileError,
       profileErrorMessage,

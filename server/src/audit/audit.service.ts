@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { AuditEntry } from './audit.interface';
 import { Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
+import { AuditQueryDto } from './audit-query.dto';
+import { AuditSuggestionsDto } from './audit-suggestions.dto';
 
 @Injectable()
 export class AuditService {
@@ -15,7 +17,7 @@ export class AuditService {
       ? parseInt(process.env.KUBERO_AUDIT_LIMIT)
       : 1000;
 
-    if (process.env.KUBERO_AUDIT !== 'true') {
+    if (process.env.KUBERO_AUDIT === 'false') {
       this.enabled = false;
       Logger.log('⏸️ Audit logging not enabled', 'Feature');
       return;
@@ -85,15 +87,41 @@ export class AuditService {
   public async get(
     limit: number = 100,
     pipelines?: string[],
-  ): Promise<{ audit: AuditEntry[]; count: number; limit: number }> {
+    filters: AuditQueryDto = {},
+  ): Promise<{
+    audit: AuditEntry[];
+    count: number;
+    limit: number;
+    page: number;
+    enabled: boolean;
+  }> {
+    const page = filters.page ?? 1;
     if (!this.enabled) {
-      return { audit: [], count: 0, limit: limit };
+      return { audit: [], count: 0, limit, page, enabled: false };
     }
-    const where = pipelines ? { pipeline: { in: pipelines } } : {};
+    const where: Prisma.AuditWhereInput = {
+      AND: [
+        ...(pipelines ? [{ pipeline: { in: pipelines } }] : []),
+        ...(filters.pipeline ? [{ pipeline: filters.pipeline }] : []),
+      ],
+      ...(filters.action ? { action: filters.action } : {}),
+      ...(filters.username
+        ? { users: { username: { contains: filters.username } } }
+        : {}),
+      ...(filters.from || filters.to
+        ? {
+            timestamp: {
+              ...(filters.from ? { gte: new Date(filters.from) } : {}),
+              ...(filters.to ? { lt: new Date(filters.to) } : {}),
+            },
+          }
+        : {}),
+    };
     const audit = await this.prisma.audit.findMany({
       where,
-      orderBy: { timestamp: 'desc' },
+      orderBy: [{ timestamp: 'desc' }, { id: 'desc' }],
       take: limit,
+      skip: (page - 1) * limit,
       include: {
         users: {
           select: { username: true },
@@ -101,7 +129,44 @@ export class AuditService {
       },
     });
     const count = await this.prisma.audit.count({ where });
-    return { audit, count, limit };
+    return { audit, count, limit, page, enabled: true };
+  }
+
+  public async getSuggestions(
+    query: AuditSuggestionsDto,
+    pipelines?: string[],
+  ): Promise<string[]> {
+    if (!this.enabled) return [];
+    const access: Prisma.AuditWhereInput[] = pipelines
+      ? [{ pipeline: { in: pipelines } }]
+      : [];
+    const search = query.q?.trim() ?? '';
+    if (query.kind === 'pipeline') {
+      const rows = await this.prisma.audit.findMany({
+        where: {
+          AND: [...access, { pipeline: { not: '', contains: search } }],
+        },
+        select: { pipeline: true },
+        distinct: ['pipeline'],
+        orderBy: { pipeline: 'asc' },
+        take: 20,
+      });
+      return rows.map((row) => row.pipeline);
+    }
+    const rows = await this.prisma.audit.findMany({
+      where: {
+        AND: [
+          ...access,
+          ...(query.pipeline ? [{ pipeline: query.pipeline }] : []),
+        ],
+        users: { username: { contains: search } },
+      },
+      select: { users: { select: { username: true } } },
+      distinct: ['user'],
+      orderBy: { users: { username: 'asc' } },
+      take: 20,
+    });
+    return rows.map((row) => row.users.username);
   }
 
   public async getFiltered(

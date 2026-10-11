@@ -247,11 +247,6 @@ export class MetricsService {
         step = 60 * 10; // 10 minutes
         vector = '10m';
         break;
-      case '7d':
-        start = new Date().getTime() - 7 * 24 * 60 * 60 * 1000;
-        step = 60 * 120; // 700 minutes
-        vector = '20m';
-        break;
     }
 
     return {
@@ -273,8 +268,10 @@ export class MetricsService {
     try {
       metrics = await this.prom.rangeQuery(query, start, end, step);
       for (let i = 0; i < metrics.result.length; i++) {
+        // rate(...) de container_cpu_usage_seconds_total viene en cores; el
+        // eje Y del gráfico dice "millicores", así que se convierte acá.
         const data = metrics.result[i].values.map((v: any) => {
-          return [Date.parse(v.time), v.value];
+          return [Date.parse(v.time), v.value * 1000];
         });
         resp.push({
           name: metrics.result[i].metric.labels.pod,

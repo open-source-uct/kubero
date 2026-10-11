@@ -10,10 +10,36 @@
             <v-tab v-if="logType == 'buildlogs' && (buildstrategy=='nixpacks' || buildstrategy=='dockerfile')" @click="getBuildLogHistory('push')">push</v-tab>
             <v-tab v-if="logType == 'buildlogs'" @click="getBuildLogHistory('deploy')">deploy</v-tab>
         </v-tabs>
-        <div class="console" id="console">
-            <div v-for="line in loglines" :key="line.id">
-            {{ new Date(line.time).toLocaleDateString() }} {{ new Date(line.time).toLocaleTimeString()}} <span :style="'color:' +line.color">[{{ line.podID }}/{{ line.container.replace('kuberoapp-', '') }}]</span>
-            {{ line.log }}
+        <div class="console-toolbar">
+            <v-select
+                v-if="currentTab == 'addons' && addonInstances.length > 0"
+                v-model="selectedAddon"
+                :items="addonItems()"
+                :aria-label="$t('app.actions.addonFilter')"
+                prepend-inner-icon="mdi-filter-variant"
+                density="compact"
+                variant="outlined"
+                hide-details
+                theme="dark"
+                bg-color="#16202D"
+                class="addon-select"
+            ></v-select>
+            <v-spacer></v-spacer>
+            <v-btn
+                size="small"
+                variant="text"
+                :aria-label="$t('global.copy')"
+                :title="$t('global.copy')"
+                @click="copyLogs"
+            >
+                <v-icon left>{{ copied ? 'mdi-check' : 'mdi-content-copy' }}</v-icon>
+                {{ $t('global.copy') }}
+            </v-btn>
+        </div>
+        <div class="console" id="console" ref="consoleEl" @scroll="onConsoleScroll">
+            <div v-for="line in displayLines" :key="line.id">
+            {{ new Date(line.time).toLocaleDateString() }} {{ new Date(line.time).toLocaleTimeString()}} <span :style="'color:' +line.color">[{{ lineLabel(line) }}]</span>
+            <span class="log-text">{{ cleanLog(line) }}</span>
             </div>
             <span style="margin: 25px;"></span>
         </div>
@@ -23,7 +49,7 @@
 
 <script lang="ts">
 import axios from "axios";
-import { ref, reactive, defineComponent } from 'vue'
+import { ref, reactive, defineComponent, computed, watch, nextTick } from 'vue'
 import { useKuberoStore } from '../../stores/kubero'
 
 type LogLine = {
@@ -37,6 +63,11 @@ type LogLine = {
     podID: string;
     time: number;
     color: string;
+}
+
+type AddonInstance = {
+    name: string;
+    displayName: string;
 }
 
 const socket = useKuberoStore().kubero.socket as any;
@@ -53,11 +84,79 @@ socket.on('log', (data: LogLine) => {
 
 
 export default defineComponent({
-    setup() {
+    setup(props) {
+        // addon seleccionado en la pestaña addons ("all" = todos)
+        const selectedAddon = ref('all');
+        // la popup no recibe la lista de addons, así que se carga desde la app
+        const loadedAddons = ref([] as any[]);
+
+        // nombre de la instancia (prefijo de sus pods) y nombre a mostrar
+        const addonInstances = computed((): AddonInstance[] => {
+            const addons = props.addons.length > 0 ? props.addons : loadedAddons.value;
+            return addons.map((addon: any) => {
+                const crd = addon.resourceDefinitions?.[addon.kind]
+                    ?? Object.values(addon.resourceDefinitions || {}).find((r: any) => r?.kind !== 'Secret');
+                return {
+                    name: crd?.metadata?.name as string,
+                    displayName: (addon.displayName || addon.kind) as string,
+                };
+            }).filter((addon: AddonInstance) => !!addon.name);
+        });
+
+        // el addon con el prefijo más largo gana (evita que "app-pg" se confunda con "app-pg-2")
+        const addonForPod = (podName: string): AddonInstance | undefined => {
+            let match: AddonInstance | undefined;
+            for (const addon of addonInstances.value) {
+                if (podName.startsWith(addon.name + '-') && (!match || addon.name.length > match.name.length)) {
+                    match = addon;
+                }
+            }
+            return match;
+        };
+
+        const visibleLines = computed((): LogLine[] => {
+            if (currentTab.value != 'addons' || selectedAddon.value == 'all') {
+                return loglines.value;
+            }
+            return loglines.value.filter((line) => addonForPod(line.pod)?.name == selectedAddon.value);
+        });
+
+        // true durante 1.5 s después de copiar, para cambiar el icono
+        const copied = ref(false);
+
+        // la lista llega con lo más nuevo primero; se muestra al revés (lo nuevo abajo)
+        const displayLines = computed((): LogLine[] => [...visibleLines.value].reverse());
+
+        // si la persona está leyendo más arriba, no la movemos con cada línea nueva
+        const consoleEl = ref<HTMLElement | null>(null);
+        const stickToBottom = ref(true);
+        const onConsoleScroll = () => {
+            const el = consoleEl.value;
+            if (el) {
+                stickToBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+            }
+        };
+        watch(displayLines, async () => {
+            await nextTick();
+            const el = consoleEl.value;
+            if (el && stickToBottom.value) {
+                el.scrollTop = el.scrollHeight;
+            }
+        });
+
         return {
             loglines,
             currentTab,
             socket,
+            copied,
+            displayLines,
+            consoleEl,
+            onConsoleScroll,
+            selectedAddon,
+            loadedAddons,
+            addonInstances,
+            addonForPod,
+            visibleLines,
         }
     },
     mounted() {
@@ -66,6 +165,11 @@ export default defineComponent({
             //this.socketJoin()
             //this.startLogs()
         } else {
+            if (this.logType == 'runlogs' && this.hasAddons && this.addons.length == 0) {
+                axios.get(`/api/apps/${this.pipeline}/${this.phase}/${this.app}`).then((response) => {
+                    this.loadedAddons = response.data.spec.addons || [];
+                });
+            }
             this.getLogHistory('web')
             this.socketJoin()
             this.startLogs()
@@ -114,6 +218,10 @@ export default defineComponent({
         type: Boolean,
         default: false
       },
+      addons: {
+        type: Array,
+        default: () => []
+      },
     },
     data: () => ({
         loglines: [
@@ -133,6 +241,41 @@ export default defineComponent({
         ] as LogLine[],
     }),
     methods: {
+        // quita los códigos de color ANSI (los de tracing/Rust) y el salto de línea final,
+        // para que no aparezcan como texto ni dejen líneas vacías
+        cleanLog(line: LogLine) {
+            // eslint-disable-next-line no-control-regex
+            return line.log.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '').replace(/\n+$/, '');
+        },
+        async copyLogs() {
+            // displayLines ya va de lo más viejo a lo más nuevo
+            const text = this.displayLines.map((line: LogLine) =>
+                `${new Date(line.time).toLocaleString()} [${this.lineLabel(line)}] ${this.cleanLog(line)}`
+            ).join('\n');
+            try {
+                await navigator.clipboard.writeText(text);
+                this.copied = true;
+                setTimeout(() => { this.copied = false; }, 1500);
+            } catch (e) {
+                console.log('Cannot copy');
+            }
+        },
+        addonItems() {
+            return [
+                { title: this.$t('app.actions.allAddons'), value: 'all' },
+                ...this.addonInstances.map((addon: AddonInstance) => ({ title: addon.displayName, value: addon.name })),
+            ];
+        },
+        lineLabel(line: LogLine) {
+            const addon = this.addonForPod(line.pod);
+            if (addon) {
+                return `${addon.displayName}/${line.container}`;
+            }
+            if (this.currentTab == 'addons') {
+                return `${line.pod.replace(this.app + '-', '')}/${line.container}`;
+            }
+            return `${line.podID}/${line.container.replace('kuberoapp-', '')}`;
+        },
         socketJoin() {
             console.log("socketJoin", `${this.pipeline}-${this.phase}-${this.app}`);
             socket.emit("join", {
@@ -210,6 +353,24 @@ a:link { text-decoration: none;}
     flex-shrink: 0;
 }
 
+
+.console-toolbar {
+    display: flex;
+    align-items: center;
+    padding: 4px 6px;
+    background-color: #0B1119;
+    border: 1px solid rgba(135, 135, 135, 0.2);
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    color: #E2E8F0;
+}
+
+.console-toolbar .addon-select {
+    max-width: 260px;
+    margin-right: 8px;
+}
+
 .console {
     flex: 1;
     overflow-x: auto;
@@ -223,8 +384,14 @@ a:link { text-decoration: none;}
     border: 1px solid rgba(135, 135, 135, 0.2);
     border-bottom-left-radius: 8px;
     border-bottom-right-radius: 8px;
-    display: flex;
-    flex-direction: column-reverse;
+    display: block;
     min-height: 0;
+    user-select: text;
+}
+
+/* el texto del log se ajusta en vez de cortarse con scroll horizontal */
+.console .log-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 </style>

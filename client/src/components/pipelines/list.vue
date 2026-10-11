@@ -329,24 +329,11 @@ onBeforeUnmount(() => {
 })
 </script>
 
+<style scoped src="../../styles/resource-list.css"></style>
 <style scoped>
-.pipelines-page { max-width: 1440px; padding: 28px 28px 48px; }
-.pipelines-header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin: 10px 0 24px; }
-.pipelines-header h1 { margin: 0; }
-.pipelines-header p { max-width: 70ch; margin: 6px 0 0; color: rgb(var(--v-theme-on-background)); font-size: .875rem; line-height: 1.55; opacity: .68; }
 .alert-content { display: flex; justify-content: space-between; gap: 24px; align-items: center; }
 .alert-content p { margin: 4px 0 0; }
-.pipeline-panel { overflow: hidden; border: 1px solid var(--uct-corp-gray-border); border-radius: 8px; background: rgb(var(--v-theme-cardBackground)); }
-.pipeline-toolbar { display: grid; grid-template-columns: minmax(260px, 1.4fr) repeat(3, minmax(170px, .7fr)); gap: 12px; padding: 20px; border-bottom: 1px solid var(--uct-corp-gray-border); }
-.pipeline-toolbar :deep(.v-field) { background: rgb(var(--v-theme-cardBackground)); }
 .reset-filters { grid-column: 1 / -1; justify-self: start; }
-.table-summary { display: flex; min-height: 46px; justify-content: space-between; gap: 16px; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--uct-corp-gray-border); color: rgb(var(--v-theme-on-cardBackground)); font-size: .8125rem; }
-.pipeline-table-wrap { overflow-x: auto; }
-.pipeline-table { min-width: 1080px; background: transparent; }
-.pipeline-table :deep(th) { height: 44px !important; color: rgb(var(--v-theme-on-cardBackground)); font-size: .6875rem; font-weight: 600 !important; letter-spacing: .05em; text-transform: uppercase; opacity: .62; }
-.pipeline-table :deep(td) { height: 68px !important; color: rgb(var(--v-theme-on-cardBackground)); font-size: .8125rem; }
-.pipeline-table :deep(tbody tr) { transition: background-color 140ms ease-out; }
-.pipeline-table :deep(tbody tr:hover) { background: rgba(var(--v-theme-primary), .045); }
 .pipeline-identity { display: flex; min-width: 220px; gap: 11px; align-items: flex-start; }
 .pipeline-identity > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
 .pipeline-identity a { color: rgb(var(--v-theme-on-cardBackground)); font-size: .875rem; font-weight: 600; text-decoration-color: rgba(var(--v-theme-primary), .45); text-decoration-thickness: 1px; text-underline-offset: 3px; }
@@ -358,34 +345,15 @@ onBeforeUnmount(() => {
 .phases-list { min-width: 220px; }
 .actions-heading { width: 140px; }
 .actions-cell { display: flex; justify-content: flex-end; gap: 2px; white-space: nowrap; }
-.empty-state { display: flex; min-height: 300px; max-width: 520px; margin: 0 auto; padding: 48px 24px; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-.empty-state h2 { margin: 14px 0 6px; color: rgb(var(--v-theme-on-cardBackground)); font-size: 1.125rem; font-weight: 600; }
-.empty-state p { margin: 0 0 20px; color: rgb(var(--v-theme-on-cardBackground)); font-size: .875rem; line-height: 1.55; opacity: .65; }
-.table-footer { display: grid; grid-template-columns: 1fr auto 1fr; gap: 20px; align-items: center; padding: 14px 20px; border-top: 1px solid var(--uct-corp-gray-border); }
-.page-size { display: flex; gap: 10px; align-items: center; color: rgb(var(--v-theme-on-cardBackground)); font-size: .75rem; }
-.page-size :deep(.v-select) { max-width: 86px; }
-.page-range { justify-self: end; color: rgb(var(--v-theme-on-cardBackground)); font-size: .75rem; font-variant-numeric: tabular-nums; opacity: .65; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 @media (max-width: 1050px) {
-  .pipeline-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .toolbar-search { grid-column: 1 / -1; }
-  .table-footer { grid-template-columns: 1fr auto; }
-  .page-range { display: none; }
 }
 
 @media (max-width: 700px) {
-  .pipelines-page { padding: 20px 14px 36px; }
-  .pipelines-header { align-items: stretch; flex-direction: column; }
-  .pipelines-header .v-btn { align-self: flex-start; }
-  .pipeline-toolbar { grid-template-columns: 1fr; padding: 16px; }
   .toolbar-search { grid-column: auto; }
   .alert-content { align-items: flex-start; flex-direction: column; }
-  .table-footer { display: flex; flex-direction: column; }
-  .page-size { align-self: flex-start; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .pipeline-table :deep(tbody tr) { transition: none; }
-}
 </style>

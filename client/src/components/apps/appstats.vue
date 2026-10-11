@@ -82,18 +82,24 @@
                     </v-row>
                 </div>
                 <div class="app-stats__metrics app-stats__metrics--table" v-if="metricsDisplay == 'table'">
-                    <v-row>
-                        <v-col cols="8" class="pb-0 text-left text-caption font-weight-light">Pod</v-col>
-                        <v-col cols="1" class="pb-0 text-left text-caption font-weight-light">CPU</v-col>
-                        <v-col cols="1" class="pb-0 text-right text-caption font-weight-light">Memory</v-col>
-                        <v-col cols="2" class="pb-0 text-right text-caption font-weight-light">Uptime</v-col>
-                    </v-row>
-                    <v-row v-for="metric in metrics" :key="metric.name" id="metrics">
-                        <v-col cols="8" class="py-0 text-left text-body-2 overflow-x-hidden"><span style="white-space: nowrap;">{{metric.name}}</span></v-col>
-                        <v-col cols="1" class="py-0 text-left text-body-2">{{metric.cpu.usage}}{{metric.cpu.unit}}</v-col>
-                        <v-col cols="1" class="py-0 text-right text-body-2">{{metric.memory.usage}}{{metric.memory.unit}}</v-col>
-                        <v-col cols="2" class="py-0 text-right text-body-2">{{metric.uptime.formatted}}</v-col>
-                    </v-row>
+                    <table :aria-label="$t('app.titles.consumption')">
+                        <thead>
+                            <tr>
+                                <th scope="col">Pod</th>
+                                <th scope="col">CPU</th>
+                                <th scope="col">Memory</th>
+                                <th scope="col">Uptime</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="metric in metrics" :key="metric.name">
+                                <td>{{metric.name}}</td>
+                                <td>{{metric.cpu.usage}}{{metric.cpu.unit}}</td>
+                                <td>{{metric.memory.usage}}{{metric.memory.unit}}</td>
+                                <td>{{metric.uptime.formatted}}</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
                 </section>
 
@@ -635,12 +641,38 @@ export default defineComponent({
   padding: 2px 4px 4px;
 }
 
-.app-stats__metrics--table {
-  overflow-x: auto;
+.app-stats__metrics--table table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
 }
 
-.app-stats__metrics--table :deep(.v-row) {
-  min-width: 640px;
+.app-stats__metrics--table th,
+.app-stats__metrics--table td {
+  padding: 8px;
+  vertical-align: top;
+  text-align: right;
+  overflow-wrap: anywhere;
+  font-size: 0.875rem;
+}
+
+.app-stats__metrics--table th {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.app-stats__metrics--table th:first-child,
+.app-stats__metrics--table td:first-child {
+  width: 55%;
+  text-align: left;
+}
+
+.app-stats__metrics--table tbody tr:nth-child(even) {
+  background-color: rgba(var(--v-theme-primary), .04);
+}
+
+.app-stats__metrics--table tbody tr:nth-child(odd) {
+  background-color: rgba(var(--v-theme-primary), .08);
 }
 
 .app-stats__volume {
@@ -656,21 +688,17 @@ export default defineComponent({
   box-shadow: none;
 }
 
-#metrics:nth-child(even) {
-  background-color: rgba(var(--v-theme-primary), .04);
-}
-#metrics:nth-child(odd) {
-  background-color: rgba(var(--v-theme-primary), .08);
-}
-
-.theme--light#metrics:nth-child(odd) {
-  background-color: rgba(var(--v-theme-primary), .08);
-}
-.theme--dark#metrics:nth-child(odd) {
-  background-color: rgba(var(--v-theme-primary), .12);
-}
-
 @media (max-width: 599px) {
+  .app-stats__metrics--table th,
+  .app-stats__metrics--table td {
+    padding: 8px 4px;
+  }
+
+  .app-stats__metrics--table th:first-child,
+  .app-stats__metrics--table td:first-child {
+    width: 40%;
+  }
+
   .app-stats__section {
     padding: 18px 16px;
   }

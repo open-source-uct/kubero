@@ -94,7 +94,6 @@ export class AddonsService {
 
     const kuberoPostgresql = new KuberoPostgresql(this.CRDList);
     this.addonsList.push(kuberoPostgresql);
-
   }
 
   public async getAddonsList(): Promise<IPlugin[]> {

@@ -179,10 +179,20 @@ describe('MetricsService', () => {
     expect(result.vector).toBe('10m');
   });
 
-  it('should getStepsAndStart for 7d', () => {
-    const result = (service as any).getStepsAndStart('7d');
-    expect(result.vector).toBe('20m');
+  it('converts getCPUMetrics from cores to millicores', async () => {
+    (service as any).prom.rangeQuery.mockResolvedValueOnce({
+      result: [
+        {
+          metric: { labels: { pod: 'pod1' } },
+          values: [{ time: '2024-05-23T12:00:00Z', value: 0.25 }],
+        },
+      ],
+    });
+    const q = { pipeline: 'pipe', phase: 'phase', app: 'app', scale: '24h' };
+    const result = await service.getCPUMetrics(q as any);
+    expect(result[0].data[0][1]).toBe(250);
   });
+
   describe('query safety and size', () => {
     const base = {
       pipeline: 'pipe',

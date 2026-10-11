@@ -1,18 +1,14 @@
 <template>
     <v-container fluid class="app-overview">
         <v-row class="app-overview__grid">
-            <v-col cols="12" lg="8" class="app-overview__main">
+            <v-col cols="12" class="app-overview__main">
                 <Appstats :pipeline="pipeline" :phase="phase" :app="app" :appData="appData" :pipelineData="pipelineData"></Appstats>
-            </v-col>
-            <v-col cols="12" lg="4" class="app-overview__aside">
-                <Audit :pipeline="pipeline" :phase="phase" :app="app"></Audit>
             </v-col>
         </v-row>
     </v-container>
 </template>
 
 <script lang="ts">
-import Audit from './eventsAudit.vue'
 import Appstats from './appstats.vue'
 
 import { defineComponent } from 'vue'
@@ -43,7 +39,6 @@ export default defineComponent({
     data: () => ({
     }),
     components: {
-        Audit,
         Appstats,
     },
 });
@@ -58,20 +53,8 @@ export default defineComponent({
     margin: -8px;
 }
 
-.app-overview__main,
-.app-overview__aside {
+.app-overview__main {
     padding: 8px;
 }
 
-.app-overview__aside {
-    min-width: 0;
-}
-
-@media (min-width: 1280px) {
-    .app-overview__aside {
-        position: sticky;
-        top: 20px;
-        align-self: flex-start;
-    }
-}
 </style>

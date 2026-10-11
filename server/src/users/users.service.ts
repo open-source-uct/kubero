@@ -22,7 +22,7 @@ export class UsersService {
   private readonly prisma = new PrismaClient();
   private logger = new Logger(UsersService.name);
 
-  constructor() {}
+  constructor() { }
 
   async findOne(username: string): Promise<PrismaUser | null> {
     return this.prisma.user.findUnique({ where: { username } });
@@ -223,9 +223,26 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { username } });
   }
 
-  async create(user: any): Promise<PrismaUser> {
+  async create(user: any): Promise<PartialPrismaUser> {
     //this.logger.debug('Creating user with data:', user);
-    const { role, userGroups, tokens, ...cleanedData } = user;
+    const { role, userGroups } = user;
+    // Lista explicita: evita que el body inyecte campos como roleId, twoFaSecret o id
+    const CREATABLE_FIELDS = [
+      'username',
+      'email',
+      'password',
+      'firstName',
+      'lastName',
+      'image',
+      'isActive',
+      'provider',
+      'providerId',
+      'providerData',
+    ];
+    const cleanedData = Object.fromEntries(
+      Object.entries(user).filter(([key]) => CREATABLE_FIELDS.includes(key)),
+    ) as Pick<PrismaUser, 'username' | 'email' | 'password'> &
+      Partial<Omit<PrismaUser, 'id' | 'roleId'>>;
 
     if (
       cleanedData.password &&
@@ -240,14 +257,18 @@ export class UsersService {
     }
 
     return this.prisma.user.create({
+      omit: {
+        password: true,
+        twoFaSecret: true,
+      },
       data: {
         ...cleanedData,
         role: role && role ? { connect: { id: role } } : undefined,
         userGroups:
           userGroups && Array.isArray(userGroups)
             ? {
-                connect: userGroups.map((g: any) => ({ id: g })),
-              }
+              connect: userGroups.map((g: any) => ({ id: g }))
+            }
             : undefined,
       },
     });
@@ -305,6 +326,7 @@ export class UsersService {
       return await this.prisma.user.update({
         omit: {
           password: true,
+          twoFaSecret: true,
         },
         where: { id: userId },
         data,
@@ -319,7 +341,7 @@ export class UsersService {
   async updatePassword(
     userId: string,
     newPassword: string,
-  ): Promise<PrismaUser | undefined> {
+  ): Promise<PartialPrismaUser | undefined> {
     if (
       !newPassword ||
       typeof newPassword !== 'string' ||
@@ -331,6 +353,7 @@ export class UsersService {
     try {
       const hashedPassword = await bcrypt.hash(newPassword, 10);
       const user = await this.prisma.user.update({
+        omit: { password: true, twoFaSecret: true },
         where: { id: userId },
         data: { password: hashedPassword },
       });
@@ -350,7 +373,7 @@ export class UsersService {
     userId: string,
     currentPassword: string,
     newPassword: string,
-  ): Promise<PrismaUser | undefined> {
+  ): Promise<PartialPrismaUser | undefined> {
     if (
       !currentPassword ||
       !newPassword ||
@@ -397,6 +420,7 @@ export class UsersService {
       // Hash and update new password
       const hashedNewPassword = await bcrypt.hash(newPassword, 10);
       const updatedUser = await this.prisma.user.update({
+        omit: { password: true, twoFaSecret: true },
         where: { id: userId },
         data: { password: hashedNewPassword },
       });

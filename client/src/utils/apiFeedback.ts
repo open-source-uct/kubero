@@ -20,6 +20,7 @@ export type ApiFeedbackAction =
   | 'deleteTeam'
   | 'createTeam'
   | 'deleteToken'
+  | 'createToken'
   | 'saveSettings'
   | 'loadSettings'
   | 'loadNotifications'
