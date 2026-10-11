@@ -215,6 +215,15 @@ describe('MetricsService', () => {
       expect(lastQuery()).toContain('pod=~"app-kuberoapp-.*"');
     });
 
+    it('sums the http metrics by status across ingress-nginx pods', async () => {
+      // el ingress corre un pod por nodo; sin el sum by (status), el mismo
+      // código salía repetido una vez por pod que llegó a atender algo
+      await service.getHttpStatusCodesMetrics(base as any);
+      expect(lastQuery().startsWith('sum by (status) (')).toBe(true);
+      await service.getHttpResponseTimeMetrics(base as any);
+      expect(lastQuery().startsWith('sum by (status) (')).toBe(true);
+    });
+
     it.each([
       ['host', { host: 'x"} or {namespace="other-team' }],
       ['host', { host: 'a.example.test", status=~".+' }],
@@ -272,7 +281,7 @@ describe('MetricsService', () => {
         ...base,
         calc: 'count({__name__=~".+"}) or rate',
       } as any);
-      expect(lastQuery().startsWith('rate(')).toBe(true);
+      expect(lastQuery().startsWith('sum by (status) (rate(')).toBe(true);
       expect(lastQuery()).not.toContain('__name__');
     });
 

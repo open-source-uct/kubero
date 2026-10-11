@@ -296,8 +296,10 @@ export class MetricsService {
     let metrics: QueryResult;
 
     const { end, start, step, vector } = this.getStepsAndStart(q.scale);
-    // rate(nginx_ingress_controller_requests{namespace="asdf-production", host="a.a.localhost"}[10m])
-    const query = `${this.calcOf(q)}(nginx_ingress_controller_requests{namespace="${this.namespaceOf(q)}", host="${this.safe('host', q.host)}"}[${vector}])`;
+    // Sin el ingress ahora corre en varios pods (uno por nodo), y cada uno expone su
+    // propio contador: sin el sum by (status), el mismo código 200 salía repetido
+    // una vez por pod que atendió al menos una petición.
+    const query = `sum by (status) (${this.calcOf(q)}(nginx_ingress_controller_requests{namespace="${this.namespaceOf(q)}", host="${this.safe('host', q.host)}"}[${vector}]))`;
     //console.log(query);
     try {
       metrics = await this.prom.rangeQuery(query, start, end, step);
@@ -328,8 +330,9 @@ export class MetricsService {
     let metrics: QueryResult;
 
     const { end, start, step, vector } = this.getStepsAndStart(q.scale);
-    // rate(nginx_ingress_controller_response_duration_seconds_count{namespace="asdf-production", host="a.a.localhost",status="200"}[10m]) //in ms
-    const query = `${this.calcOf(q)}(nginx_ingress_controller_response_duration_seconds_count{namespace="${this.namespaceOf(q)}", host="${this.safe('host', q.host)}", status="200"}[${vector}])`;
+    // mismo motivo que en getHttpStatusCodesMetrics: varios pods de ingress, sin
+    // sumarlos salían varias series todas con status="200"
+    const query = `sum by (status) (${this.calcOf(q)}(nginx_ingress_controller_response_duration_seconds_count{namespace="${this.namespaceOf(q)}", host="${this.safe('host', q.host)}", status="200"}[${vector}]))`;
     //console.log(query);
     try {
       metrics = await this.prom.rangeQuery(query, start, end, step);
