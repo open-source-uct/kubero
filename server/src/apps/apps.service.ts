@@ -85,6 +85,7 @@ export class AppsService {
       app.phase,
       userGroups,
     );
+    await this.applySharedTlsSecret(app, contextName);
     await this.kubectl.createApp(app, contextName);
 
     const m = {
@@ -126,6 +127,21 @@ export class AppsService {
           'Failed to trigger image build for ' + app.name + ': ' + error,
         );
       });
+    }
+  }
+
+  // Si KUBERO_SHARED_TLS_SECRET_NAME está seteado, reemplaza el secretName del Ingress por
+  // el secreto TLS compartido (copiado al namespace de la app) y deja de pedirle el
+  // certificado a cert-manager. Si no está seteado, no hace nada (comportamiento actual).
+  private async applySharedTlsSecret(app: App, context: string) {
+    const sharedTlsSecret = await this.kubectl.ensureSharedTlsSecret(
+      `${app.pipeline}-${app.phase}`,
+      context,
+    );
+    if (sharedTlsSecret && app.ingress?.tls?.length) {
+      app.ingress.tls.forEach((tls) => (tls.secretName = sharedTlsSecret));
+      delete app.ingress.annotations['cert-manager.io/cluster-issuer'];
+      delete app.ingress.annotations['kubernetes.io/tls-acme'];
     }
   }
 
@@ -669,6 +685,7 @@ export class AppsService {
     }
 
     if (contextName) {
+      await this.applySharedTlsSecret(app, contextName);
       await this.kubectl.updateApp(app, resourceVersion, contextName);
       // IMPORTANT TODO : Update this.appStateList !!
 

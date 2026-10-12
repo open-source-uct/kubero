@@ -49,7 +49,7 @@
 
 <script lang="ts">
 import axios from "axios";
-import { ref, reactive, defineComponent, computed, watch, nextTick } from 'vue'
+import { ref, defineComponent, computed, watch, nextTick } from 'vue'
 import { useKuberoStore } from '../../stores/kubero'
 
 type LogLine = {
@@ -223,23 +223,9 @@ export default defineComponent({
         default: () => []
       },
     },
-    data: () => ({
-        loglines: [
-            /* example
-            {
-                app: "bla"
-                container: "kuberoapp-web"
-                id: "049464b6-3f35-4b72-a885-6c263e64aec7"
-                log: "logtest: nana\n"
-                phase: "production"
-                pipeline: "hoho"
-                pod: "bla-kuberoapp-web-6dfd5c4c9b-mxg9v"
-                podID: "6dfd5c4c9b-mxg9v"
-                time: 1656970421989
-            },
-            */
-        ] as LogLine[],
-    }),
+    // loglines ya lo expone setup() (es el ref que comparten el socket y los
+    // métodos); declararlo también acá chocaba con ese y eslint lo marcaba
+    // como clave duplicada
     methods: {
         // quita los códigos de color ANSI (los de tracing/Rust) y el salto de línea final,
         // para que no aparezcan como texto ni dejen líneas vacías

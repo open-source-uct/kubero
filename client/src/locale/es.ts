@@ -439,6 +439,7 @@ const messages = {
       duplicateEnvVar: 'El nombre de la variable de entorno ya existe',
       showEnvValues: 'Mostrar valores',
       hideEnvValues: 'Ocultar valores',
+      downloadEnvFile: 'Descargar .env',
     },
     strategy: {
       name: 'Estrategia',
