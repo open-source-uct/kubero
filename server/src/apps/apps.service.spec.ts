@@ -134,6 +134,7 @@ describe('AppsService', () => {
             getPods: jest.fn(),
             updateApp: jest.fn(),
             execInContainer: jest.fn(),
+            ensureSharedTlsSecret: jest.fn(),
           },
         },
         {
@@ -193,6 +194,45 @@ describe('AppsService', () => {
       const app = new App(mockApp);
       await service.createApp(app, { username: 'u' } as any, mockUSerGroups);
       expect(kubectl.createApp).not.toHaveBeenCalled();
+    });
+    it('should replace the ingress secretName and drop cert-manager annotations when a shared TLS secret is returned', async () => {
+      (pipelinesService.getContext as jest.Mock).mockResolvedValue('ctx');
+      (kubectl.ensureSharedTlsSecret as jest.Mock).mockResolvedValue(
+        'inf-uct-cl-tls',
+      );
+      const app = new App(mockApp);
+      app.ingress.tls = [{ hosts: ['app.inf.uct.cl'], secretName: 'app-tls' }];
+      app.ingress.annotations = {
+        'cert-manager.io/cluster-issuer': 'letsencrypt-prod',
+        'kubernetes.io/tls-acme': 'true',
+      };
+
+      await service.createApp(app, { username: 'u' } as any, mockUSerGroups);
+
+      expect(kubectl.ensureSharedTlsSecret).toHaveBeenCalledWith(
+        `${app.pipeline}-${app.phase}`,
+        'ctx',
+      );
+      expect(app.ingress.tls[0].secretName).toBe('inf-uct-cl-tls');
+      const annotationKeys = Object.keys(app.ingress.annotations);
+      expect(annotationKeys).not.toContain('cert-manager.io/cluster-issuer');
+      expect(annotationKeys).not.toContain('kubernetes.io/tls-acme');
+    });
+    it('should leave the ingress untouched when no shared TLS secret is configured', async () => {
+      (pipelinesService.getContext as jest.Mock).mockResolvedValue('ctx');
+      (kubectl.ensureSharedTlsSecret as jest.Mock).mockResolvedValue(null);
+      const app = new App(mockApp);
+      app.ingress.tls = [{ hosts: ['app.inf.uct.cl'], secretName: 'app-tls' }];
+      app.ingress.annotations = {
+        'cert-manager.io/cluster-issuer': 'letsencrypt-prod',
+      };
+
+      await service.createApp(app, { username: 'u' } as any, mockUSerGroups);
+
+      expect(app.ingress.tls[0].secretName).toBe('app-tls');
+      expect(Object.keys(app.ingress.annotations)).toContain(
+        'cert-manager.io/cluster-issuer',
+      );
     });
   });
 
@@ -320,6 +360,30 @@ describe('AppsService', () => {
         mockUSerGroups,
       );
       expect(kubectl.updateApp).not.toHaveBeenCalled();
+    });
+    it('should replace the ingress secretName and drop cert-manager annotations when a shared TLS secret is returned', async () => {
+      (pipelinesService.getContext as jest.Mock).mockResolvedValue('ctx');
+      (kubectl.ensureSharedTlsSecret as jest.Mock).mockResolvedValue(
+        'inf-uct-cl-tls',
+      );
+      const app = new App(mockApp);
+      app.ingress.tls = [{ hosts: ['app.inf.uct.cl'], secretName: 'app-tls' }];
+      app.ingress.annotations = {
+        'cert-manager.io/cluster-issuer': 'letsencrypt-prod',
+        'kubernetes.io/tls-acme': 'true',
+      };
+
+      await service.updateApp(
+        app,
+        'rv',
+        { username: 'u' } as any,
+        mockUSerGroups,
+      );
+
+      expect(app.ingress.tls[0].secretName).toBe('inf-uct-cl-tls');
+      expect(Object.keys(app.ingress.annotations)).not.toContain(
+        'cert-manager.io/cluster-issuer',
+      );
     });
   });
 
