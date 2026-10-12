@@ -678,13 +678,25 @@
             </v-row>
 
             <v-row>
-              <v-file-input
-                prepend-icon="mdi-file"
-                label="Drop or select .env file"
-                show-size
-                v-model="envFile"
-                @change="handleFileInput"
-              ></v-file-input>
+              <v-col cols="12" md="9">
+                <v-file-input
+                  prepend-icon="mdi-file"
+                  label="Drop or select .env file"
+                  show-size
+                  v-model="envFile"
+                  @change="handleFileInput"
+                ></v-file-input>
+              </v-col>
+              <v-col cols="12" md="3" class="d-flex align-center">
+                <v-btn
+                  variant="text"
+                  prepend-icon="mdi-download"
+                  :disabled="envVars.length === 0"
+                  @click="downloadEnvFile"
+                >
+                  {{ $t('app.form.downloadEnvFile') }}
+                </v-btn>
+              </v-col>
             </v-row>
           </v-expansion-panel-text>
         </v-expansion-panel>
@@ -2405,6 +2417,22 @@ export default defineComponent({
           this.sAAnnotations.splice(i, 1);
         }
       }
+    },
+    downloadEnvFile() {
+      // mismo formato NOMBRE=valor que ya entiende parseEnvFile al importar
+      const content = this.envVars
+        .filter((envvar: EnvVar) => envvar.name.trim() !== "")
+        .map((envvar: EnvVar) => `${envvar.name}=${envvar.value}`)
+        .join("\n");
+      const filename = this.app && this.app !== "new" ? `${this.app}.env` : "app.env";
+      const url = window.URL.createObjectURL(new Blob([content]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
     },
     handleFileInput() {
       // check if the file is an array or not
