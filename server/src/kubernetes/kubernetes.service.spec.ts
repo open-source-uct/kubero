@@ -33,6 +33,8 @@ jest.mock('@kubernetes/client-node', () => {
         createNamespace: jest.fn().mockResolvedValue({}),
         patchNamespacedCustomObject: jest.fn().mockResolvedValue({}),
         patchNamespacedSecret: jest.fn().mockResolvedValue({}),
+        readNamespacedSecret: jest.fn().mockResolvedValue({ body: {} }),
+        createNamespacedSecret: jest.fn().mockResolvedValue({}),
         createNamespacedJob: jest.fn().mockResolvedValue({}),
         deleteNamespacedJob: jest.fn().mockResolvedValue({}),
         readNamespacedJob: jest.fn().mockResolvedValue({ body: {} }),
@@ -499,6 +501,85 @@ describe('KubernetesService', () => {
     await expect(
       service.updateKuberoSecret('ns', { key: 'value' }),
     ).resolves.toBeUndefined();
+  });
+
+  describe('ensureSharedTlsSecret', () => {
+    const originalEnv = { ...process.env };
+
+    afterEach(() => {
+      process.env = { ...originalEnv };
+    });
+
+    it('returns null and makes no API calls when the feature is disabled', async () => {
+      delete process.env.KUBERO_SHARED_TLS_SECRET_NAME;
+      const coreV1ApiMock = (service as any).coreV1Api;
+
+      const result = await service.ensureSharedTlsSecret(
+        'ramtun-production',
+        'ctx',
+      );
+
+      expect(result).toBeNull();
+      expect(coreV1ApiMock.readNamespacedSecret).not.toHaveBeenCalled();
+    });
+
+    it('returns the secret name without copying when it already exists in the target namespace', async () => {
+      process.env.KUBERO_SHARED_TLS_SECRET_NAME = 'inf-uct-cl-tls';
+      const coreV1ApiMock = (service as any).coreV1Api;
+      coreV1ApiMock.readNamespacedSecret.mockResolvedValueOnce({ body: {} });
+
+      const result = await service.ensureSharedTlsSecret(
+        'ramtun-production',
+        'ctx',
+      );
+
+      expect(result).toBe('inf-uct-cl-tls');
+      expect(coreV1ApiMock.createNamespacedSecret).not.toHaveBeenCalled();
+    });
+
+    it('copies the secret from the source namespace when missing in the target', async () => {
+      process.env.KUBERO_SHARED_TLS_SECRET_NAME = 'inf-uct-cl-tls';
+      process.env.KUBERO_SHARED_TLS_SECRET_NAMESPACE = 'kubero';
+      const coreV1ApiMock = (service as any).coreV1Api;
+      coreV1ApiMock.readNamespacedSecret
+        .mockRejectedValueOnce(new Error('not found in target'))
+        .mockResolvedValueOnce({
+          body: {
+            type: 'kubernetes.io/tls',
+            data: { 'tls.crt': 'ZmFrZQ==', 'tls.key': 'ZmFrZQ==' },
+            metadata: { name: 'inf-uct-cl-tls', namespace: 'kubero' },
+          },
+        });
+
+      const result = await service.ensureSharedTlsSecret(
+        'ramtun-production',
+        'ctx',
+      );
+
+      expect(result).toBe('inf-uct-cl-tls');
+      expect(coreV1ApiMock.createNamespacedSecret).toHaveBeenCalledWith(
+        'ramtun-production',
+        expect.objectContaining({
+          metadata: { name: 'inf-uct-cl-tls', namespace: 'ramtun-production' },
+          data: { 'tls.crt': 'ZmFrZQ==', 'tls.key': 'ZmFrZQ==' },
+        }),
+      );
+    });
+
+    it('returns null without throwing when the source secret cannot be read', async () => {
+      process.env.KUBERO_SHARED_TLS_SECRET_NAME = 'inf-uct-cl-tls';
+      const coreV1ApiMock = (service as any).coreV1Api;
+      coreV1ApiMock.readNamespacedSecret
+        .mockRejectedValueOnce(new Error('not found in target'))
+        .mockRejectedValueOnce(new Error('not found in source either'));
+
+      const result = await service.ensureSharedTlsSecret(
+        'ramtun-production',
+        'ctx',
+      );
+
+      expect(result).toBeNull();
+    });
   });
 
   it('should deleteKuberoBuildJob', async () => {

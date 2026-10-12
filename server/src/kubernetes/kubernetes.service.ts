@@ -34,6 +34,7 @@ import {
   BatchV1Api,
   NetworkingV1Api,
   V1Job,
+  V1Secret,
 } from '@kubernetes/client-node';
 import { WebSocket } from 'ws';
 import stream from 'stream';
@@ -1116,6 +1117,56 @@ export class KubernetesService {
       );
     } catch {
       // this.logger.debug(error);
+    }
+  }
+
+  // Copia el secreto TLS compartido (wildcard del dominio) al namespace de una app, si
+  // todavía no tiene una copia. Así el Ingress puede apuntar directo a él, igual que el
+  // resto de los proyectos del cluster, sin pasarle nada a cert-manager. Desactivado por
+  // defecto: sin KUBERO_SHARED_TLS_SECRET_NAME no se hace ninguna llamada a la API.
+  public async ensureSharedTlsSecret(
+    targetNamespace: string,
+    context: string,
+  ): Promise<string | null> {
+    const secretName = process.env.KUBERO_SHARED_TLS_SECRET_NAME;
+    if (!secretName) {
+      return null;
+    }
+    this.setCurrentContext(context);
+    const sourceNamespace =
+      process.env.KUBERO_SHARED_TLS_SECRET_NAMESPACE ||
+      process.env.KUBERO_NAMESPACE ||
+      'kubero';
+
+    try {
+      await this.coreV1Api.readNamespacedSecret(secretName, targetNamespace);
+      return secretName;
+    } catch {
+      // no existe en el namespace destino, hay que copiarlo
+    }
+
+    try {
+      const { body: source } = await this.coreV1Api.readNamespacedSecret(
+        secretName,
+        sourceNamespace,
+      );
+      const copy: V1Secret = {
+        apiVersion: 'v1',
+        kind: 'Secret',
+        type: source.type,
+        data: source.data,
+        metadata: {
+          name: secretName,
+          namespace: targetNamespace,
+        },
+      };
+      await this.coreV1Api.createNamespacedSecret(targetNamespace, copy);
+      return secretName;
+    } catch {
+      this.logger.error(
+        'No se pudo preparar el secreto TLS compartido en ' + targetNamespace,
+      );
+      return null;
     }
   }
 
