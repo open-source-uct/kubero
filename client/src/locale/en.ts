@@ -633,6 +633,8 @@ const messages = {
         form: {
           name: 'Role Name',
           description: 'Description',
+          scopeToOwnTeam: 'Limit to own teams',
+          scopeToOwnTeamHint: 'Only sees and manages users who share a team with them',
           permissionsRead: 'Read',
           permissionsWrite: 'Write',
           permissions: {

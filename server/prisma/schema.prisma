@@ -114,9 +114,10 @@ model UserGroup {
 }
 
 model Role {
-  id          String  @id @default(cuid())
-  name        String  @unique
-  description String?
+  id             String  @id @default(cuid())
+  name           String  @unique
+  description    String?
+  scopeToOwnTeam Boolean @default(false) // si es true, este rol solo gestiona usuarios de sus propios equipos
 
   users       User[] // Users associated with this role
   permissions Permission[] // Permissions directly assigned to this role

@@ -8,6 +8,7 @@ export interface AuthenticatedUser {
   role: string;
   userGroups: string[];
   permissions: string[];
+  scopeToOwnTeam: boolean;
   strategy?: string;
 }
 
@@ -50,12 +51,14 @@ export class IdentityService {
       throw new UnauthorizedException();
     }
 
-    const rolePermissions = await this.rolesService.getPermissions(
-      user.role?.id,
-    );
+    const {
+      permissions: rolePermissions,
+      scopeToOwnTeam: freshScopeToOwnTeam,
+    } = await this.rolesService.getPermissions(user.role?.id);
     let permissions: string[] = rolePermissions.map(
       (p: any) => `${p.resource}:${p.action}`,
     );
+    let scopeToOwnTeam = freshScopeToOwnTeam;
 
     if (payload.strategy === 'token') {
       // Token personal: si trae el id de su fila (jti) tiene que seguir
@@ -77,6 +80,9 @@ export class IdentityService {
       // los que se le dieron al crearlo
       const granted: string[] = payload.permissions ?? [];
       permissions = permissions.filter((p) => granted.includes(p));
+      // mismo criterio para el acotamiento por equipo: si el token se emitió
+      // acotado, seguir acotado aunque el rol haya cambiado después
+      scopeToOwnTeam = freshScopeToOwnTeam || Boolean(payload.scopeToOwnTeam);
     }
 
     return {
@@ -85,6 +91,7 @@ export class IdentityService {
       role: user.role?.name ?? 'none',
       userGroups: (user.userGroups ?? []).map((g: any) => g.name),
       permissions,
+      scopeToOwnTeam,
       strategy: payload.strategy,
     };
   }

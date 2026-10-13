@@ -481,6 +481,18 @@ watch(() => route.fullPath, () => {
     activeSecondary.value = null
     activeTrigger.value = null
     primaryOpen.value = false
+    return
+  }
+  // en escritorio: si se navegó a algo fuera del grupo abierto (ej. un enlace
+  // directo como Templates mientras el panel de Pipelines estaba abierto),
+  // hay que cerrarlo — nada más avisa que la ruta ya no pertenece a ese grupo
+  const stillInGroup =
+    (activeSecondary.value === 'pipelines' && isPipelineRoute.value) ||
+    (activeSecondary.value === 'accounts' && isAccountsRoute.value) ||
+    (activeSecondary.value === 'settings' && isSettingsRoute.value)
+  if (activeSecondary.value && !stillInGroup) {
+    activeSecondary.value = null
+    activeTrigger.value = null
   }
 })
 

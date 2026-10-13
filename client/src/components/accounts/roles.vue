@@ -45,6 +45,13 @@
           {{ permission.resource }}: {{ permission.action }}
         </span>
       </template>
+      <template v-slot:[`item.scopeToOwnTeam`]="{ item }">
+        <v-icon
+          :icon="item.scopeToOwnTeam ? 'mdi-account-group-outline' : 'mdi-earth'"
+          :color="item.scopeToOwnTeam ? 'primary' : undefined"
+          :aria-label="item.scopeToOwnTeam ? $t('roles.form.scopeToOwnTeam') : 'global'"
+        ></v-icon>
+      </template>
       <template v-slot:[`item.permissionsApp`]="{ item }">
         <span role="img" :aria-label="getResourcePermissionLabel(item.permissions, 'app')">
           <v-icon
@@ -137,8 +144,8 @@
       </template>
       <template v-slot:[`item.actions`]="{ item }">
         <div class="account-actions">
-          <v-tooltip :text="$t('global.edit')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-pencil-outline" variant="text" size="small" :aria-label="`${$t('global.edit')} ${item.name}`" :disabled="item.name === 'admin' || !writeUserPermission" @click="openEditRoleDialog(item)" /></template></v-tooltip>
-          <v-tooltip :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" :disabled="item.name === 'admin' || item.name === 'guest' || item.name === 'member' || !writeUserPermission" @click="deleteRole(item)" /></template></v-tooltip>
+          <v-tooltip :text="$t('global.edit')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-pencil-outline" variant="text" size="small" :aria-label="`${$t('global.edit')} ${item.name}`" :disabled="item.name === 'admin' || !canManageRoles" @click="openEditRoleDialog(item)" /></template></v-tooltip>
+          <v-tooltip :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" :disabled="item.name === 'admin' || item.name === 'guest' || item.name === 'member' || !canManageRoles" @click="deleteRole(item)" /></template></v-tooltip>
         </div>
       </template>
       <template #bottom>
@@ -157,7 +164,7 @@
         color="primary"
         style="margin-right: 6px;"
         @click="openCreateDialog"
-        :disabled="!writeUserPermission"
+        :disabled="!canManageRoles"
       >
         <v-icon>mdi-plus</v-icon>
         <span class="sr-only">{{ $t('roles.actions.create') }}</span>
@@ -171,6 +178,15 @@
         <v-card-text>
           <v-text-field v-model="editedRole.name" :label="$t('roles.form.name')"></v-text-field>
           <v-text-field v-model="editedRole.description" :label="$t('roles.form.description')"></v-text-field>
+          <v-switch
+            v-model="editedRole.scopeToOwnTeam"
+            :disabled="editedRole.name === 'admin'"
+            color="primary"
+            :label="$t('roles.form.scopeToOwnTeam')"
+            :hint="$t('roles.form.scopeToOwnTeamHint')"
+            persistent-hint
+            class="mb-4"
+          ></v-switch>
           <v-table density="compact" class="mb-4">
             <tbody>
               <tr>
@@ -265,6 +281,14 @@
         <v-card-text>
           <v-text-field v-model="newRole.name" :label="$t('roles.form.name')"></v-text-field>
           <v-text-field v-model="newRole.description" :label="$t('roles.form.description')"></v-text-field>
+          <v-switch
+            v-model="newRole.scopeToOwnTeam"
+            color="primary"
+            :label="$t('roles.form.scopeToOwnTeam')"
+            :hint="$t('roles.form.scopeToOwnTeamHint')"
+            persistent-hint
+            class="mb-4"
+          ></v-switch>
           <v-table density="compact" class="mb-4">
             <tbody>
               <tr>
@@ -372,7 +396,8 @@ export default defineComponent({
       id: string | number;
       name: string;
       description?: string;
-      permissions?: Permission[]; 
+      scopeToOwnTeam?: boolean;
+      permissions?: Permission[];
     }
     interface Permission {
       id: string | number;
@@ -403,13 +428,19 @@ export default defineComponent({
     const newRole = ref<Role | any>({
       name: '',
       description: '',
+      scopeToOwnTeam: false,
       permissions: permissionsByResource(),
     })
     const authStore = useAuthStore();
     const writeUserPermission = authStore.hasPermission('user:write')
+    // los roles son definiciones globales del sistema: un usuario acotado a
+    // su propio equipo puede verlos (para saber cuál asignar), pero nunca
+    // crear, editar ni borrar ninguno
+    const canManageRoles = writeUserPermission && !authStore.scopeToOwnTeam
 
     const headers = [
       { title: t('roles.name'), value: 'name' },
+      { title: t('roles.form.scopeToOwnTeam'), value: 'scopeToOwnTeam', align: 'center' as const },
       //{ title: 'Permissions', value: 'permissions' },
       { title: t('roles.form.permissions.apps'), value: 'permissionsApp', align: 'center' as const },
       { title: t('roles.form.permissions.pipelines'), value: 'permissionsPipeline', align: 'center' as const },
@@ -594,6 +625,7 @@ export default defineComponent({
       getResourcePermissions,
       getResourcePermissionLabel,
       writeUserPermission,
+      canManageRoles,
     }
   },
 })

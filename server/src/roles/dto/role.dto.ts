@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsArray,
+  IsBoolean,
   ValidateNested,
   IsIn,
 } from 'class-validator';
@@ -52,6 +53,10 @@ export class CreateRoleDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  scopeToOwnTeam?: boolean;
 
   @IsArray()
   @ValidateNested({ each: true })

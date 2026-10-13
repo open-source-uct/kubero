@@ -332,6 +332,7 @@ export class DatabaseService {
         create: {
           name: 'admin',
           description: 'Administrator role with full access',
+          scopeToOwnTeam: false,
           permissions: {
             create: [
               { action: 'write', resource: 'app' },
@@ -359,6 +360,7 @@ export class DatabaseService {
         create: {
           name: 'member',
           description: 'Member role with limited access',
+          scopeToOwnTeam: false,
           permissions: {
             create: [
               { action: 'write', resource: 'app' },
@@ -386,6 +388,7 @@ export class DatabaseService {
         create: {
           name: 'guest',
           description: 'Guest role with minimal access',
+          scopeToOwnTeam: false,
           permissions: {
             create: [
               { action: 'read', resource: 'app' },
