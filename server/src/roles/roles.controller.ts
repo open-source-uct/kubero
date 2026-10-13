@@ -2,10 +2,12 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Post,
   Put,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -26,6 +28,18 @@ import { CreateRoleDto, UpdateRoleDto } from './dto/role.dto';
 export class RolesController {
   constructor(private rolesService: RolesService) {}
 
+  // Los roles no pertenecen a ningún equipo (a diferencia de usuarios y
+  // equipos), así que acotarlos no tiene sentido: un rol acotado a equipo
+  // propio puede ver los roles (para saber cuál asignar), pero no crear,
+  // editar ni borrar ninguno.
+  private assertNotScoped(req: any) {
+    if (req.user.scopeToOwnTeam) {
+      throw new ForbiddenException(
+        'Tu rol no puede administrar roles del sistema',
+      );
+    }
+  }
+
   @Get('/')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('user:read', 'user:write')
@@ -41,8 +55,8 @@ export class RolesController {
     isArray: true,
   })
   @ApiOperation({ summary: 'Get all Roles' })
-  async getRoles() {
-    return this.rolesService.findAll();
+  async getRoles(@Request() req: any) {
+    return this.rolesService.findAll(req.user.scopeToOwnTeam);
   }
 
   @Post('/')
@@ -60,7 +74,8 @@ export class RolesController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Create a new Role' })
-  async createRole(@Body() role: CreateRoleDto) {
+  async createRole(@Body() role: CreateRoleDto, @Request() req: any) {
+    this.assertNotScoped(req);
     return this.rolesService.createRole(role);
   }
 
@@ -79,7 +94,8 @@ export class RolesController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Delete a Role' })
-  async deleteRole(@Param('roleId') roleId: string) {
+  async deleteRole(@Param('roleId') roleId: string, @Request() req: any) {
+    this.assertNotScoped(req);
     return this.rolesService.deleteRole(roleId);
   }
 
@@ -101,7 +117,9 @@ export class RolesController {
   async updateRole(
     @Param('roleId') roleId: string,
     @Body() role: UpdateRoleDto,
+    @Request() req: any,
   ) {
+    this.assertNotScoped(req);
     return this.rolesService.updateRole(roleId, role);
   }
 }

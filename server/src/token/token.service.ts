@@ -60,7 +60,8 @@ export class TokenService {
 
     const role = user.role?.name || 'guest';
     const userGroups = user.userGroups || [];
-    const permissions = await this.rolesService.getPermissions(user.role?.id);
+    const { permissions, scopeToOwnTeam } =
+      await this.rolesService.getPermissions(user.role?.id);
     const permissionStrings = permissions.map(
       (p: any) => `${p.resource}:${p.action}`,
     );
@@ -104,6 +105,7 @@ export class TokenService {
         permissionStrings,
         expiresAt,
         row.id,
+        scopeToOwnTeam,
       );
     } catch (error) {
       // no dejar una fila sin JWT

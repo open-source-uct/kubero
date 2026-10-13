@@ -31,9 +31,10 @@ describe('TokenService', () => {
   };
 
   const mockRolesService = {
-    getPermissions: jest
-      .fn()
-      .mockResolvedValue([{ resource: 'app', action: 'write' }]),
+    getPermissions: jest.fn().mockResolvedValue({
+      permissions: [{ resource: 'app', action: 'write' }],
+      scopeToOwnTeam: false,
+    }),
   };
 
   beforeEach(async () => {
@@ -57,9 +58,10 @@ describe('TokenService', () => {
       role: { id: 'r1', name: 'admin' },
       userGroups: [{ id: 'g1', name: 'everyone' }],
     });
-    mockRolesService.getPermissions.mockResolvedValue([
-      { resource: 'app', action: 'write' },
-    ]);
+    mockRolesService.getPermissions.mockResolvedValue({
+      permissions: [{ resource: 'app', action: 'write' }],
+      scopeToOwnTeam: false,
+    });
     mockAuthService.generateToken.mockResolvedValue('mocked-jwt-token');
   });
 
@@ -98,6 +100,7 @@ describe('TokenService', () => {
         ['app:write'],
         '2025-01-01',
         '1', // id de la fila: el JWT se firma con él (jti) para poder revocarlo
+        false,
       );
       const createCall = mockPrisma.token.create.mock.calls[0][0];
       expect(createCall.data.role).toBe('admin');

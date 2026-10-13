@@ -12,8 +12,12 @@ export class GroupsService {
   private logger = new Logger(GroupsService.name);
 
   constructor() {}
-  async findAll(): Promise<any[]> {
+  async findAll(
+    callerGroups: string[] = [],
+    scopeToOwnTeam = false,
+  ): Promise<any[]> {
     return this.prisma.userGroup.findMany({
+      where: scopeToOwnTeam ? { name: { in: callerGroups } } : undefined,
       select: {
         id: true,
         name: true,
@@ -35,13 +39,26 @@ export class GroupsService {
     return clean;
   }
 
-  async create(name: string, description: string): Promise<any> {
+  async create(
+    name: string,
+    description: string,
+    callerUserId?: string,
+    scopeToOwnTeam = false,
+  ): Promise<any> {
     const groupData = {
       name: this.cleanName(name),
       description,
     };
     return this.prisma.userGroup.create({
-      data: groupData,
+      data: {
+        ...groupData,
+        // un rol acotado que crea un equipo nuevo no pertenece a él todavía;
+        // sin esto, el equipo que acaba de crear le quedaría invisible
+        users:
+          scopeToOwnTeam && callerUserId
+            ? { connect: { id: callerUserId } }
+            : undefined,
+      },
     });
   }
 
@@ -64,7 +81,25 @@ export class GroupsService {
     }
   }
 
-  async update(id: string, groupData: any): Promise<any> {
+  // Un rol acotado a equipo propio solo puede tocar equipos a los que él
+  // mismo pertenece (crear uno nuevo sí se permite, eso no expone nada de
+  // otros equipos).
+  private async assertOwnTeam(id: string, callerGroups: string[]) {
+    const group = await this.prisma.userGroup.findUnique({ where: { id } });
+    if (group && !callerGroups.includes(group.name)) {
+      throw new ForbiddenException('No tienes acceso a este equipo');
+    }
+  }
+
+  async update(
+    id: string,
+    groupData: any,
+    callerGroups: string[] = [],
+    scopeToOwnTeam = false,
+  ): Promise<any> {
+    if (scopeToOwnTeam) {
+      await this.assertOwnTeam(id, callerGroups);
+    }
     // renombrar 'admin' dejaría a todos sus miembros sin el acceso total
     if (groupData?.name !== undefined) {
       await this.assertNotProtected(id, 'renamed');
@@ -76,7 +111,14 @@ export class GroupsService {
     });
   }
 
-  async delete(id: string): Promise<any> {
+  async delete(
+    id: string,
+    callerGroups: string[] = [],
+    scopeToOwnTeam = false,
+  ): Promise<any> {
+    if (scopeToOwnTeam) {
+      await this.assertOwnTeam(id, callerGroups);
+    }
     await this.assertNotProtected(id, 'deleted');
     return this.prisma.userGroup.delete({
       where: { id },

@@ -50,8 +50,11 @@ export class UsersController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Get all Users' })
-  async getPipelines() {
-    return this.usersService.findAll();
+  async getPipelines(@Request() req: any) {
+    return this.usersService.findAll(
+      req.user.userGroups,
+      req.user.scopeToOwnTeam,
+    );
   }
 
   @Get('/username/:username')
@@ -126,8 +129,17 @@ export class UsersController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Update User by ID' })
-  async updateUser(@Param('id') id: string, @Body() body: UpdateUserDto) {
-    return this.usersService.update(id, body);
+  async updateUser(
+    @Param('id') id: string,
+    @Body() body: UpdateUserDto,
+    @Request() req: any,
+  ) {
+    return this.usersService.update(
+      id,
+      body,
+      req.user.userGroups,
+      req.user.scopeToOwnTeam,
+    );
   }
 
   @Delete('/id/:id')
@@ -146,7 +158,12 @@ export class UsersController {
   })
   @ApiOperation({ summary: 'Delete User by ID' })
   async deleteUser(@Param('id') id: string, @Request() req: any) {
-    return this.usersService.delete(id, req.user.userId);
+    return this.usersService.delete(
+      id,
+      req.user.userId,
+      req.user.userGroups,
+      req.user.scopeToOwnTeam,
+    );
   }
 
   @Put('/id/:id/password/')
@@ -218,9 +235,13 @@ export class UsersController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Create a new User' })
-  async createUser(@Body() body: CreateUserDto) {
+  async createUser(@Body() body: CreateUserDto, @Request() req: any) {
     try {
-      return await this.usersService.create(body);
+      return await this.usersService.create(
+        body,
+        req.user.userGroups,
+        req.user.scopeToOwnTeam,
+      );
     } catch (error) {
       throw new HttpException(
         `Error creating user: ${error.message}`,

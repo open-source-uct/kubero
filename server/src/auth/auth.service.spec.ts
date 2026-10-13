@@ -25,10 +25,13 @@ describe('AuthService', () => {
       }),
     };
     rolesService = {
-      getPermissions: jest.fn().mockResolvedValue([
-        { resource: 'app', action: 'read' },
-        { resource: 'app', action: 'write' },
-      ]),
+      getPermissions: jest.fn().mockResolvedValue({
+        permissions: [
+          { resource: 'app', action: 'read' },
+          { resource: 'app', action: 'write' },
+        ],
+        scopeToOwnTeam: false,
+      }),
     };
     kubectl = {
       getKubernetesVersion: jest.fn().mockReturnValue('1.25'),
@@ -131,6 +134,7 @@ describe('AuthService', () => {
         role: 'none',
         userGroups: [],
         permissions: ['app:read', 'app:write'],
+        scopeToOwnTeam: false,
       });
     });
 
@@ -162,6 +166,7 @@ describe('AuthService', () => {
         role: 'none',
         userGroups: [],
         permissions: ['app:read', 'app:write'],
+        scopeToOwnTeam: false,
       });
     });
   });
@@ -182,6 +187,7 @@ describe('AuthService', () => {
           role: 'student',
           userGroups: ['students'],
           permissions: ['app:write'],
+          scopeToOwnTeam: false,
           strategy: 'token',
         },
         expect.objectContaining({ expiresIn: 36000 }),
