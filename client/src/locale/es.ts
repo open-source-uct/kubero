@@ -632,6 +632,8 @@ const messages = {
     form: {
       name: 'Nombre del rol',
       description: 'Descripción',
+      scopeToOwnTeam: 'Acotar a equipos propios',
+      scopeToOwnTeamHint: 'Solo ve y gestiona usuarios que comparten un equipo con él',
       permissionsRead: 'Lectura',
       permissionsWrite: 'Escritura',
       permissions: {

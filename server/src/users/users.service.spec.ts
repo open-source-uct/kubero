@@ -31,6 +31,7 @@ describe('UsersService', () => {
     };
     userGroup: {
       findFirst: jest.Mock;
+      findMany: jest.Mock;
     };
   };
 
@@ -53,6 +54,7 @@ describe('UsersService', () => {
       },
       userGroup: {
         findFirst: jest.fn(),
+        findMany: jest.fn(),
       },
     };
 
@@ -722,6 +724,200 @@ describe('UsersService', () => {
 
       // Should not throw, but handle gracefully
       await expect(service.delete('nonexistent')).resolves.toBeUndefined();
+    });
+  });
+
+  describe('scopeToOwnTeam', () => {
+    it('findAll filters by the caller teams when the role is scoped', async () => {
+      prismaMock.user.findMany.mockResolvedValueOnce([]);
+      await service.findAll(['Taller1'], true);
+      expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userGroups: { some: { name: { in: ['Taller1'] } } } },
+        }),
+      );
+    });
+
+    it('findAll does not filter when the role is not scoped', async () => {
+      prismaMock.user.findMany.mockResolvedValueOnce([]);
+      await service.findAll(['Taller1'], false);
+      expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: undefined }),
+      );
+    });
+
+    it('create rejects assigning a team outside the caller teams', async () => {
+      prismaMock.userGroup.findMany.mockResolvedValueOnce([
+        { id: 'g-taller2', name: 'Taller2' },
+      ]);
+      await expect(
+        service.create(
+          { username: 'ana', password: 'pass', userGroups: ['g-taller2'] },
+          ['Taller1'],
+          true,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prismaMock.user.create).not.toHaveBeenCalled();
+    });
+
+    it('create rejects assigning a role that can manage users but is not itself scoped', async () => {
+      prismaMock.role.findUnique.mockResolvedValueOnce({
+        scopeToOwnTeam: false,
+        permissions: [{ resource: 'user', action: 'write' }],
+      });
+      await expect(
+        service.create(
+          { username: 'ana', password: 'pass', role: 'admin-role-id' },
+          ['Taller1'],
+          true,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prismaMock.user.create).not.toHaveBeenCalled();
+    });
+
+    it('create rejects assigning a role with config:write but not itself scoped', async () => {
+      prismaMock.role.findUnique.mockResolvedValueOnce({
+        scopeToOwnTeam: false,
+        permissions: [{ resource: 'config', action: 'write' }],
+      });
+      await expect(
+        service.create(
+          { username: 'ana', password: 'pass', role: 'ops-role-id' },
+          ['Taller1'],
+          true,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prismaMock.user.create).not.toHaveBeenCalled();
+    });
+
+    it('create allows assigning a harmless role (no user:write) even if not scoped', async () => {
+      prismaMock.role.findUnique.mockResolvedValueOnce({
+        scopeToOwnTeam: false,
+        permissions: [],
+      });
+      prismaMock.userGroup.findMany.mockResolvedValueOnce([
+        { id: 'g-taller1', name: 'Taller1' },
+      ]);
+      prismaMock.user.create.mockResolvedValueOnce({ id: 'u-new' });
+      await expect(
+        service.create(
+          {
+            username: 'ana',
+            password: 'pass',
+            role: 'student-role-id',
+            userGroups: ['g-taller1'],
+          },
+          ['Taller1'],
+          true,
+        ),
+      ).resolves.toEqual({ id: 'u-new' });
+    });
+
+    it('create allows a team that the caller belongs to', async () => {
+      prismaMock.userGroup.findMany.mockResolvedValueOnce([
+        { id: 'g-taller1', name: 'Taller1' },
+      ]);
+      prismaMock.user.create.mockResolvedValueOnce({ id: 'u-new' });
+      await service.create(
+        { username: 'ana', password: 'pass', userGroups: ['g-taller1'] },
+        ['Taller1'],
+        true,
+      );
+      expect(prismaMock.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userGroups: { connect: [{ id: 'g-taller1' }] },
+          }),
+        }),
+      );
+    });
+
+    it('update rejects touching a user that shares no team with the caller', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        userGroups: [{ name: 'Taller2' }],
+      });
+      await expect(
+        service.update('u1', { username: 'x' }, ['Taller1'], true),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prismaMock.user.update).not.toHaveBeenCalled();
+    });
+
+    it('update allows touching a user that shares a team with the caller', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        userGroups: [{ name: 'Taller1' }],
+      });
+      prismaMock.user.update.mockResolvedValueOnce({ id: 'u1' });
+      await expect(
+        service.update('u1', { username: 'x' }, ['Taller1'], true),
+      ).resolves.toEqual({ id: 'u1' });
+    });
+
+    it('update never wipes a team membership outside the caller own scope', async () => {
+      // el estudiante está en Taller1 (del profesor) y en Taller2 (ajeno);
+      // el profesor solo puede tocar su propia membresía
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        userGroups: [{ name: 'Taller1' }, { name: 'Taller2' }],
+      });
+      prismaMock.userGroup.findMany.mockResolvedValueOnce([
+        { id: 'g-taller1', name: 'Taller1' },
+      ]);
+      prismaMock.userGroup.findMany.mockResolvedValueOnce([
+        { id: 'g-taller1' },
+      ]);
+      prismaMock.user.update.mockResolvedValueOnce({ id: 'u1' });
+
+      await service.update(
+        'u1',
+        { userGroups: ['g-taller1'] },
+        ['Taller1'],
+        true,
+      );
+
+      expect(prismaMock.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userGroups: {
+              disconnect: [],
+              connect: [{ id: 'g-taller1' }],
+            },
+          }),
+        }),
+      );
+    });
+
+    it('disconnects only the caller own team when removing the user from it, leaving unrelated teams untouched', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        userGroups: [{ name: 'Taller1' }, { name: 'Taller2' }],
+      });
+      // el profesor quita al estudiante de Taller1 (no manda ningún equipo)
+      prismaMock.userGroup.findMany.mockResolvedValueOnce([
+        { id: 'g-taller1' },
+      ]);
+      prismaMock.user.update.mockResolvedValueOnce({ id: 'u1' });
+
+      await service.update('u1', { userGroups: [] }, ['Taller1'], true);
+
+      expect(prismaMock.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userGroups: {
+              disconnect: [{ id: 'g-taller1' }],
+              connect: [],
+            },
+          }),
+        }),
+      );
+    });
+
+    it('delete rejects removing a user that shares no team with the caller', async () => {
+      // assertSharesTeam corre antes que assertAnotherAdminRemains
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        userGroups: [{ name: 'Taller2' }],
+      });
+      await expect(
+        service.delete('u1', 'caller', ['Taller1'], true),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prismaMock.user.delete).not.toHaveBeenCalled();
     });
   });
 });

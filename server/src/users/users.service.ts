@@ -177,8 +177,14 @@ export class UsersService {
     });
   }
 
-  async findAll(): Promise<User[]> {
+  async findAll(
+    callerGroups: string[] = [],
+    scopeToOwnTeam = false,
+  ): Promise<User[]> {
     return this.prisma.user.findMany({
+      where: scopeToOwnTeam
+        ? { userGroups: { some: { name: { in: callerGroups } } } }
+        : undefined,
       select: {
         id: true,
         username: true,
@@ -223,9 +229,99 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { username } });
   }
 
-  async create(user: any): Promise<PartialPrismaUser> {
+  // Un rol acotado a equipo propio (Role.scopeToOwnTeam) solo puede gestionar
+  // usuarios de sus propios equipos, y solo puede asignarles equipos propios y
+  // roles que también estén acotados (si no, podría crear un usuario con un
+  // rol global y saltarse el acotamiento).
+  private async restrictGroupIdsToCallerTeams(
+    groupIds: any[],
+    callerGroups: string[],
+  ): Promise<string[]> {
+    const ids = (groupIds || []).map((g: any) =>
+      typeof g === 'string' ? g : g.id,
+    );
+    if (ids.length === 0) {
+      return [];
+    }
+    const groups = await this.prisma.userGroup.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true },
+    });
+    const allowed = groups
+      .filter((g) => callerGroups.includes(g.name))
+      .map((g) => g.id);
+    if (allowed.length === 0) {
+      throw new ForbiddenException(
+        'No puedes asignar equipos fuera de los tuyos',
+      );
+    }
+    return allowed;
+  }
+
+  // user:write (gestiona usuarios) y config:write (configuración global del
+  // sistema) son los dos permisos que permiten escalar más allá de "mi
+  // equipo"; un rol sin ninguno de los dos no puede escalar privilegios, así
+  // que no hace falta que esté acotado para poder asignarlo (ej. student)
+  private static readonly ESCALATING_PERMISSIONS = [
+    { resource: 'user', action: 'write' },
+    { resource: 'config', action: 'write' },
+  ] as const;
+
+  private async assertAssignableRole(roleId: string): Promise<void> {
+    const role = await this.prisma.role.findUnique({
+      where: { id: roleId },
+      select: {
+        scopeToOwnTeam: true,
+        permissions: {
+          where: { OR: [...UsersService.ESCALATING_PERMISSIONS] },
+        },
+      },
+    });
+    if (!role) {
+      throw new ForbiddenException('El rol no existe');
+    }
+    const canEscalate = role.permissions.length > 0;
+    if (canEscalate && !role.scopeToOwnTeam) {
+      throw new ForbiddenException(
+        'No puedes asignar un rol con permisos de administración sin que esté acotado a tu equipo',
+      );
+    }
+  }
+
+  private async assertSharesTeam(
+    userId: string,
+    callerGroups: string[],
+  ): Promise<void> {
+    const target = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { userGroups: { select: { name: true } } },
+    });
+    if (!target) {
+      return;
+    }
+    const shares = target.userGroups.some((g) => callerGroups.includes(g.name));
+    if (!shares) {
+      throw new ForbiddenException('No tienes acceso a este usuario');
+    }
+  }
+
+  async create(
+    user: any,
+    callerGroups: string[] = [],
+    scopeToOwnTeam = false,
+  ): Promise<PartialPrismaUser> {
     //this.logger.debug('Creating user with data:', user);
     const { role, userGroups } = user;
+    let resolvedUserGroups = userGroups;
+    if (scopeToOwnTeam) {
+      if (role) {
+        await this.assertAssignableRole(role);
+      }
+      resolvedUserGroups = await this.restrictGroupIdsToCallerTeams(
+        userGroups,
+        callerGroups,
+      );
+    }
     // Lista explicita: evita que el body inyecte campos como roleId, twoFaSecret o id
     const CREATABLE_FIELDS = [
       'username',
@@ -265,10 +361,12 @@ export class UsersService {
         ...cleanedData,
         role: role && role ? { connect: { id: role } } : undefined,
         userGroups:
-          userGroups && Array.isArray(userGroups)
+          resolvedUserGroups && Array.isArray(resolvedUserGroups)
             ? {
-              connect: userGroups.map((g: any) => ({ id: g }))
-            }
+                connect: resolvedUserGroups.map((g: any) => ({
+                  id: g.id || g,
+                })),
+              }
             : undefined,
       },
     });
@@ -277,7 +375,12 @@ export class UsersService {
   async update(
     userId: string,
     user: any,
+    callerGroups: string[] = [],
+    scopeToOwnTeam = false,
   ): Promise<PartialPrismaUser | undefined> {
+    if (scopeToOwnTeam) {
+      await this.assertSharesTeam(userId, callerGroups);
+    }
     const {
       id,
       createdAt,
@@ -304,15 +407,40 @@ export class UsersService {
       }
     }
 
+    if (scopeToOwnTeam && role && typeof role === 'string') {
+      await this.assertAssignableRole(role);
+    }
+
     // fix relations
     if (role && typeof role === 'string') {
       data.role = { connect: { id: role } };
     }
     if (userGroups && Array.isArray(userGroups)) {
-      data.userGroups = {
-        set: [],
-        connect: userGroups.map((g: any) => ({ id: g.id || g })),
-      };
+      if (scopeToOwnTeam) {
+        const resolvedUserGroups = await this.restrictGroupIdsToCallerTeams(
+          userGroups,
+          callerGroups,
+        );
+        // nunca un "set" completo acá: un rol acotado no debe poder tocar
+        // (ni borrar sin querer) la membresía del usuario en equipos fuera de
+        // su propio alcance, así que solo se desconectan/conectan sus
+        // propios equipos, dejando el resto intacto
+        const ownGroups = await this.prisma.userGroup.findMany({
+          where: { name: { in: callerGroups } },
+          select: { id: true },
+        });
+        data.userGroups = {
+          disconnect: ownGroups
+            .filter((g) => !resolvedUserGroups.includes(g.id))
+            .map((g) => ({ id: g.id })),
+          connect: resolvedUserGroups.map((id) => ({ id })),
+        };
+      } else {
+        data.userGroups = {
+          set: [],
+          connect: userGroups.map((g: any) => ({ id: g.id || g })),
+        };
+      }
     }
 
     if (Object.keys(data).length === 0) {
@@ -454,9 +582,17 @@ export class UsersService {
     }
   }
 
-  async delete(userId: string, actingUserId?: string): Promise<void> {
+  async delete(
+    userId: string,
+    actingUserId?: string,
+    callerGroups: string[] = [],
+    scopeToOwnTeam = false,
+  ): Promise<void> {
     if (actingUserId && actingUserId === userId) {
       throw new ForbiddenException('You cannot delete your own account');
+    }
+    if (scopeToOwnTeam) {
+      await this.assertSharesTeam(userId, callerGroups);
     }
     await this.assertAnotherAdminRemains(userId);
     try {

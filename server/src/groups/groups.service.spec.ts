@@ -150,6 +150,96 @@ describe('GroupsService protected teams', () => {
   });
 });
 
+describe('GroupsService scopeToOwnTeam', () => {
+  let service: GroupsService;
+  let prisma: any;
+
+  beforeEach(() => {
+    prisma = {
+      userGroup: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn(),
+        update: jest.fn().mockResolvedValue({}),
+        delete: jest.fn().mockResolvedValue({}),
+      },
+    };
+    service = new GroupsService();
+    // @ts-expect-error prisma es privado; se reemplaza por un mock
+    service['prisma'] = prisma;
+  });
+
+  it('findAll filters by the caller teams when scoped', async () => {
+    await service.findAll(['Taller1'], true);
+    expect(prisma.userGroup.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { name: { in: ['Taller1'] } } }),
+    );
+  });
+
+  it('findAll does not filter when not scoped', async () => {
+    await service.findAll(['Taller1'], false);
+    expect(prisma.userGroup.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: undefined }),
+    );
+  });
+
+  it('refuses to update a team the caller does not belong to', async () => {
+    prisma.userGroup.findUnique.mockResolvedValue({
+      id: 'g',
+      name: 'Taller2',
+    });
+    await expect(
+      service.update('g', { description: 'x' }, ['Taller1'], true),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.userGroup.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses to delete a team the caller does not belong to', async () => {
+    prisma.userGroup.findUnique.mockResolvedValue({
+      id: 'g',
+      name: 'Taller2',
+    });
+    await expect(service.delete('g', ['Taller1'], true)).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(prisma.userGroup.delete).not.toHaveBeenCalled();
+  });
+
+  it('allows updating and deleting a team the caller belongs to', async () => {
+    prisma.userGroup.findUnique.mockResolvedValue({
+      id: 'g',
+      name: 'Taller1',
+    });
+    await service.update('g', { description: 'x' }, ['Taller1'], true);
+    await service.delete('g', ['Taller1'], true);
+    expect(prisma.userGroup.update).toHaveBeenCalled();
+    expect(prisma.userGroup.delete).toHaveBeenCalled();
+  });
+
+  it('create joins the caller to the new team when scoped (otherwise it would be invisible to them)', async () => {
+    prisma.userGroup.create = jest.fn().mockResolvedValue({});
+    await service.create('Taller3', 'desc', 'caller-id', true);
+    expect(prisma.userGroup.create).toHaveBeenCalledWith({
+      data: {
+        name: 'Taller3',
+        description: 'desc',
+        users: { connect: { id: 'caller-id' } },
+      },
+    });
+  });
+
+  it('create does not join the caller when not scoped', async () => {
+    prisma.userGroup.create = jest.fn().mockResolvedValue({});
+    await service.create('Taller3', 'desc', 'caller-id', false);
+    expect(prisma.userGroup.create).toHaveBeenCalledWith({
+      data: {
+        name: 'Taller3',
+        description: 'desc',
+        users: undefined,
+      },
+    });
+  });
+});
+
 describe('GroupsService names', () => {
   let service: GroupsService;
   let prisma: any;

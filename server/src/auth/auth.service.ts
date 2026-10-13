@@ -76,7 +76,8 @@ export class AuthService {
       throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
     }
 
-    const permissions = await this.rolesService.getPermissions(user.roleId);
+    const { permissions, scopeToOwnTeam } =
+      await this.rolesService.getPermissions(user.roleId);
     user.permissions = permissions.map((p) => `${p.resource}:${p.action}`);
 
     // Defines the user object to be signed in the JWT
@@ -87,6 +88,7 @@ export class AuthService {
       role: user.role ? user.role.name : 'none',
       userGroups: user.userGroups ? user.userGroups.map((g) => g.name) : [],
       permissions: user.permissions ? user.permissions : [],
+      scopeToOwnTeam,
       strategy: 'local',
     };
 
@@ -121,7 +123,8 @@ export class AuthService {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
 
-    const permissions = await this.rolesService.getPermissions(user.roleId);
+    const { permissions, scopeToOwnTeam } =
+      await this.rolesService.getPermissions(user.roleId);
     user.permissions = permissions.map((p) => `${p.resource}:${p.action}`);
 
     const u = {
@@ -130,6 +133,7 @@ export class AuthService {
       role: user.role ? user.role.name : 'none',
       userGroups: user.userGroups ? user.userGroups.map((g) => g.name) : [],
       permissions: user.permissions ? user.permissions : [],
+      scopeToOwnTeam,
       strategy: 'oauth2',
     };
     return this.jwtService.sign(u);
@@ -143,6 +147,7 @@ export class AuthService {
     permissions: string[] = [],
     expiresAt?: string,
     tokenId?: string,
+    scopeToOwnTeam = false,
   ): Promise<string> {
     if (!userId || !username || !role) {
       this.logger.error('Invalid user data for token generation', {
@@ -159,6 +164,7 @@ export class AuthService {
       role: role,
       userGroups: userGroups,
       permissions: permissions,
+      scopeToOwnTeam,
       strategy: 'token',
     };
 

@@ -37,8 +37,10 @@ describe('RolesService protections', () => {
     prisma = {
       role: {
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         delete: jest.fn().mockResolvedValue({ id: 'r' }),
         update: jest.fn().mockResolvedValue({ id: 'r' }),
+        create: jest.fn().mockResolvedValue({ id: 'r' }),
       },
       user: { count: jest.fn().mockResolvedValue(0) },
     };
@@ -127,6 +129,107 @@ describe('RolesService protections', () => {
         permissions: withPermissions('app:read'),
       });
       expect(prisma.role.update).toHaveBeenCalled();
+    });
+
+    it('refuses to scope the admin role to a team', async () => {
+      prisma.role.findUnique.mockResolvedValue({ id: 'r', name: 'admin' });
+      await expect(
+        service.updateRole('r', {
+          name: 'admin',
+          scopeToOwnTeam: true,
+          permissions: withPermissions('user:write', 'config:write'),
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.role.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('scopeToOwnTeam', () => {
+    it('createRole saves scopeToOwnTeam on the new role', async () => {
+      await service.createRole({
+        name: 'profesor',
+        scopeToOwnTeam: true,
+        permissions: withPermissions('user:write'),
+      });
+      expect(prisma.role.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ scopeToOwnTeam: true }),
+        }),
+      );
+    });
+
+    it('createRole defaults scopeToOwnTeam to false when omitted', async () => {
+      await service.createRole({
+        name: 'profesor',
+        permissions: withPermissions('user:write'),
+      });
+      expect(prisma.role.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ scopeToOwnTeam: false }),
+        }),
+      );
+    });
+
+    it('updateRole saves scopeToOwnTeam on a non-admin role', async () => {
+      prisma.role.findUnique.mockResolvedValue({ id: 'r', name: 'profesor' });
+      await service.updateRole('r', {
+        name: 'profesor',
+        scopeToOwnTeam: true,
+        permissions: withPermissions('user:write'),
+      });
+      expect(prisma.role.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ scopeToOwnTeam: true }),
+        }),
+      );
+    });
+
+    it('getPermissions returns the scopeToOwnTeam flag alongside permissions', async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        scopeToOwnTeam: true,
+        permissions: [{ id: 'p1', resource: 'user', action: 'write' }],
+      });
+      const result = await service.getPermissions('r');
+      expect(result).toEqual({
+        permissions: [{ id: 'p1', resource: 'user', action: 'write' }],
+        scopeToOwnTeam: true,
+      });
+    });
+
+    it('getPermissions defaults to not scoped for a missing role', async () => {
+      prisma.role.findUnique.mockResolvedValue(null);
+      const result = await service.getPermissions('missing');
+      expect(result).toEqual({ permissions: [], scopeToOwnTeam: false });
+    });
+
+    it('findAll returns every role when the caller is not scoped', async () => {
+      await service.findAll(false);
+      expect(prisma.role.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: undefined }),
+      );
+    });
+
+    it('findAll only shows assignable roles when the caller is scoped', async () => {
+      await service.findAll(true);
+      expect(prisma.role.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: [
+              { scopeToOwnTeam: true },
+              {
+                permissions: {
+                  none: {
+                    OR: [
+                      { resource: 'user', action: 'write' },
+                      { resource: 'config', action: 'write' },
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+        }),
+      );
     });
   });
 });

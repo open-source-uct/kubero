@@ -21,11 +21,15 @@ describe('UsersController', () => {
     expect(controller).toBeDefined();
   });
 
+  const req = {
+    user: { userId: 'u1', userGroups: ['everyone'], scopeToOwnTeam: false },
+  };
+
   describe('createUser', () => {
     it('returns the created user', async () => {
       users.create.mockResolvedValue({ id: 'u1' });
       await expect(
-        controller.createUser({ username: 'ana' } as any),
+        controller.createUser({ username: 'ana' } as any, req),
       ).resolves.toEqual({ id: 'u1' });
     });
 
@@ -34,7 +38,7 @@ describe('UsersController', () => {
       // recibía un 500 genérico
       users.create.mockRejectedValue(new Error('team not found'));
       const error = await controller
-        .createUser({ username: 'ana' } as any)
+        .createUser({ username: 'ana' } as any, req)
         .catch((e) => e);
       expect(error).toBeInstanceOf(HttpException);
       expect(error.getStatus()).toBe(400);
@@ -44,8 +48,13 @@ describe('UsersController', () => {
 
   describe('deleteUser', () => {
     it('passes the acting user so nobody can delete their own account', async () => {
-      await controller.deleteUser('u2', { user: { userId: 'u1' } });
-      expect(users.delete).toHaveBeenCalledWith('u2', 'u1');
+      await controller.deleteUser('u2', req);
+      expect(users.delete).toHaveBeenCalledWith(
+        'u2',
+        'u1',
+        ['everyone'],
+        false,
+      );
     });
   });
 });

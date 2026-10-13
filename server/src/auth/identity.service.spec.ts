@@ -20,10 +20,13 @@ describe('IdentityService.resolve', () => {
       findToken: jest.fn(),
     };
     rolesService = {
-      getPermissions: jest.fn().mockResolvedValue([
-        { resource: 'app', action: 'write' },
-        { resource: 'pipeline', action: 'read' },
-      ]),
+      getPermissions: jest.fn().mockResolvedValue({
+        permissions: [
+          { resource: 'app', action: 'write' },
+          { resource: 'pipeline', action: 'read' },
+        ],
+        scopeToOwnTeam: false,
+      }),
     };
     strategy = new IdentityService(usersService as any, rolesService as any);
   });
@@ -44,14 +47,16 @@ describe('IdentityService.resolve', () => {
       role: 'member',
       userGroups: ['Taller1'],
       permissions: ['app:write', 'pipeline:read'],
+      scopeToOwnTeam: false,
       strategy: 'local',
     });
   });
 
   it('reflects a role change immediately', async () => {
-    rolesService.getPermissions.mockResolvedValue([
-      { resource: 'app', action: 'read' },
-    ]);
+    rolesService.getPermissions.mockResolvedValue({
+      permissions: [{ resource: 'app', action: 'read' }],
+      scopeToOwnTeam: false,
+    });
     const user = await strategy.resolve({ userId: 'u1', strategy: 'local' });
     expect(user.permissions).toEqual(['app:read']);
   });

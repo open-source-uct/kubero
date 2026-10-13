@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Put,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -41,8 +42,11 @@ export class GroupsController {
     isArray: true,
   })
   @ApiOperation({ summary: 'Get all Groups' })
-  async getGroups() {
-    return this.groupsService.findAll();
+  async getGroups(@Request() req: any) {
+    return this.groupsService.findAll(
+      req.user.userGroups,
+      req.user.scopeToOwnTeam,
+    );
   }
 
   @Post('/')
@@ -60,8 +64,13 @@ export class GroupsController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Create a new Group' })
-  async createGroup(@Body() groupData: CreateGroupDto) {
-    return this.groupsService.create(groupData.name, groupData.description);
+  async createGroup(@Body() groupData: CreateGroupDto, @Request() req: any) {
+    return this.groupsService.create(
+      groupData.name,
+      groupData.description,
+      req.user.userId,
+      req.user.scopeToOwnTeam,
+    );
   }
 
   @Delete('/:id')
@@ -79,11 +88,15 @@ export class GroupsController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Delete a Group by ID' })
-  async deleteGroup(@Param('id') id: string) {
+  async deleteGroup(@Param('id') id: string, @Request() req: any) {
     if (!id) {
       throw new Error('Group ID is required');
     }
-    return this.groupsService.delete(id);
+    return this.groupsService.delete(
+      id,
+      req.user.userGroups,
+      req.user.scopeToOwnTeam,
+    );
   }
 
   @Put('/:id')
@@ -104,7 +117,13 @@ export class GroupsController {
   async updateGroup(
     @Param('id') id: string,
     @Body() groupData: UpdateGroupDto,
+    @Request() req: any,
   ) {
-    return this.groupsService.update(id, groupData);
+    return this.groupsService.update(
+      id,
+      groupData,
+      req.user.userGroups,
+      req.user.scopeToOwnTeam,
+    );
   }
 }
