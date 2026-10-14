@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { AuthService } from '../auth/auth.service';
 import { UsersService } from '../users/users.service';
@@ -60,7 +60,7 @@ export class TokenService {
 
     const role = user.role?.name || 'guest';
     const userGroups = user.userGroups || [];
-    const { permissions, scopeToOwnTeam } =
+    const { permissions, scopeToOwnTeam, priority } =
       await this.rolesService.getPermissions(user.role?.id);
     const permissionStrings = permissions.map(
       (p: any) => `${p.resource}:${p.action}`,
@@ -106,6 +106,7 @@ export class TokenService {
         expiresAt,
         row.id,
         scopeToOwnTeam,
+        priority,
       );
     } catch (error) {
       // no dejar una fila sin JWT
@@ -120,7 +121,26 @@ export class TokenService {
     };
   }
 
-  async delete(id: string): Promise<any> {
+  // Un token solo lo puede borrar su propio dueño, salvo que quien pida el
+  // borrado tenga token:write (hoy solo admin): si no, cualquier rol con
+  // token:ok (profesor/webmaster/estudiante) podría revocar el token de
+  // cualquier otro usuario adivinando su id.
+  async delete(
+    id: string,
+    callerId: string,
+    canManageAnyToken = false,
+  ): Promise<any> {
+    if (!canManageAnyToken) {
+      const token = await this.prisma.token.findUnique({
+        where: { id },
+        select: { userId: true },
+      });
+      if (!token || token.userId !== callerId) {
+        throw new ForbiddenException(
+          'No puedes borrar un token que no es tuyo',
+        );
+      }
+    }
     return this.prisma.token.delete({
       where: { id },
     });

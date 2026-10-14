@@ -205,7 +205,9 @@
             :items="teams"
             item-title="name"
             item-value="id"
-            :label="$t('user.teams')"
+            :label="isScopedCaller ? `${$t('user.teams')} *` : $t('user.teams')"
+            :hint="isScopedCaller ? $t('user.errors.teamRequired') : undefined"
+            :persistent-hint="isScopedCaller"
             multiple
             clearable
           >
@@ -262,6 +264,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useI18n } from 'vue-i18n'
 import { handledApiErrorConfig, notifyApiError } from '../../utils/apiFeedback'
 import { confirmDestructiveAction } from '../../utils/destructiveConfirmation'
+import { useNotificationStore } from '../../stores/notifications'
 
 export default defineComponent({
   name: 'UserList',
@@ -357,6 +360,7 @@ export default defineComponent({
     const roles = ref<Role[]>([])
     const authStore = useAuthStore();
     const writeUserPermission = authStore.hasPermission('user:write')
+    const isScopedCaller = authStore.scopeToOwnTeam
 
     const headers = [
       { title: t('user.username'), value: 'username' },
@@ -537,6 +541,15 @@ export default defineComponent({
     }
 
     const saveCreate = async () => {
+      // un rol acotado que crea un usuario sin equipo lo deja invisible para
+      // sí mismo desde el día uno (solo admin podría volver a encontrarlo)
+      if (authStore.scopeToOwnTeam && !newUser.value.userGroups?.length) {
+        useNotificationStore().error(
+          t('user.errors.teamRequiredTitle'),
+          t('user.errors.teamRequired'),
+        )
+        return
+      }
       try {
         await axios.post('/api/users', newUser.value, handledApiErrorConfig)
         await loadUsers()
@@ -634,6 +647,7 @@ export default defineComponent({
       roles,
       teams,
       writeUserPermission,
+      isScopedCaller,
     }
   },
 })

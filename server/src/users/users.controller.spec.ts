@@ -5,10 +5,22 @@ import { UsersService } from './users.service';
 
 describe('UsersController', () => {
   let controller: UsersController;
-  let users: { create: jest.Mock; delete: jest.Mock };
+  let users: {
+    create: jest.Mock;
+    delete: jest.Mock;
+    findByUsername: jest.Mock;
+    findById: jest.Mock;
+    updatePassword: jest.Mock;
+  };
 
   beforeEach(async () => {
-    users = { create: jest.fn(), delete: jest.fn() };
+    users = {
+      create: jest.fn(),
+      delete: jest.fn(),
+      findByUsername: jest.fn(),
+      findById: jest.fn(),
+      updatePassword: jest.fn(),
+    };
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
       providers: [{ provide: UsersService, useValue: users }],
@@ -54,6 +66,49 @@ describe('UsersController', () => {
         'u1',
         ['everyone'],
         false,
+      );
+    });
+  });
+
+  describe('getUserByUsername', () => {
+    it('passes the caller scope so a scoped role cannot look up another team', async () => {
+      const scopedReq = {
+        user: { userId: 'u1', userGroups: ['Taller1'], scopeToOwnTeam: true },
+      };
+      await controller.getUserByUsername('ana', scopedReq);
+      expect(users.findByUsername).toHaveBeenCalledWith(
+        'ana',
+        ['Taller1'],
+        true,
+      );
+    });
+  });
+
+  describe('getUserById', () => {
+    it('passes the caller scope so a scoped role cannot look up another team', async () => {
+      const scopedReq = {
+        user: { userId: 'u1', userGroups: ['Taller1'], scopeToOwnTeam: true },
+      };
+      await controller.getUserById('u2', scopedReq);
+      expect(users.findById).toHaveBeenCalledWith('u2', ['Taller1'], true);
+    });
+  });
+
+  describe('updateUserPassword', () => {
+    it('passes the caller scope so a scoped role cannot reset another team password', async () => {
+      const scopedReq = {
+        user: { userId: 'u1', userGroups: ['Taller1'], scopeToOwnTeam: true },
+      };
+      await controller.updateUserPassword(
+        'u2',
+        { password: 'newpass' } as any,
+        scopedReq,
+      );
+      expect(users.updatePassword).toHaveBeenCalledWith(
+        'u2',
+        'newpass',
+        ['Taller1'],
+        true,
       );
     });
   });

@@ -8,6 +8,7 @@ interface JwtPayload {
   role: string
   permissions: string[]
   scopeToOwnTeam?: boolean
+  priority?: number
   exp: number
   [key: string]: any
 }
@@ -21,6 +22,7 @@ export const useAuthStore = defineStore('auth', {
     role: '' as string,
     userGroups: [] as string[],
     scopeToOwnTeam: false as boolean,
+    priority: 0 as number,
   }),
 
   actions: {
@@ -34,6 +36,7 @@ export const useAuthStore = defineStore('auth', {
         this.role = decoded.role || ''
         this.userGroups = decoded.userGroups || []
         this.scopeToOwnTeam = decoded.scopeToOwnTeam || false
+        this.priority = decoded.priority || 0
       } catch (e) {
         console.error('Failed to decode JWT Token', e)
         this.reset()
@@ -48,6 +51,7 @@ export const useAuthStore = defineStore('auth', {
       this.role = ''
       this.userGroups = []
       this.scopeToOwnTeam = false
+      this.priority = 0
     },
   },
   getters: {

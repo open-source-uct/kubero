@@ -15,35 +15,21 @@ export class RolesService {
 
   constructor() {}
 
-  async findAll(scopeToOwnTeam = false): Promise<any[]> {
+  async findAll(scopeToOwnTeam = false, callerPriority = 0): Promise<any[]> {
     return this.prisma.role.findMany({
-      // un rol acotado solo puede asignar roles que él mismo podría asignar:
-      // los que también estén acotados, o los que no puedan escalar
-      // privilegios (sin user:write ni config:write) — mismo criterio que
+      // un rol acotado solo puede asignar roles también acotados y con
+      // priority <= la suya — mismo criterio que
       // UsersService.assertAssignableRole, para no mostrarle roles que nunca
       // va a poder usar
       where: scopeToOwnTeam
-        ? {
-            OR: [
-              { scopeToOwnTeam: true },
-              {
-                permissions: {
-                  none: {
-                    OR: [
-                      { resource: 'user', action: 'write' },
-                      { resource: 'config', action: 'write' },
-                    ],
-                  },
-                },
-              },
-            ],
-          }
+        ? { scopeToOwnTeam: true, priority: { lte: callerPriority } }
         : undefined,
       select: {
         id: true,
         name: true,
         description: true,
         scopeToOwnTeam: true,
+        priority: true,
         createdAt: true,
         updatedAt: true,
         permissions: {
@@ -57,17 +43,20 @@ export class RolesService {
     });
   }
 
-  async getPermissions(
-    roleId: string | null | undefined,
-  ): Promise<{ permissions: any[]; scopeToOwnTeam: boolean }> {
+  async getPermissions(roleId: string | null | undefined): Promise<{
+    permissions: any[];
+    scopeToOwnTeam: boolean;
+    priority: number;
+  }> {
     this.logger.debug(`getPermissions for roleId: ${roleId}`);
     if (!roleId) {
-      return { permissions: [], scopeToOwnTeam: false };
+      return { permissions: [], scopeToOwnTeam: false, priority: 0 };
     }
     const role = await this.prisma.role.findUnique({
       where: { id: roleId },
       select: {
         scopeToOwnTeam: true,
+        priority: true,
         permissions: {
           select: {
             id: true,
@@ -80,33 +69,34 @@ export class RolesService {
     return {
       permissions: role?.permissions || [],
       scopeToOwnTeam: role?.scopeToOwnTeam ?? false,
+      priority: role?.priority ?? 0,
     };
   }
 
-  async createRole(roleData: any): Promise<any> {
-    //this.logger.debug(`createRole with data: ${JSON.stringify(roleData)}`);
-    return this.prisma.role.create({
-      data: {
-        name: roleData.name,
-        description: roleData.description,
-        scopeToOwnTeam: roleData.scopeToOwnTeam ?? false,
-        permissions: {
-          create: roleData.permissions.map((p: any) => ({
-            resource: p.resource,
-            action: p.action,
-          })),
-        },
-      },
-      include: {
-        permissions: true,
-      },
-    });
+  // Los roles de esta app son fijos: admin, webmaster, profesor y student
+  // (ver database.service.ts). No se crean roles nuevos — el seed se encarga
+  // de que esos cuatro siempre existan, con sus permisos editables desde acá.
+  async createRole(_roleData: any): Promise<any> {
+    throw new ForbiddenException(
+      'No se pueden crear roles nuevos: los únicos roles de esta app son admin, webmaster, profesor y student',
+    );
   }
 
   // Permisos sin los que el rol admin dejaría de poder administrar el sistema
   private static readonly ADMIN_REQUIRED_PERMISSIONS = [
     { resource: 'user', action: 'write' },
     { resource: 'config', action: 'write' },
+  ];
+
+  // Los cuatro roles fijos de la app: ni se borran ni se renombran, para que
+  // el seed siempre los encuentre por su nombre exacto (si se renombrara
+  // "profesor", el próximo reinicio el seed crearía otro "profesor" desde
+  // cero, dejando dos roles parecidos dando vueltas).
+  private static readonly FIXED_ROLES = [
+    'admin',
+    'webmaster',
+    'profesor',
+    'estudiante',
   ];
 
   async deleteRole(roleId: string): Promise<any> {
@@ -118,8 +108,8 @@ export class RolesService {
     if (!role) {
       throw new NotFoundException('Role not found');
     }
-    if (role.name === 'admin') {
-      throw new ForbiddenException('The admin role cannot be deleted');
+    if (RolesService.FIXED_ROLES.includes(role.name)) {
+      throw new ForbiddenException(`The "${role.name}" role cannot be deleted`);
     }
     const assigned = await this.prisma.user.count({ where: { roleId } });
     if (assigned > 0) {
@@ -146,10 +136,14 @@ export class RolesService {
     if (!role) {
       throw new NotFoundException('Role not found');
     }
+    if (
+      RolesService.FIXED_ROLES.includes(role.name) &&
+      roleData.name !== undefined &&
+      roleData.name !== role.name
+    ) {
+      throw new ForbiddenException(`The "${role.name}" role cannot be renamed`);
+    }
     if (role.name === 'admin') {
-      if (roleData.name !== undefined && roleData.name !== 'admin') {
-        throw new ForbiddenException('The admin role cannot be renamed');
-      }
       const keeps = RolesService.ADMIN_REQUIRED_PERMISSIONS.every((required) =>
         roleData.permissions.some(
           (p: any) =>
@@ -166,6 +160,14 @@ export class RolesService {
           'The admin role cannot be scoped to a team',
         );
       }
+      if (
+        roleData.priority !== undefined &&
+        roleData.priority < role.priority
+      ) {
+        throw new ForbiddenException(
+          'The admin role priority cannot be lowered',
+        );
+      }
     }
     return this.prisma.role.update({
       where: { id: roleId },
@@ -173,6 +175,7 @@ export class RolesService {
         name: roleData.name,
         description: roleData.description,
         scopeToOwnTeam: roleData.scopeToOwnTeam ?? false,
+        priority: roleData.priority ?? 0,
         permissions: {
           deleteMany: {},
           create: roleData.permissions.map((p: any) => ({

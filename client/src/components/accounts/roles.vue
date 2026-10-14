@@ -45,13 +45,6 @@
           {{ permission.resource }}: {{ permission.action }}
         </span>
       </template>
-      <template v-slot:[`item.scopeToOwnTeam`]="{ item }">
-        <v-icon
-          :icon="item.scopeToOwnTeam ? 'mdi-account-group-outline' : 'mdi-earth'"
-          :color="item.scopeToOwnTeam ? 'primary' : undefined"
-          :aria-label="item.scopeToOwnTeam ? $t('roles.form.scopeToOwnTeam') : 'global'"
-        ></v-icon>
-      </template>
       <template v-slot:[`item.permissionsApp`]="{ item }">
         <span role="img" :aria-label="getResourcePermissionLabel(item.permissions, 'app')">
           <v-icon
@@ -145,7 +138,7 @@
       <template v-slot:[`item.actions`]="{ item }">
         <div class="account-actions">
           <v-tooltip :text="$t('global.edit')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-pencil-outline" variant="text" size="small" :aria-label="`${$t('global.edit')} ${item.name}`" :disabled="item.name === 'admin' || !canManageRoles" @click="openEditRoleDialog(item)" /></template></v-tooltip>
-          <v-tooltip :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" :disabled="item.name === 'admin' || item.name === 'guest' || item.name === 'member' || !canManageRoles" @click="deleteRole(item)" /></template></v-tooltip>
+          <v-tooltip :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" :disabled="isFixedRole(item.name) || !canManageRoles" @click="deleteRole(item)" /></template></v-tooltip>
         </div>
       </template>
       <template #bottom>
@@ -157,36 +150,13 @@
       </template>
     </v-data-table>
 
-    <!-- Button to add a role -->
-    <div class="legacy-create-control">
-      <v-btn
-        fab
-        color="primary"
-        style="margin-right: 6px;"
-        @click="openCreateDialog"
-        :disabled="!canManageRoles"
-      >
-        <v-icon>mdi-plus</v-icon>
-        <span class="sr-only">{{ $t('roles.actions.create') }}</span>
-      </v-btn>
-    </div>
-
     <!-- Dialog to edit a role -->
     <v-dialog v-model="editDialog" max-width="500px">
       <v-card color="cardBackground" class="uct-card">
         <v-card-title class="text-h6 font-weight-bold">{{ $t('roles.actions.edit') }}</v-card-title>
         <v-card-text>
-          <v-text-field v-model="editedRole.name" :label="$t('roles.form.name')"></v-text-field>
+          <v-text-field v-model="editedRole.name" :disabled="isFixedRole(editedRole.name)" :label="$t('roles.form.name')"></v-text-field>
           <v-text-field v-model="editedRole.description" :label="$t('roles.form.description')"></v-text-field>
-          <v-switch
-            v-model="editedRole.scopeToOwnTeam"
-            :disabled="editedRole.name === 'admin'"
-            color="primary"
-            :label="$t('roles.form.scopeToOwnTeam')"
-            :hint="$t('roles.form.scopeToOwnTeamHint')"
-            persistent-hint
-            class="mb-4"
-          ></v-switch>
           <v-table density="compact" class="mb-4">
             <tbody>
               <tr>
@@ -274,107 +244,6 @@
       </v-card>
     </v-dialog>
 
-    <!-- Dialog for a new Role -->
-    <v-dialog v-model="createDialog" max-width="500px">
-      <v-card color="cardBackground" class="uct-card">
-        <v-card-title class="text-h6 font-weight-bold">{{ $t('roles.actions.create') }}</v-card-title>
-        <v-card-text>
-          <v-text-field v-model="newRole.name" :label="$t('roles.form.name')"></v-text-field>
-          <v-text-field v-model="newRole.description" :label="$t('roles.form.description')"></v-text-field>
-          <v-switch
-            v-model="newRole.scopeToOwnTeam"
-            color="primary"
-            :label="$t('roles.form.scopeToOwnTeam')"
-            :hint="$t('roles.form.scopeToOwnTeamHint')"
-            persistent-hint
-            class="mb-4"
-          ></v-switch>
-          <v-table density="compact" class="mb-4">
-            <tbody>
-              <tr>
-                <td>{{ $t('roles.form.permissions.apps') }} {{ $t('roles.permission') }}</td>
-                <td>
-                  <v-radio-group v-model="newRole.permissions[0].action" inline>
-                    <v-radio label="none" value="none"></v-radio>
-                    <v-radio label="read" value="read"></v-radio>
-                    <v-radio label="write" value="write"></v-radio>
-                  </v-radio-group>
-                </td>
-              </tr>
-              <tr>
-                <td>{{ $t('roles.form.permissions.pipelines') }} {{ $t('roles.permission') }}</td>
-                <td>
-                  <v-radio-group v-model="newRole.permissions[1].action" inline>
-                    <v-radio label="none" value="none"></v-radio>
-                    <v-radio label="read" value="read"></v-radio>
-                    <v-radio label="write" value="write"></v-radio>
-                  </v-radio-group>
-                </td>
-              </tr>
-              <tr>
-                <td>{{ $t('roles.form.permissions.accounts') }} {{ $t('roles.permission') }}</td>
-                <td>
-                  <v-radio-group v-model="newRole.permissions[2].action" inline>
-                    <v-radio label="none" value="none"></v-radio>
-                    <v-radio label="read" value="read"></v-radio>
-                    <v-radio label="write" value="write"></v-radio>
-                  </v-radio-group>
-                </td>
-              </tr>
-              <tr>
-                <td>{{ $t('roles.form.permissions.settings') }} {{ $t('roles.permission') }}</td>
-                <td>
-                  <v-radio-group v-model="newRole.permissions[3].action" inline>
-                    <v-radio label="none" value="none"></v-radio>
-                    <v-radio label="read" value="read"></v-radio>
-                    <v-radio label="write" value="write"></v-radio>
-                  </v-radio-group>
-                </td>
-              </tr>
-              <tr>
-                <td>{{ $t('roles.form.permissions.tokens') }} {{ $t('roles.permission') }}</td>
-                <td>
-                  <v-radio-group v-model="newRole.permissions[4].action" inline>
-                    <v-radio label="none" value="none"></v-radio>
-                    <v-radio label="own" value="ok"></v-radio>
-                    <v-radio label="all" value="write"></v-radio>
-                  </v-radio-group>
-                </td>
-              </tr>
-              <tr>
-                <td>{{ $t('roles.form.permissions.audit') }}</td>
-                <td>
-                  <v-switch color="primary" value="ok" false-value="none" v-model="newRole.permissions[5].action" label=""></v-switch>
-                </td>
-              </tr>
-              <tr>
-                <td>{{ $t('roles.form.permissions.console') }}</td>
-                <td>
-                  <v-switch color="primary" value="ok" false-value="none" v-model="newRole.permissions[6].action" label=""></v-switch>
-                </td>
-              </tr>
-              <tr>
-                <td>{{ $t('roles.form.permissions.logs') }}</td>
-                <td>
-                  <v-switch color="primary" value="ok" false-value="none" v-model="newRole.permissions[7].action" label=""></v-switch>
-                </td>
-              </tr>
-              <tr>
-                <td>{{ $t('roles.form.permissions.reboot') }}</td>
-                <td>
-                  <v-switch color="primary" value="ok" false-value="none" v-model="newRole.permissions[8].action" label=""></v-switch>
-                </td>
-              </tr>
-            </tbody>
-          </v-table>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn text @click="createDialog = false">{{ $t('global.abort') }}</v-btn>
-          <v-btn color="primary" @click="saveCreate">{{ $t('global.create') }}</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
   </v-container>
 </template>
 
@@ -397,6 +266,7 @@ export default defineComponent({
       name: string;
       description?: string;
       scopeToOwnTeam?: boolean;
+      priority?: number;
       permissions?: Permission[];
     }
     interface Permission {
@@ -404,6 +274,10 @@ export default defineComponent({
       resource: string;
       action: string;
     }
+    // Mismo listado que RolesService.FIXED_ROLES en el servidor: ninguno de
+    // estos se puede crear, borrar ni renombrar — solo editar sus permisos.
+    const FIXED_ROLES = ['admin', 'webmaster', 'profesor', 'estudiante']
+    const isFixedRole = (name: string) => FIXED_ROLES.includes(name)
     const roles = ref<Role[]>([])
     const roleTable = ref<{ $el?: HTMLElement } | null>(null)
     const loading = ref(true)
@@ -413,7 +287,6 @@ export default defineComponent({
     const itemsPerPage = ref(10)
     const pageSizeOptions = [10, 25, 50]
     const editDialog = ref(false)
-    const createDialog = ref(false)
     const editedRole = ref<Role | any>({})
     // Orden de las filas de los diálogos: los v-model usan estas posiciones
     const RESOURCES = ['app', 'pipeline', 'user', 'config', 'token', 'audit', 'console', 'logs', 'reboot']
@@ -425,12 +298,6 @@ export default defineComponent({
         resource,
         action: permissions.find((p) => p.resource === resource)?.action ?? 'none',
       }))
-    const newRole = ref<Role | any>({
-      name: '',
-      description: '',
-      scopeToOwnTeam: false,
-      permissions: permissionsByResource(),
-    })
     const authStore = useAuthStore();
     const writeUserPermission = authStore.hasPermission('user:write')
     // los roles son definiciones globales del sistema: un usuario acotado a
@@ -440,7 +307,6 @@ export default defineComponent({
 
     const headers = [
       { title: t('roles.name'), value: 'name' },
-      { title: t('roles.form.scopeToOwnTeam'), value: 'scopeToOwnTeam', align: 'center' as const },
       //{ title: 'Permissions', value: 'permissions' },
       { title: t('roles.form.permissions.apps'), value: 'permissionsApp', align: 'center' as const },
       { title: t('roles.form.permissions.pipelines'), value: 'permissionsPipeline', align: 'center' as const },
@@ -527,24 +393,6 @@ export default defineComponent({
       }
     }
 
-    const openCreateDialog = () => {
-      newRole.value = {
-        name: '',
-        description: '',
-        permissions: permissionsByResource(),
-      }
-      createDialog.value = true
-    }
-
-    const saveCreate = async () => {
-      try {
-        await axios.post('/api/roles', newRole.value, handledApiErrorConfig)
-        await loadRoles()
-        createDialog.value = false
-      } catch (e) {
-        notifyApiError(e, 'createRole')
-      }
-    }
 /*
     const getResources = async () => {
       try {
@@ -614,18 +462,15 @@ export default defineComponent({
       paginationVisible,
       pageRange,
       editDialog,
-      createDialog,
       editedRole,
-      newRole,
       openEditRoleDialog,
       saveEdit,
       deleteRole,
-      openCreateDialog,
-      saveCreate,
       getResourcePermissions,
       getResourcePermissionLabel,
       writeUserPermission,
       canManageRoles,
+      isFixedRole,
     }
   },
 })

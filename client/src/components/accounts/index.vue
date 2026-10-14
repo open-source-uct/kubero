@@ -78,7 +78,9 @@ const activeSection = computed(() => {
       description: t('accounts.descriptions.roles'),
       icon: 'mdi-shield-account-outline',
       component: Roles,
-      createLabel: t('roles.actions.create'),
+      // los roles son fijos (admin/webmaster/profesor/student): no se crean
+      // roles nuevos, así que esta sección no necesita botón de crear
+      createLabel: '',
     },
     tokens: {
       key: 'tokens',
