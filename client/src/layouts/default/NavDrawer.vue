@@ -370,8 +370,13 @@ const accountItems = computed<SecondaryNavItem[]>(() => [
     ? [
         { id: 'users', title: t('accounts.users'), icon: 'mdi-account-multiple-outline', to: '/accounts/users' },
         { id: 'teams', title: t('accounts.teams'), icon: 'mdi-account-group-outline', to: '/accounts/teams' },
-        { id: 'roles', title: t('accounts.roles'), icon: 'mdi-shield-account-outline', to: '/accounts/roles' },
       ]
+    : []),
+  // los roles son fijos y nadie acotado puede crear/editar/borrar ninguno,
+  // así que esta pantalla le queda de solo lectura sin ninguna utilidad —
+  // se deja visible solo para quien no está acotado (admin)
+  ...(canReadUsers.value && !authStore.scopeToOwnTeam
+    ? [{ id: 'roles', title: t('accounts.roles'), icon: 'mdi-shield-account-outline', to: '/accounts/roles' }]
     : []),
   ...(canReadTokens.value
     ? [{ id: 'tokens', title: t('accounts.tokens'), icon: 'mdi-key-chain-variant', to: '/accounts/tokens' }]

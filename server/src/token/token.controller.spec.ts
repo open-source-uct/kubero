@@ -52,13 +52,23 @@ describe('TokenController', () => {
 
   describe('deleteToken', () => {
     it('should delete token by id', async () => {
-      const result = await controller.deleteToken('1');
-      expect(tokenService.delete).toHaveBeenCalledWith('1');
+      const req = {
+        user: { userId: 'u1', permissions: ['token:write'] },
+      };
+      const result = await controller.deleteToken('1', req);
+      expect(tokenService.delete).toHaveBeenCalledWith('1', 'u1', true);
       expect(result).toEqual({ id: '1', deleted: true });
     });
 
+    it('passes canManageAnyToken=false for a caller without token:write', async () => {
+      const req = { user: { userId: 'u1', permissions: ['token:ok'] } };
+      await controller.deleteToken('1', req);
+      expect(tokenService.delete).toHaveBeenCalledWith('1', 'u1', false);
+    });
+
     it('should throw if id missing', async () => {
-      await expect(controller.deleteToken('')).rejects.toThrow();
+      const req = { user: { userId: 'u1', permissions: [] } };
+      await expect(controller.deleteToken('', req)).rejects.toThrow();
     });
   });
 
@@ -78,7 +88,7 @@ describe('TokenController', () => {
     it('should delete token for current user and return filtered tokens', async () => {
       const req = { user: { userId: 'u1' } };
       const result = await controller.deleteMyToken('1', req);
-      expect(tokenService.delete).toHaveBeenCalledWith('1');
+      expect(tokenService.delete).toHaveBeenCalledWith('1', 'u1');
       expect(result).toEqual([{ id: '1', user: { id: 'u1' } }]);
     });
 

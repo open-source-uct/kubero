@@ -76,7 +76,7 @@ export class AuthService {
       throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
     }
 
-    const { permissions, scopeToOwnTeam } =
+    const { permissions, scopeToOwnTeam, priority } =
       await this.rolesService.getPermissions(user.roleId);
     user.permissions = permissions.map((p) => `${p.resource}:${p.action}`);
 
@@ -89,6 +89,7 @@ export class AuthService {
       userGroups: user.userGroups ? user.userGroups.map((g) => g.name) : [],
       permissions: user.permissions ? user.permissions : [],
       scopeToOwnTeam,
+      priority,
       strategy: 'local',
     };
 
@@ -123,7 +124,7 @@ export class AuthService {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
 
-    const { permissions, scopeToOwnTeam } =
+    const { permissions, scopeToOwnTeam, priority } =
       await this.rolesService.getPermissions(user.roleId);
     user.permissions = permissions.map((p) => `${p.resource}:${p.action}`);
 
@@ -134,6 +135,7 @@ export class AuthService {
       userGroups: user.userGroups ? user.userGroups.map((g) => g.name) : [],
       permissions: user.permissions ? user.permissions : [],
       scopeToOwnTeam,
+      priority,
       strategy: 'oauth2',
     };
     return this.jwtService.sign(u);
@@ -148,6 +150,7 @@ export class AuthService {
     expiresAt?: string,
     tokenId?: string,
     scopeToOwnTeam = false,
+    priority = 0,
   ): Promise<string> {
     if (!userId || !username || !role) {
       this.logger.error('Invalid user data for token generation', {
@@ -165,6 +168,7 @@ export class AuthService {
       userGroups: userGroups,
       permissions: permissions,
       scopeToOwnTeam,
+      priority,
       strategy: 'token',
     };
 

@@ -124,6 +124,29 @@ describe('UsersService', () => {
     });
   });
 
+  it('findById rejects a cross-team lookup for a scoped caller', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      id: '1',
+      username: 'user1',
+      userGroups: [{ name: 'OtroEquipo' }],
+    });
+    await expect(service.findById('1', ['MiEquipo'], true)).rejects.toThrow(
+      ForbiddenException,
+    );
+  });
+
+  it('findById allows a same-team lookup for a scoped caller', async () => {
+    const mockUser = {
+      id: '1',
+      username: 'user1',
+      userGroups: [{ name: 'MiEquipo' }],
+    };
+    prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
+    await expect(service.findById('1', ['MiEquipo'], true)).resolves.toBe(
+      mockUser,
+    );
+  });
+
   it('should find all users', async () => {
     const mockUsers = [
       { id: '1', username: 'user1' },
@@ -193,6 +216,26 @@ describe('UsersService', () => {
       where: { id: '1' },
       data: { password: expect.any(String) }, // password will be hashed
     });
+  });
+
+  it('updatePassword rejects resetting a cross-team user password for a scoped caller', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      userGroups: [{ name: 'OtroEquipo' }],
+    });
+    await expect(
+      service.updatePassword('1', 'newpass', ['MiEquipo'], true),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  it('updatePassword allows resetting a same-team user password for a scoped caller', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      userGroups: [{ name: 'MiEquipo' }],
+    });
+    prismaMock.user.update.mockResolvedValueOnce({ id: '1' } as PrismaUser);
+    await expect(
+      service.updatePassword('1', 'newpass', ['MiEquipo'], true),
+    ).resolves.toEqual({ id: '1' });
   });
 
   it('should not pass unexpected fields to create', async () => {
@@ -370,15 +413,50 @@ describe('UsersService', () => {
 
   describe('findByUsername', () => {
     it('should find user by username', async () => {
-      const mockUser = { id: '1', username: 'testuser' };
+      const mockUser = { id: '1', username: 'testuser', userGroups: [] };
       prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
 
       const result = await service.findByUsername('testuser');
 
       expect(result).toBe(mockUser);
-      expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
-        where: { username: 'testuser' },
+      expect(prismaMock.user.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { username: 'testuser' } }),
+      );
+    });
+
+    it('never returns the password hash or 2FA secret', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        id: '1',
+        username: 'testuser',
+        userGroups: [],
       });
+      await service.findByUsername('testuser');
+      const call = prismaMock.user.findUnique.mock.calls[0][0];
+      expect(call.select.password).toBeUndefined();
+      expect(call.select.twoFaSecret).toBeUndefined();
+    });
+
+    it('rejects a cross-team lookup for a scoped caller', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        id: '1',
+        username: 'testuser',
+        userGroups: [{ name: 'OtroEquipo' }],
+      });
+      await expect(
+        service.findByUsername('testuser', ['MiEquipo'], true),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('allows a same-team lookup for a scoped caller', async () => {
+      const mockUser = {
+        id: '1',
+        username: 'testuser',
+        userGroups: [{ name: 'MiEquipo' }],
+      };
+      prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
+      await expect(
+        service.findByUsername('testuser', ['MiEquipo'], true),
+      ).resolves.toBe(mockUser);
     });
   });
 
@@ -760,40 +838,65 @@ describe('UsersService', () => {
       expect(prismaMock.user.create).not.toHaveBeenCalled();
     });
 
-    it('create rejects assigning a role that can manage users but is not itself scoped', async () => {
-      prismaMock.role.findUnique.mockResolvedValueOnce({
-        scopeToOwnTeam: false,
-        permissions: [{ resource: 'user', action: 'write' }],
-      });
+    it('create rejects assigning a role with higher priority than the caller', async () => {
+      prismaMock.role.findUnique.mockResolvedValueOnce({ priority: 100 });
       await expect(
         service.create(
           { username: 'ana', password: 'pass', role: 'admin-role-id' },
           ['Taller1'],
           true,
+          50,
         ),
       ).rejects.toThrow(ForbiddenException);
       expect(prismaMock.user.create).not.toHaveBeenCalled();
     });
 
-    it('create rejects assigning a role with config:write but not itself scoped', async () => {
+    it('create rejects assigning an unscoped role even with a low/default priority (e.g. member, priority 0)', async () => {
+      // la prioridad baja no basta: un rol sin acotar deja a quien lo reciba
+      // viendo todo el sistema, sin importar su número de prioridad
       prismaMock.role.findUnique.mockResolvedValueOnce({
+        priority: 0,
         scopeToOwnTeam: false,
-        permissions: [{ resource: 'config', action: 'write' }],
       });
       await expect(
         service.create(
-          { username: 'ana', password: 'pass', role: 'ops-role-id' },
+          { username: 'ana', password: 'pass', role: 'member-role-id' },
           ['Taller1'],
           true,
+          50,
         ),
       ).rejects.toThrow(ForbiddenException);
       expect(prismaMock.user.create).not.toHaveBeenCalled();
     });
 
-    it('create allows assigning a harmless role (no user:write) even if not scoped', async () => {
+    it('create allows assigning a role with the same priority as the caller', async () => {
       prismaMock.role.findUnique.mockResolvedValueOnce({
-        scopeToOwnTeam: false,
-        permissions: [],
+        priority: 50,
+        scopeToOwnTeam: true,
+      });
+      prismaMock.userGroup.findMany.mockResolvedValueOnce([
+        { id: 'g-taller1', name: 'Taller1' },
+      ]);
+      prismaMock.user.create.mockResolvedValueOnce({ id: 'u-new' });
+      await expect(
+        service.create(
+          {
+            username: 'ana',
+            password: 'pass',
+            role: 'webmaster-role-id',
+            userGroups: ['g-taller1'],
+          },
+          ['Taller1'],
+          true,
+          50,
+        ),
+      ).resolves.toEqual({ id: 'u-new' });
+    });
+
+    it('create allows assigning a role with lower priority than the caller', async () => {
+      prismaMock.role.findUnique.mockResolvedValueOnce({
+        priority: 10,
+        scopeToOwnTeam: true,
       });
       prismaMock.userGroup.findMany.mockResolvedValueOnce([
         { id: 'g-taller1', name: 'Taller1' },
@@ -809,6 +912,7 @@ describe('UsersService', () => {
           },
           ['Taller1'],
           true,
+          50,
         ),
       ).resolves.toEqual({ id: 'u-new' });
     });
@@ -830,6 +934,28 @@ describe('UsersService', () => {
           }),
         }),
       );
+    });
+
+    it('create rejects leaving a new user with no team at all (it would become invisible)', async () => {
+      await expect(
+        service.create(
+          { username: 'ana', password: 'pass', userGroups: [] },
+          ['Taller1'],
+          true,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prismaMock.user.create).not.toHaveBeenCalled();
+    });
+
+    it('create rejects omitting userGroups entirely when scoped', async () => {
+      await expect(
+        service.create(
+          { username: 'ana', password: 'pass' },
+          ['Taller1'],
+          true,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prismaMock.user.create).not.toHaveBeenCalled();
     });
 
     it('update rejects touching a user that shares no team with the caller', async () => {

@@ -139,8 +139,12 @@ export class UsersService {
     return user;
   }
 
-  async findById(userId: string): Promise<PartialPrismaUser | null> {
-    return this.prisma.user.findUnique({
+  async findById(
+    userId: string,
+    callerGroups: string[] = [],
+    scopeToOwnTeam = false,
+  ): Promise<PartialPrismaUser | null> {
+    const user = await this.prisma.user.findUnique({
       where: {
         id: userId,
       },
@@ -175,6 +179,14 @@ export class UsersService {
         },
       },
     });
+    if (
+      user &&
+      scopeToOwnTeam &&
+      !user.userGroups.some((g) => callerGroups.includes(g.name))
+    ) {
+      throw new ForbiddenException('No tienes acceso a este usuario');
+    }
+    return user;
   }
 
   async findAll(
@@ -225,8 +237,52 @@ export class UsersService {
     });
   }
 
-  async findByUsername(username: string): Promise<PrismaUser | null> {
-    return this.prisma.user.findUnique({ where: { username } });
+  async findByUsername(
+    username: string,
+    callerGroups: string[] = [],
+    scopeToOwnTeam = false,
+  ): Promise<PartialPrismaUser | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { username },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        createdAt: true,
+        updatedAt: true,
+        isActive: true,
+        lastLogin: true,
+        lastIp: true,
+        provider: true,
+        providerId: true,
+        providerData: true,
+        image: true,
+        role: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+          },
+        },
+        userGroups: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+          },
+        },
+      },
+    });
+    if (
+      user &&
+      scopeToOwnTeam &&
+      !user.userGroups.some((g) => callerGroups.includes(g.name))
+    ) {
+      throw new ForbiddenException('No tienes acceso a este usuario');
+    }
+    return user;
   }
 
   // Un rol acotado a equipo propio (Role.scopeToOwnTeam) solo puede gestionar
@@ -258,32 +314,32 @@ export class UsersService {
     return allowed;
   }
 
-  // user:write (gestiona usuarios) y config:write (configuración global del
-  // sistema) son los dos permisos que permiten escalar más allá de "mi
-  // equipo"; un rol sin ninguno de los dos no puede escalar privilegios, así
-  // que no hace falta que esté acotado para poder asignarlo (ej. student)
-  private static readonly ESCALATING_PERMISSIONS = [
-    { resource: 'user', action: 'write' },
-    { resource: 'config', action: 'write' },
-  ] as const;
-
-  private async assertAssignableRole(roleId: string): Promise<void> {
+  // Un rol acotado solo puede asignar roles cuya priority sea menor o igual a
+  // la suya propia (admin=100, profesor/webmaster=50, student=10, por
+  // ejemplo) — así no hace falta inferir "peligro" a partir de combinaciones
+  // de permisos.
+  private async assertAssignableRole(
+    roleId: string,
+    callerPriority: number,
+  ): Promise<void> {
     const role = await this.prisma.role.findUnique({
       where: { id: roleId },
-      select: {
-        scopeToOwnTeam: true,
-        permissions: {
-          where: { OR: [...UsersService.ESCALATING_PERMISSIONS] },
-        },
-      },
+      select: { priority: true, scopeToOwnTeam: true },
     });
     if (!role) {
       throw new ForbiddenException('El rol no existe');
     }
-    const canEscalate = role.permissions.length > 0;
-    if (canEscalate && !role.scopeToOwnTeam) {
+    // la prioridad sola no alcanza: un rol sin acotar (ej. member, guest, con
+    // priority 0 por defecto) dejaría a quien lo reciba viendo todo el
+    // sistema, sin importar qué tan "baja" sea su prioridad numérica
+    if (!role.scopeToOwnTeam) {
       throw new ForbiddenException(
-        'No puedes asignar un rol con permisos de administración sin que esté acotado a tu equipo',
+        'No puedes asignar un rol que no esté acotado a un equipo',
+      );
+    }
+    if (role.priority > callerPriority) {
+      throw new ForbiddenException(
+        'No puedes asignar un rol con mayor prioridad que el tuyo',
       );
     }
   }
@@ -309,18 +365,28 @@ export class UsersService {
     user: any,
     callerGroups: string[] = [],
     scopeToOwnTeam = false,
+    callerPriority = 0,
   ): Promise<PartialPrismaUser> {
     //this.logger.debug('Creating user with data:', user);
     const { role, userGroups } = user;
     let resolvedUserGroups = userGroups;
     if (scopeToOwnTeam) {
       if (role) {
-        await this.assertAssignableRole(role);
+        await this.assertAssignableRole(role, callerPriority);
       }
       resolvedUserGroups = await this.restrictGroupIdsToCallerTeams(
         userGroups,
         callerGroups,
       );
+      // un usuario recién creado no tiene ningún otro equipo todavía: si
+      // queda sin ninguno, le queda invisible al que lo acaba de crear (y a
+      // cualquier otro acotado) desde el día uno — solo admin podría
+      // encontrarlo después
+      if (resolvedUserGroups.length === 0) {
+        throw new ForbiddenException(
+          'Debes asignarle al menos un equipo propio al usuario nuevo',
+        );
+      }
     }
     // Lista explicita: evita que el body inyecte campos como roleId, twoFaSecret o id
     const CREATABLE_FIELDS = [
@@ -377,6 +443,7 @@ export class UsersService {
     user: any,
     callerGroups: string[] = [],
     scopeToOwnTeam = false,
+    callerPriority = 0,
   ): Promise<PartialPrismaUser | undefined> {
     if (scopeToOwnTeam) {
       await this.assertSharesTeam(userId, callerGroups);
@@ -408,7 +475,7 @@ export class UsersService {
     }
 
     if (scopeToOwnTeam && role && typeof role === 'string') {
-      await this.assertAssignableRole(role);
+      await this.assertAssignableRole(role, callerPriority);
     }
 
     // fix relations
@@ -469,6 +536,8 @@ export class UsersService {
   async updatePassword(
     userId: string,
     newPassword: string,
+    callerGroups: string[] = [],
+    scopeToOwnTeam = false,
   ): Promise<PartialPrismaUser | undefined> {
     if (
       !newPassword ||
@@ -477,6 +546,9 @@ export class UsersService {
     ) {
       this.logger.warn('No valid new password provided for password update.');
       return undefined;
+    }
+    if (scopeToOwnTeam) {
+      await this.assertSharesTeam(userId, callerGroups);
     }
     try {
       const hashedPassword = await bcrypt.hash(newPassword, 10);

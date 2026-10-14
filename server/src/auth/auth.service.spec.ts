@@ -188,6 +188,7 @@ describe('AuthService', () => {
           userGroups: ['students'],
           permissions: ['app:write'],
           scopeToOwnTeam: false,
+          priority: 0,
           strategy: 'token',
         },
         expect.objectContaining({ expiresIn: 36000 }),
