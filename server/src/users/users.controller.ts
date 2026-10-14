@@ -72,8 +72,15 @@ export class UsersController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Get User by username' })
-  async getUserByUsername(@Param('username') username: string) {
-    return this.usersService.findByUsername(username);
+  async getUserByUsername(
+    @Param('username') username: string,
+    @Request() req: any,
+  ) {
+    return this.usersService.findByUsername(
+      username,
+      req.user.userGroups,
+      req.user.scopeToOwnTeam,
+    );
   }
 
   @Get('/id/:id')
@@ -91,8 +98,12 @@ export class UsersController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Get User by ID' })
-  async getUserById(@Param('id') id: string) {
-    return this.usersService.findById(id);
+  async getUserById(@Param('id') id: string, @Request() req: any) {
+    return this.usersService.findById(
+      id,
+      req.user.userGroups,
+      req.user.scopeToOwnTeam,
+    );
   }
 
   @Get('/count')
@@ -139,6 +150,7 @@ export class UsersController {
       body,
       req.user.userGroups,
       req.user.scopeToOwnTeam,
+      req.user.priority,
     );
   }
 
@@ -184,8 +196,14 @@ export class UsersController {
   async updateUserPassword(
     @Param('id') id: string,
     @Body() body: UpdatePasswordDto,
+    @Request() req: any,
   ) {
-    return this.usersService.updatePassword(id, body.password);
+    return this.usersService.updatePassword(
+      id,
+      body.password,
+      req.user.userGroups,
+      req.user.scopeToOwnTeam,
+    );
   }
 
   @Put('/profile/password')
@@ -241,6 +259,7 @@ export class UsersController {
         body,
         req.user.userGroups,
         req.user.scopeToOwnTeam,
+        req.user.priority,
       );
     } catch (error) {
       throw new HttpException(

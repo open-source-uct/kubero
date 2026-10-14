@@ -116,7 +116,7 @@ const routes = [
       {
         path: '/accounts/roles',
         name: 'Account Roles',
-        meta: { accountSection: 'roles', requiredAnyPermissions: ['user:read', 'user:write'] },
+        meta: { accountSection: 'roles', requiredAnyPermissions: ['user:read', 'user:write'], requiresUnscoped: true },
         component: () => import('@/views/Accounts.vue'),
       },
       {
@@ -236,6 +236,12 @@ router.beforeEach((to) => {
   }
 
   if (to.meta.requiresAdmin && authStore.role !== 'admin') {
+    return { name: 'Pipelines' }
+  }
+
+  // los roles son definiciones globales: un rol acotado a su propio equipo
+  // no puede crear/editar/borrar ninguno, así que esta pantalla no le sirve
+  if (to.meta.requiresUnscoped && authStore.scopeToOwnTeam) {
     return { name: 'Pipelines' }
   }
 

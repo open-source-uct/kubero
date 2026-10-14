@@ -549,6 +549,8 @@ const messages = {
           currentPasswordRequired: 'Current password is required',
           newPasswordRequired: 'New password is required',
           passwordMinLength: 'Password must be at least 8 characters',
+          teamRequiredTitle: 'A team is required',
+          teamRequired: 'Your role only sees users from its own teams: if you don\'t assign one now, this user will become invisible to you after being created.',
         },
         actions: {
           name: 'Actions',
@@ -633,8 +635,6 @@ const messages = {
         form: {
           name: 'Role Name',
           description: 'Description',
-          scopeToOwnTeam: 'Limit to own teams',
-          scopeToOwnTeamHint: 'Only sees and manages users who share a team with them',
           permissionsRead: 'Read',
           permissionsWrite: 'Write',
           permissions: {

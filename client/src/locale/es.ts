@@ -548,6 +548,8 @@ const messages = {
       currentPasswordRequired: 'La contraseña actual es obligatoria',
       newPasswordRequired: 'La nueva contraseña es obligatoria',
       passwordMinLength: 'La contraseña debe tener al menos 8 caracteres',
+      teamRequiredTitle: 'Falta asignar un equipo',
+      teamRequired: 'Tu rol solo ve usuarios de sus propios equipos: si no le asignas uno ahora, este usuario te quedará invisible después de crearlo.',
     },
     actions: {
       name: 'Acciones',
@@ -632,8 +634,6 @@ const messages = {
     form: {
       name: 'Nombre del rol',
       description: 'Descripción',
-      scopeToOwnTeam: 'Acotar a equipos propios',
-      scopeToOwnTeamHint: 'Solo ve y gestiona usuarios que comparten un equipo con él',
       permissionsRead: 'Lectura',
       permissionsWrite: 'Escritura',
       permissions: {

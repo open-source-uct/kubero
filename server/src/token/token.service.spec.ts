@@ -11,6 +11,7 @@ describe('TokenService', () => {
   const mockPrisma = {
     token: {
       findMany: jest.fn().mockResolvedValue([{ id: '1', name: 'token1' }]),
+      findUnique: jest.fn().mockResolvedValue({ userId: 'u1' }),
       create: jest.fn().mockResolvedValue({ id: '1', name: 'token1' }),
       delete: jest.fn().mockResolvedValue({ id: '1', deleted: true }),
     },
@@ -34,6 +35,7 @@ describe('TokenService', () => {
     getPermissions: jest.fn().mockResolvedValue({
       permissions: [{ resource: 'app', action: 'write' }],
       scopeToOwnTeam: false,
+      priority: 0,
     }),
   };
 
@@ -61,6 +63,7 @@ describe('TokenService', () => {
     mockRolesService.getPermissions.mockResolvedValue({
       permissions: [{ resource: 'app', action: 'write' }],
       scopeToOwnTeam: false,
+      priority: 0,
     });
     mockAuthService.generateToken.mockResolvedValue('mocked-jwt-token');
   });
@@ -101,6 +104,7 @@ describe('TokenService', () => {
         '2025-01-01',
         '1', // id de la fila: el JWT se firma con él (jti) para poder revocarlo
         false,
+        0,
       );
       const createCall = mockPrisma.token.create.mock.calls[0][0];
       expect(createCall.data.role).toBe('admin');
@@ -126,8 +130,26 @@ describe('TokenService', () => {
   });
 
   describe('delete', () => {
-    it('should delete a token by id', async () => {
-      const result = await service.delete('1');
+    it('deletes a token when the caller owns it', async () => {
+      mockPrisma.token.findUnique.mockResolvedValueOnce({ userId: 'u1' });
+      const result = await service.delete('1', 'u1');
+      expect(mockPrisma.token.delete).toHaveBeenCalledWith({
+        where: { id: '1' },
+      });
+      expect(result).toEqual({ id: '1', deleted: true });
+    });
+
+    it('refuses to delete another user token without token:write', async () => {
+      mockPrisma.token.findUnique.mockResolvedValueOnce({ userId: 'other' });
+      await expect(service.delete('1', 'u1')).rejects.toThrow(
+        'No puedes borrar un token que no es tuyo',
+      );
+      expect(mockPrisma.token.delete).not.toHaveBeenCalled();
+    });
+
+    it('lets a caller with token:write (admin) delete any token', async () => {
+      const result = await service.delete('1', 'someone-else', true);
+      expect(mockPrisma.token.findUnique).not.toHaveBeenCalled();
       expect(mockPrisma.token.delete).toHaveBeenCalledWith({
         where: { id: '1' },
       });

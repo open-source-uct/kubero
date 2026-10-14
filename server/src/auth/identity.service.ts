@@ -9,6 +9,7 @@ export interface AuthenticatedUser {
   userGroups: string[];
   permissions: string[];
   scopeToOwnTeam: boolean;
+  priority: number;
   strategy?: string;
 }
 
@@ -54,11 +55,13 @@ export class IdentityService {
     const {
       permissions: rolePermissions,
       scopeToOwnTeam: freshScopeToOwnTeam,
+      priority: freshPriority,
     } = await this.rolesService.getPermissions(user.role?.id);
     let permissions: string[] = rolePermissions.map(
       (p: any) => `${p.resource}:${p.action}`,
     );
     let scopeToOwnTeam = freshScopeToOwnTeam;
+    let priority = freshPriority;
 
     if (payload.strategy === 'token') {
       // Token personal: si trae el id de su fila (jti) tiene que seguir
@@ -83,6 +86,8 @@ export class IdentityService {
       // mismo criterio para el acotamiento por equipo: si el token se emitió
       // acotado, seguir acotado aunque el rol haya cambiado después
       scopeToOwnTeam = freshScopeToOwnTeam || Boolean(payload.scopeToOwnTeam);
+      // la prioridad tampoco puede subir respecto a la que tenía al crearse
+      priority = Math.min(freshPriority, payload.priority ?? freshPriority);
     }
 
     return {
@@ -92,6 +97,7 @@ export class IdentityService {
       userGroups: (user.userGroups ?? []).map((g: any) => g.name),
       permissions,
       scopeToOwnTeam,
+      priority,
       strategy: payload.strategy,
     };
   }

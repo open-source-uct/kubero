@@ -56,7 +56,10 @@ export class RolesController {
   })
   @ApiOperation({ summary: 'Get all Roles' })
   async getRoles(@Request() req: any) {
-    return this.rolesService.findAll(req.user.scopeToOwnTeam);
+    return this.rolesService.findAll(
+      req.user.scopeToOwnTeam,
+      req.user.priority,
+    );
   }
 
   @Post('/')

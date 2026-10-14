@@ -111,11 +111,15 @@ export class TokenController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Delete a Token' })
-  async deleteToken(@Param('id') id: string) {
+  async deleteToken(@Param('id') id: string, @Request() req: any) {
     if (!id) {
       throw new HttpException('Token ID is required', HttpStatus.BAD_REQUEST);
     }
-    return this.tokenService.delete(id);
+    return this.tokenService.delete(
+      id,
+      req.user.userId,
+      req.user.permissions?.includes('token:write'),
+    );
   }
 
   @Get('/my')
@@ -166,7 +170,8 @@ export class TokenController {
         HttpStatus.BAD_REQUEST,
       );
     }
-    await this.tokenService.delete(id);
+    // siempre restringido al propio: este endpoint es "mi token", nunca el de otro
+    await this.tokenService.delete(id, userId);
     // devuelve los tokens que le quedan al usuario (antes la promesa interna
     // no se retornaba y la respuesta salía vacía)
     const tokens = await this.tokenService.findAll();

@@ -118,6 +118,7 @@ model Role {
   name           String  @unique
   description    String?
   scopeToOwnTeam Boolean @default(false) // si es true, este rol solo gestiona usuarios de sus propios equipos
+  priority       Int     @default(0) // un rol acotado solo puede asignar roles con priority <= la suya
 
   users       User[] // Users associated with this role
   permissions Permission[] // Permissions directly assigned to this role

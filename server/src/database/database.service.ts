@@ -26,6 +26,7 @@ export class DatabaseService {
   public static async DBinit() {
     await this.Init();
     await this.RunMigrations();
+    await this.RenameLegacyRoleNames();
     await this.SeedDefaultData();
     await this.CreateSystemUser();
     await this.CreateAdminUser();
@@ -322,17 +323,46 @@ export class DatabaseService {
     Logger.log('Legacy users migrated successfully.', 'DatabaseService');
   }
 
+  // El rol "student" se renombró a "estudiante" (mismo idioma que "profesor",
+  // "webmaster" se deja igual por ser un término ya establecido). Si ya existe
+  // con el nombre viejo, se renombra en el lugar — conserva id, permisos,
+  // acotamiento y prioridad — en vez de dejarlo huérfano y crear uno nuevo.
+  private static async RenameLegacyRoleNames() {
+    const prisma = new PrismaClient();
+    const renames: Array<[string, string]> = [['student', 'estudiante']];
+    for (const [oldName, newName] of renames) {
+      const legacy = await prisma.role.findUnique({ where: { name: oldName } });
+      if (!legacy) continue;
+      const alreadyRenamed = await prisma.role.findUnique({
+        where: { name: newName },
+      });
+      if (alreadyRenamed) continue;
+      await prisma.role.update({
+        where: { id: legacy.id },
+        data: { name: newName },
+      });
+      Logger.log(
+        `Role "${oldName}" renamed to "${newName}".`,
+        'DatabaseService',
+      );
+    }
+  }
+
   private static async SeedDefaultData() {
     const prisma = new PrismaClient();
     // Ensure the 'admin' role exists with permissions
     await prisma.role
       .upsert({
         where: { name: 'admin' },
-        update: {},
+        // a diferencia de los demás roles, estos dos campos sí se corrigen
+        // en instalaciones ya existentes: admin siempre debe quedar sin
+        // acotar y con la prioridad más alta, si no esta jerarquía queda rota
+        update: { scopeToOwnTeam: false, priority: 100 },
         create: {
           name: 'admin',
           description: 'Administrator role with full access',
           scopeToOwnTeam: false,
+          priority: 100,
           permissions: {
             create: [
               { action: 'write', resource: 'app' },
@@ -406,6 +436,94 @@ export class DatabaseService {
       })
       .then(() => {
         Logger.log('Role "guest" seeded successfully.', 'DatabaseService');
+      });
+
+    // Estos tres roles son fijos para esta app: siempre deben existir, sin
+    // tener que configurarlos a mano cada vez. Jerarquía de prioridad:
+    // admin (100) > webmaster (60) > profesor (50) > student (10). Los tres
+    // quedan acotados a su propio equipo — solo admin ve/gestiona todo.
+    await prisma.role
+      .upsert({
+        where: { name: 'webmaster' },
+        update: { scopeToOwnTeam: true, priority: 60 },
+        create: {
+          name: 'webmaster',
+          description: 'Web master role, scoped to its own teams',
+          scopeToOwnTeam: true,
+          priority: 60,
+          permissions: {
+            create: [
+              { action: 'write', resource: 'app' },
+              { action: 'write', resource: 'pipeline' },
+              { action: 'read', resource: 'user' },
+              { action: 'read', resource: 'config' },
+              { action: 'ok', resource: 'console' },
+              { action: 'ok', resource: 'logs' },
+              { action: 'ok', resource: 'reboot' },
+              { action: 'ok', resource: 'audit' },
+              { action: 'ok', resource: 'token' },
+            ],
+          },
+        },
+      })
+      .then(() => {
+        Logger.log('Role "webmaster" seeded successfully.', 'DatabaseService');
+      });
+
+    await prisma.role
+      .upsert({
+        where: { name: 'profesor' },
+        update: { scopeToOwnTeam: true, priority: 50 },
+        create: {
+          name: 'profesor',
+          description: 'Teacher role, scoped to its own teams',
+          scopeToOwnTeam: true,
+          priority: 50,
+          permissions: {
+            create: [
+              { action: 'read', resource: 'app' },
+              { action: 'read', resource: 'pipeline' },
+              { action: 'write', resource: 'user' },
+              { action: 'read', resource: 'config' },
+              { action: 'ok', resource: 'console' },
+              { action: 'ok', resource: 'logs' },
+              { action: 'ok', resource: 'reboot' },
+              { action: 'ok', resource: 'audit' },
+              { action: 'ok', resource: 'token' },
+            ],
+          },
+        },
+      })
+      .then(() => {
+        Logger.log('Role "profesor" seeded successfully.', 'DatabaseService');
+      });
+
+    await prisma.role
+      .upsert({
+        where: { name: 'estudiante' },
+        update: { scopeToOwnTeam: true, priority: 10 },
+        create: {
+          name: 'estudiante',
+          description: 'Student role, scoped to its own teams',
+          scopeToOwnTeam: true,
+          priority: 10,
+          permissions: {
+            create: [
+              { action: 'write', resource: 'app' },
+              { action: 'write', resource: 'pipeline' },
+              { action: 'read', resource: 'user' },
+              { action: 'read', resource: 'config' },
+              { action: 'ok', resource: 'console' },
+              { action: 'ok', resource: 'logs' },
+              { action: 'ok', resource: 'reboot' },
+              { action: 'ok', resource: 'audit' },
+              { action: 'ok', resource: 'token' },
+            ],
+          },
+        },
+      })
+      .then(() => {
+        Logger.log('Role "estudiante" seeded successfully.', 'DatabaseService');
       });
 
     // Ensure the 'everyone' user group exists
