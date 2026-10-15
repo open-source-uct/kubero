@@ -1,5 +1,5 @@
 <template>
-    <v-container>
+    <v-container class="app-metrics">
 
       <div v-if="!kubero.metricsEnabled">
         <v-row>
@@ -941,3 +941,38 @@ export default defineComponent({
     },
 });
 </script>
+
+<style scoped>
+/* ApexCharts defaults to light surfaces even inside Vuetify's dark theme.
+   CSS tokens also update immediately when the user switches themes. */
+.app-metrics :deep(.apexcharts-tooltip.apexcharts-theme-light),
+.app-metrics :deep(.apexcharts-tooltip.apexcharts-theme-dark) {
+    background: rgb(var(--v-theme-cardBackground));
+    color: rgb(var(--v-theme-on-cardBackground));
+    border: 1px solid rgba(var(--v-theme-on-cardBackground), 0.2);
+    border-radius: 8px;
+}
+
+.app-metrics :deep(.apexcharts-tooltip.apexcharts-theme-light .apexcharts-tooltip-title),
+.app-metrics :deep(.apexcharts-tooltip.apexcharts-theme-dark .apexcharts-tooltip-title) {
+    background: rgb(var(--v-theme-secondary));
+    color: rgb(var(--v-theme-on-cardBackground));
+    border-bottom: 1px solid rgba(var(--v-theme-on-cardBackground), 0.2);
+}
+
+.app-metrics :deep(.apexcharts-xaxis-label),
+.app-metrics :deep(.apexcharts-yaxis-label),
+.app-metrics :deep(.apexcharts-yaxis-title-text),
+.app-metrics :deep(.apexcharts-title-text),
+.app-metrics :deep(.apexcharts-subtitle-text) {
+    fill: rgb(var(--v-theme-on-background));
+}
+
+.app-metrics :deep(.apexcharts-legend-text) {
+    color: rgb(var(--v-theme-on-background)) !important;
+}
+
+.app-metrics :deep(.apexcharts-gridline) {
+    stroke: rgba(var(--v-theme-on-background), 0.2);
+}
+</style>
