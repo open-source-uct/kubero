@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
-import { Test, TestingModule } from "@nestjs/testing";
+import { Test, type TestingModule } from "@nestjs/testing";
 import { GroupsService } from "./groups.service";
 
 describe("GroupService", () => {

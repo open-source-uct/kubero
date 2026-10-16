@@ -1,6 +1,6 @@
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
-import { IUser } from "src/auth/auth.interface";
-import { IPipeline } from "./pipelines.interface";
+import type { IUser } from "src/auth/auth.interface";
+import type { IPipeline } from "./pipelines.interface";
 import { PipelinesService } from "./pipelines.service";
 
 jest.mock("../config/buildpack/buildpack", () => ({

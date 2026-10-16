@@ -4,7 +4,7 @@ import { Permissions } from "../auth/permissions.decorator";
 import { PermissionsGuard } from "../auth/permissions.guard";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
 import { OKDTO } from "../common/dto/ok.dto";
-import { AddonsService } from "./addons.service";
+import type { AddonsService } from "./addons.service";
 
 @Controller({ path: "api/addons", version: "1" })
 export class AddonsController {

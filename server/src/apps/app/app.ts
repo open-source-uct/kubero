@@ -1,9 +1,9 @@
 import { genSaltSync, hashSync } from "bcrypt";
-import { IAddon } from "../../addons/addons.interface";
+import type { IAddon } from "../../addons/addons.interface";
 import { Buildpack } from "../../config/buildpack/buildpack";
-import { IPodSize, ISecurityContext } from "../../config/config.interface";
-import { IKubectlApp, IKubectlMetadata } from "../../kubernetes/kubernetes.interface";
-import { IApp, ICronjob, IExtraVolume, IGithubRepository } from "../apps.interface";
+import type { IPodSize, ISecurityContext } from "../../config/config.interface";
+import type { IKubectlApp, IKubectlMetadata } from "../../kubernetes/kubernetes.interface";
+import type { IApp, ICronjob, IExtraVolume, IGithubRepository } from "../apps.interface";
 
 export class KubectlApp implements IKubectlApp {
 	apiVersion: string;

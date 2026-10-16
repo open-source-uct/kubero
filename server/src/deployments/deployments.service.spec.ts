@@ -1,12 +1,12 @@
 import { ForbiddenException } from "@nestjs/common";
-import { ILoglines } from "src/logs/logs.interface";
+import type { ILoglines } from "src/logs/logs.interface";
 import { mockKubectlApp as app } from "../apps/apps.controller.spec";
-import { AppsService } from "../apps/apps.service";
-import { IUser } from "../auth/auth.interface";
-import { KubernetesService } from "../kubernetes/kubernetes.service";
-import { LogsService } from "../logs/logs.service";
-import { NotificationsService } from "../notifications/notifications.service";
-import { PipelinesService } from "../pipelines/pipelines.service";
+import type { AppsService } from "../apps/apps.service";
+import type { IUser } from "../auth/auth.interface";
+import type { KubernetesService } from "../kubernetes/kubernetes.service";
+import type { LogsService } from "../logs/logs.service";
+import type { NotificationsService } from "../notifications/notifications.service";
+import type { PipelinesService } from "../pipelines/pipelines.service";
 import { DeploymentsService } from "./deployments.service";
 
 const mockUserGroups = ["group1", "group2"];

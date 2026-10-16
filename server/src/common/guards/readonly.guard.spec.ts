@@ -1,4 +1,4 @@
-import { ExecutionContext, HttpException } from "@nestjs/common";
+import { type ExecutionContext, HttpException } from "@nestjs/common";
 import { ReadonlyGuard } from "./readonly.guard";
 
 describe("ReadonlyGuard", () => {

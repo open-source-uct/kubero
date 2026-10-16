@@ -1,5 +1,5 @@
 import { Buildpack } from "../buildpack/buildpack";
-import { IBuildpack, IKuberoConfig, IPodSize } from "../config.interface";
+import type { IBuildpack, IKuberoConfig, IPodSize } from "../config.interface";
 import { PodSize } from "../podsize/podsize";
 
 export class KuberoConfig {

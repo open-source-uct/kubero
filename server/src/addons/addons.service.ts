@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { KubernetesService } from "../kubernetes/kubernetes.service";
+import type { KubernetesService } from "../kubernetes/kubernetes.service";
 import { ClickHouseInstallation } from "./plugins/clickhouse";
 import { Tunnel } from "./plugins/cloudflare";
 import { Cockroachdb } from "./plugins/cockroachDB";
@@ -16,7 +16,7 @@ import { KuberoMysql } from "./plugins/kuberoMysql";
 import { KuberoPostgresql } from "./plugins/kuberoPostgresql";
 import { Tenant } from "./plugins/minio";
 import { PerconaServerMongoDB as MongoDB } from "./plugins/mongoDB";
-import { IPlugin } from "./plugins/plugin.interface";
+import type { IPlugin } from "./plugins/plugin.interface";
 import { PostgresCluster } from "./plugins/postgresCluster";
 import { Redis } from "./plugins/redis";
 import { RedisCluster } from "./plugins/redisCluster";

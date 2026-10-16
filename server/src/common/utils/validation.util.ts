@@ -1,4 +1,4 @@
-import { ValidationError } from "class-validator";
+import type { ValidationError } from "class-validator";
 
 // class-validator anida los errores de campos dentro de objetos (ej.
 // kubero.config.kubero.banner.bgcolor) bajo `error.children` en vez de

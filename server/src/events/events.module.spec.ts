@@ -1,5 +1,5 @@
 import { JwtService } from "@nestjs/jwt";
-import { Test, TestingModule } from "@nestjs/testing";
+import { Test, type TestingModule } from "@nestjs/testing";
 import { IdentityService } from "../auth/identity.service";
 import { EventsGateway } from "./events.gateway";
 

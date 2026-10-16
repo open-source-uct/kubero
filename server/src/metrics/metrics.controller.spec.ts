@@ -1,9 +1,9 @@
 import { ForbiddenException } from "@nestjs/common";
-import { Test, TestingModule } from "@nestjs/testing";
+import { Test, type TestingModule } from "@nestjs/testing";
 import { QueryResult, ResponseType } from "prometheus-query";
 import { PipelinesService } from "../pipelines/pipelines.service";
 import { MetricsController } from "./metrics.controller";
-import { IMetric } from "./metrics.interface";
+import type { IMetric } from "./metrics.interface";
 import { MetricsService } from "./metrics.service";
 
 describe("MetricsController", () => {

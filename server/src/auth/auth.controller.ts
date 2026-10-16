@@ -12,9 +12,9 @@ import {
 import { AuthGuard } from "@nestjs/passport";
 import { ApiBearerAuth, ApiForbiddenResponse, ApiOkResponse, ApiOperation } from "@nestjs/swagger";
 import { OKDTO } from "../common/dto/ok.dto";
-import { GetMethodsDTO, GetSessionDTO, LoginDTO, LoginOKResponseDTO } from "./auth.dto";
-import { AuthService } from "./auth.service";
-import { LoginThrottleService } from "./login-throttle.service";
+import { GetMethodsDTO, GetSessionDTO, type LoginDTO, LoginOKResponseDTO } from "./auth.dto";
+import type { AuthService } from "./auth.service";
+import type { LoginThrottleService } from "./login-throttle.service";
 import { JwtAuthGuard } from "./strategies/jwt.guard";
 
 @Controller({ path: "api/auth", version: "1" })

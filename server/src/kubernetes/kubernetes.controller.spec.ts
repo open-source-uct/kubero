@@ -1,9 +1,9 @@
-import { CoreV1Event } from "@kubernetes/client-node";
+import type { CoreV1Event } from "@kubernetes/client-node";
 import { ForbiddenException } from "@nestjs/common";
-import { Test, TestingModule } from "@nestjs/testing";
+import { Test, type TestingModule } from "@nestjs/testing";
 import { PipelinesService } from "../pipelines/pipelines.service";
 import { KubernetesController } from "./kubernetes.controller";
-import { IStorageClass } from "./kubernetes.interface";
+import type { IStorageClass } from "./kubernetes.interface";
 import { KubernetesService } from "./kubernetes.service";
 
 export const mockStorageClass = {

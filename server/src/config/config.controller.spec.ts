@@ -1,5 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
-import { Test, TestingModule } from "@nestjs/testing";
+import { Test, type TestingModule } from "@nestjs/testing";
 import { ConfigController } from "./config.controller";
 import { ConfigService } from "./config.service";
 

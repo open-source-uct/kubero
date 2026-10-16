@@ -1,11 +1,11 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Stream } from "stream";
 import { v4 as uuidv4 } from "uuid";
-import { AppsService } from "../apps/apps.service";
-import { EventsGateway } from "../events/events.gateway";
-import { KubernetesService } from "../kubernetes/kubernetes.service";
-import { PipelinesService } from "../pipelines/pipelines.service";
-import { ILoglines } from "./logs.interface";
+import type { AppsService } from "../apps/apps.service";
+import type { EventsGateway } from "../events/events.gateway";
+import type { KubernetesService } from "../kubernetes/kubernetes.service";
+import type { PipelinesService } from "../pipelines/pipelines.service";
+import type { ILoglines } from "./logs.interface";
 
 @Injectable()
 export class LogsService {

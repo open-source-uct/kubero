@@ -26,13 +26,13 @@ import { OKDTO } from "../common/dto/ok.dto";
 import { ReadonlyGuard } from "../common/guards/readonly.guard";
 import { flattenValidationErrors } from "../common/utils/validation.util";
 //import { ApiTags } from '@nestjs/swagger';
-import { ConfigService } from "./config.service";
-import { CreateRunpackDto } from "./dto/runpack.dto";
+import type { ConfigService } from "./config.service";
+import type { CreateRunpackDto } from "./dto/runpack.dto";
 import { SettingsValidationDto } from "./dto/settings-validation.dto";
-import { UpdateRunningConfigDto } from "./dto/update-running-config.dto";
-import { ValidateKubeconfigDto } from "./dto/validate-kubeconfig.dto";
+import type { UpdateRunningConfigDto } from "./dto/update-running-config.dto";
+import type { ValidateKubeconfigDto } from "./dto/validate-kubeconfig.dto";
 import { PodSize } from "./podsize/podsize";
-import { CreatePodSizeDto, UpdatePodSizeDto } from "./podsize/podsize.dto";
+import type { CreatePodSizeDto, UpdatePodSizeDto } from "./podsize/podsize.dto";
 
 @Controller({ path: "api/config", version: "1" })
 export class ConfigController {

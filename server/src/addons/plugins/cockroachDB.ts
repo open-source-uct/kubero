@@ -1,5 +1,5 @@
 import { Plugin } from "./plugin";
-import { IPlugin, IPluginFormFields } from "./plugin.interface";
+import type { IPlugin, IPluginFormFields } from "./plugin.interface";
 
 // Classname must be same as the CRD's Name
 export class Cockroachdb extends Plugin implements IPlugin {

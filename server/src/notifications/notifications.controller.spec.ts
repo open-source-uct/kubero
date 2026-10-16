@@ -1,8 +1,8 @@
 import { HttpException, HttpStatus } from "@nestjs/common";
-import { Test, TestingModule } from "@nestjs/testing";
-import { CreateNotificationDto } from "./dto/notification.dto";
+import { Test, type TestingModule } from "@nestjs/testing";
+import type { CreateNotificationDto } from "./dto/notification.dto";
 import { NotificationsController } from "./notifications.controller";
-import { INotificationConfig } from "./notifications.interface";
+import type { INotificationConfig } from "./notifications.interface";
 import { NotificationsDbService } from "./notifications-db.service";
 
 describe("NotificationsController", () => {

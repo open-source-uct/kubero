@@ -10,9 +10,9 @@ import { Permissions } from "../auth/permissions.decorator";
 import { PermissionsGuard } from "../auth/permissions.guard";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
 import { OKDTO } from "../common/dto/ok.dto";
-import { PipelinesService } from "../pipelines/pipelines.service";
+import type { PipelinesService } from "../pipelines/pipelines.service";
 import { ContextDTO, GetEventsDTO, StorageClassDTO } from "./dto/kubernetes.dto";
-import { KubernetesService } from "./kubernetes.service";
+import type { KubernetesService } from "./kubernetes.service";
 
 @Controller({ path: "api/kubernetes", version: "1" })
 export class KubernetesController {

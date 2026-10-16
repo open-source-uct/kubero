@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException, HttpException } from "@nestjs/common";
-import { User as PrismaUser } from "@prisma/client";
+import type { User as PrismaUser } from "@prisma/client";
 import axios from "axios";
 import * as bcrypt from "bcrypt";
 import { UsersService } from "./users.service";

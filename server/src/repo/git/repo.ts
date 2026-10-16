@@ -1,8 +1,8 @@
 import { Logger } from "@nestjs/common";
 import * as crypto from "crypto";
 import * as sshpk from "sshpk";
-import { IDeployKeyPair } from "../repo.interface";
-import { IDeploykeyR, IPullrequest, IRepository, IWebhook, IWebhookR } from "./types";
+import type { IDeployKeyPair } from "../repo.interface";
+import type { IDeploykeyR, IPullrequest, IRepository, IWebhook, IWebhookR } from "./types";
 
 export abstract class Repo {
 	protected repoProvider: string;

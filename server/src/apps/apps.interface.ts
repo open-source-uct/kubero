@@ -1,5 +1,5 @@
-import { IAddon } from "../addons/addons.interface";
-import { IPodSize, ISecurityContext } from "../config/config.interface";
+import type { IAddon } from "../addons/addons.interface";
+import type { IPodSize, ISecurityContext } from "../config/config.interface";
 
 export interface IApp {
 	name: string;

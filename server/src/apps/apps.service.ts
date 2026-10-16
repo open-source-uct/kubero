@@ -1,17 +1,17 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Stream } from "stream";
 import * as YAML from "yaml";
-import { IUser } from "../auth/auth.interface";
-import { ConfigService } from "../config/config.service";
-import { EventsGateway } from "../events/events.gateway";
-import { IKubectlApp } from "../kubernetes/kubernetes.interface";
-import { KubernetesService } from "../kubernetes/kubernetes.service";
-import { INotification } from "../notifications/notifications.interface";
-import { NotificationsService } from "../notifications/notifications.service";
-import { PipelinesService } from "../pipelines/pipelines.service";
+import type { IUser } from "../auth/auth.interface";
+import type { ConfigService } from "../config/config.service";
+import type { EventsGateway } from "../events/events.gateway";
+import type { IKubectlApp } from "../kubernetes/kubernetes.interface";
+import type { KubernetesService } from "../kubernetes/kubernetes.service";
+import type { INotification } from "../notifications/notifications.interface";
+import type { NotificationsService } from "../notifications/notifications.service";
+import type { PipelinesService } from "../pipelines/pipelines.service";
 import { KubectlTemplate } from "../templates/template";
 import { App } from "./app/app";
-import { IApp, Workload, WorkloadContainer } from "./apps.interface";
+import type { IApp, Workload, WorkloadContainer } from "./apps.interface";
 
 @Injectable()
 export class AppsService {

@@ -1,5 +1,5 @@
 import { Logger, ValidationPipe } from "@nestjs/common";
-import { LogLevel } from "@nestjs/common/services/logger.service";
+import type { LogLevel } from "@nestjs/common/services/logger.service";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import * as dotenv from "dotenv";

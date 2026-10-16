@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { AuditEntry } from "./audit.interface";
+import type { AuditEntry } from "./audit.interface";
 import { AuditService } from "./audit.service";
 
 jest.mock("@prisma/client");

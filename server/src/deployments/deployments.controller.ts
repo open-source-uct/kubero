@@ -17,13 +17,13 @@ import {
 	ApiOperation,
 	ApiParam,
 } from "@nestjs/swagger";
-import { IUser } from "../auth/auth.interface";
+import type { IUser } from "../auth/auth.interface";
 import { Permissions } from "../auth/permissions.decorator";
 import { PermissionsGuard } from "../auth/permissions.guard";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
 import { OKDTO } from "../common/dto/ok.dto";
 import { ReadonlyGuard } from "../common/guards/readonly.guard";
-import { DeploymentsService } from "./deployments.service";
+import type { DeploymentsService } from "./deployments.service";
 import { CreateBuild } from "./dto/CreateBuild.dto";
 
 @Controller({ path: "api/deployments", version: "1" })

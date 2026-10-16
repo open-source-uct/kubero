@@ -1,7 +1,7 @@
-import { IAddon } from "../addons/addons.interface";
-import { ICronjob, IExtraVolume } from "../apps/apps.interface";
-import { ISecurityContext } from "../config/config.interface";
-import { IKubectlMetadata } from "../kubernetes/kubernetes.interface";
+import type { IAddon } from "../addons/addons.interface";
+import type { ICronjob, IExtraVolume } from "../apps/apps.interface";
+import type { ISecurityContext } from "../config/config.interface";
+import type { IKubectlMetadata } from "../kubernetes/kubernetes.interface";
 
 export interface ITemplate {
 	name: string;

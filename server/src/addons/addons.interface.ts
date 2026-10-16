@@ -1,4 +1,4 @@
-import {
+import type {
 	//KubernetesListObject,
 	KubernetesObject,
 } from "@kubernetes/client-node";

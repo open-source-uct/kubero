@@ -1,6 +1,6 @@
-import { IBuildpack } from "../../config/config.interface";
-import { IKubectlMetadata } from "../../kubernetes/kubernetes.interface";
-import {
+import type { IBuildpack } from "../../config/config.interface";
+import type { IKubectlMetadata } from "../../kubernetes/kubernetes.interface";
+import type {
 	IgitLink,
 	IKubectlPipeline,
 	IPipeline,

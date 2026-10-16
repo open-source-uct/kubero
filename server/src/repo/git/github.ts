@@ -2,13 +2,13 @@ import debug from "debug";
 import * as gitUrlParse from "git-url-parse";
 import { verifyHmacSha256, webhookSecret } from "../../common/utils/webhook.util";
 import { Repo } from "./repo";
-import { IDeploykeyR, IPullrequest, IRepository, IWebhook, IWebhookR } from "./types";
+import type { IDeploykeyR, IPullrequest, IRepository, IWebhook, IWebhookR } from "./types";
 
 debug("app:kubero:github:api");
 
 //const { Octokit } = require("@octokit/core");
 import { Octokit } from "@octokit/core";
-import { RequestError } from "@octokit/types";
+import type { RequestError } from "@octokit/types";
 
 export class GithubApi extends Repo {
 	private octokit: any;

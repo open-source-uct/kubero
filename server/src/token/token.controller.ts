@@ -16,8 +16,8 @@ import { PermissionsGuard } from "../auth/permissions.guard";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
 import { OKDTO } from "../common/dto/ok.dto";
 import { ReadonlyGuard } from "../common/guards/readonly.guard";
-import { CreateTokenDto } from "./dto/create-token.dto";
-import { TokenService } from "./token.service";
+import type { CreateTokenDto } from "./dto/create-token.dto";
+import type { TokenService } from "./token.service";
 
 @Controller({ path: "api/tokens", version: "1" })
 export class TokenController {

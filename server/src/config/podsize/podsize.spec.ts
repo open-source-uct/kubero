@@ -1,4 +1,4 @@
-import { IPodSize } from "../config.interface";
+import type { IPodSize } from "../config.interface";
 import { PodSize } from "./podsize";
 
 const mockPodSize: IPodSize = {

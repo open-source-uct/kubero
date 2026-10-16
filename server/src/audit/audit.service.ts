@@ -1,8 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Prisma, PrismaClient } from "@prisma/client";
-import { AuditEntry } from "./audit.interface";
-import { AuditQueryDto } from "./audit-query.dto";
-import { AuditSuggestionsDto } from "./audit-suggestions.dto";
+import { type Prisma, PrismaClient } from "@prisma/client";
+import type { AuditEntry } from "./audit.interface";
+import type { AuditQueryDto } from "./audit-query.dto";
+import type { AuditSuggestionsDto } from "./audit-suggestions.dto";
 
 @Injectable()
 export class AuditService {

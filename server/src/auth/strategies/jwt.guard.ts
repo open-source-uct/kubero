@@ -1,4 +1,4 @@
-import { ExecutionContext, Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import { type ExecutionContext, Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import * as dotenv from "dotenv";
 

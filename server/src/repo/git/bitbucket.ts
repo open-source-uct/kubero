@@ -2,13 +2,13 @@ import debug from "debug";
 import * as gitUrlParse from "git-url-parse";
 import { verifyHmacSha256, webhookSecret } from "../../common/utils/webhook.util";
 import { Repo } from "./repo";
-import { IDeploykeyR, IPullrequest, IRepository, IWebhook, IWebhookR } from "./types";
+import type { IDeploykeyR, IPullrequest, IRepository, IWebhook, IWebhookR } from "./types";
 
 debug("app:kubero:bitbucket:api");
 
 import { Logger } from "@nestjs/common";
-import { RequestError } from "@octokit/types";
-import { APIClient, Bitbucket } from "bitbucket";
+import type { RequestError } from "@octokit/types";
+import { type APIClient, Bitbucket } from "bitbucket";
 
 export class BitbucketApi extends Repo {
 	private bitbucket: APIClient;

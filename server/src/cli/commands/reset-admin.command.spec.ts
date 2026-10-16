@@ -1,5 +1,5 @@
-import { Logger } from "@nestjs/common";
-import { Test, TestingModule } from "@nestjs/testing";
+import type { Logger } from "@nestjs/common";
+import { Test, type TestingModule } from "@nestjs/testing";
 import { DatabaseService } from "../../database/database.service";
 import { ResetAdminCommand } from "./reset-admin.command";
 

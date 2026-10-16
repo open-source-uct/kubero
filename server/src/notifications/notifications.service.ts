@@ -1,17 +1,17 @@
 import { Injectable, Logger } from "@nestjs/common";
 import fetch from "node-fetch";
-import { AuditService } from "../audit/audit.service";
-import { IKuberoConfig } from "../config/config.interface";
-import { EventsGateway } from "../events/events.gateway";
-import { KubernetesService } from "../kubernetes/kubernetes.service";
-import {
+import type { AuditService } from "../audit/audit.service";
+import type { IKuberoConfig } from "../config/config.interface";
+import type { EventsGateway } from "../events/events.gateway";
+import type { KubernetesService } from "../kubernetes/kubernetes.service";
+import type {
 	INotification,
 	INotificationConfig,
 	INotificationDiscord,
 	INotificationSlack,
 	INotificationWebhook,
 } from "./notifications.interface";
-import { NotificationsDbService } from "./notifications-db.service";
+import type { NotificationsDbService } from "./notifications-db.service";
 
 @Injectable()
 export class NotificationsService {

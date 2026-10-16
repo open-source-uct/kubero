@@ -1,4 +1,4 @@
-import { INotificationConfig } from "../notifications/notifications.interface";
+import type { INotificationConfig } from "../notifications/notifications.interface";
 export interface IKuberoConfig {
 	podSizeList: IPodSize[];
 	buildpacks: IBuildpack[];

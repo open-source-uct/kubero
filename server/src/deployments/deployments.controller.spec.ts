@@ -1,5 +1,5 @@
 import { ForbiddenException } from "@nestjs/common";
-import { Test, TestingModule } from "@nestjs/testing";
+import { Test, type TestingModule } from "@nestjs/testing";
 import { DeploymentsController } from "./deployments.controller";
 import { DeploymentsService } from "./deployments.service";
 

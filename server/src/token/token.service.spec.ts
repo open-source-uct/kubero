@@ -1,4 +1,4 @@
-import { Test, TestingModule } from "@nestjs/testing";
+import { Test, type TestingModule } from "@nestjs/testing";
 import { AuthService } from "../auth/auth.service";
 import { RolesService } from "../roles/roles.service";
 import { UsersService } from "../users/users.service";

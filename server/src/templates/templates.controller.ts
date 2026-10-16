@@ -1,11 +1,11 @@
 import { Controller, Get, Logger, Param, Res, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiForbiddenResponse, ApiOperation, ApiParam } from "@nestjs/swagger";
-import { Response } from "express";
+import type { Response } from "express";
 import { Permissions } from "../auth/permissions.decorator";
 import { PermissionsGuard } from "../auth/permissions.guard";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
 import { OKDTO } from "../common/dto/ok.dto";
-import { TemplatesService } from "./templates.service";
+import type { TemplatesService } from "./templates.service";
 
 @Controller({ path: "api/templates", version: "1" })
 export class TemplatesController {

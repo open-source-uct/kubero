@@ -5,10 +5,10 @@ import { Client as GitlabClient } from "@nerdvision/gitlab-js";
 import { Logger } from "@nestjs/common";
 import debug from "debug";
 import * as gitUrlParse from "git-url-parse";
-import { Options } from "got";
+import type { Options } from "got";
 import { verifySharedToken, webhookSecret } from "../../common/utils/webhook.util";
 import { Repo } from "./repo";
-import { IDeploykeyR, IPullrequest, IRepository, IWebhook, IWebhookR } from "./types";
+import type { IDeploykeyR, IPullrequest, IRepository, IWebhook, IWebhookR } from "./types";
 
 export class GitlabApi extends Repo {
 	private gitlab: GitlabClient;

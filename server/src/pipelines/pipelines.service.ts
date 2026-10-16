@@ -1,11 +1,11 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { IApp } from "../apps/apps.interface";
-import { IUser } from "../auth/auth.interface";
+import type { IApp } from "../apps/apps.interface";
+import type { IUser } from "../auth/auth.interface";
 import { Buildpack } from "../config/buildpack/buildpack";
-import { KubernetesService } from "../kubernetes/kubernetes.service";
-import { INotification } from "../notifications/notifications.interface";
-import { NotificationsService } from "../notifications/notifications.service";
-import { IPipeline, IPipelineList } from "./pipelines.interface";
+import type { KubernetesService } from "../kubernetes/kubernetes.service";
+import type { INotification } from "../notifications/notifications.interface";
+import type { NotificationsService } from "../notifications/notifications.service";
+import type { IPipeline, IPipelineList } from "./pipelines.interface";
 @Injectable()
 export class PipelinesService {
 	private readonly logger = new Logger(PipelinesService.name);

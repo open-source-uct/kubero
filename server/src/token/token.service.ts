@@ -1,8 +1,8 @@
 import { ForbiddenException, Injectable, Logger } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
-import { AuthService } from "../auth/auth.service";
-import { RolesService } from "../roles/roles.service";
-import { UsersService } from "../users/users.service";
+import type { AuthService } from "../auth/auth.service";
+import type { RolesService } from "../roles/roles.service";
+import type { UsersService } from "../users/users.service";
 
 @Injectable()
 export class TokenService {

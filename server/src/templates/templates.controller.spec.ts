@@ -1,5 +1,5 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { Response } from "express";
+import { Test, type TestingModule } from "@nestjs/testing";
+import type { Response } from "express";
 import { TemplatesController } from "./templates.controller";
 import { TemplatesService } from "./templates.service";
 

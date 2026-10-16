@@ -1,4 +1,4 @@
-import { IRunpack, ISecurityContext } from "../config.interface";
+import type { IRunpack, ISecurityContext } from "../config.interface";
 
 export class Runpack implements IRunpack {
 	public id: string;

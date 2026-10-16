@@ -1,16 +1,16 @@
 import { Logger, UseGuards } from "@nestjs/common";
-import { ModuleRef } from "@nestjs/core";
-import { JwtService } from "@nestjs/jwt";
+import type { ModuleRef } from "@nestjs/core";
+import type { JwtService } from "@nestjs/jwt";
 import {
 	ConnectedSocket,
 	MessageBody,
-	OnGatewayConnection,
+	type OnGatewayConnection,
 	SubscribeMessage,
 	WebSocketGateway,
 	WebSocketServer,
 } from "@nestjs/websockets";
-import { Server, Socket } from "socket.io";
-import { AuthenticatedUser, IdentityService } from "../auth/identity.service";
+import type { Server, Socket } from "socket.io";
+import type { AuthenticatedUser, IdentityService } from "../auth/identity.service";
 import { WsJwtGuard } from "../auth/strategies/ws-jwt.guard";
 
 // Sala del equipo: los eventos de un pipeline solo llegan a sus equipos

@@ -1,5 +1,5 @@
-import { INotificationConfig } from "src/notifications/notifications.interface";
-import { IBuildpack, IKuberoConfig, IPodSize, ISecurityContext } from "../config.interface";
+import type { INotificationConfig } from "src/notifications/notifications.interface";
+import type { IBuildpack, IKuberoConfig, IPodSize, ISecurityContext } from "../config.interface";
 
 const mockSecurityContext: ISecurityContext = {
 	readOnlyRootFilesystem: false,

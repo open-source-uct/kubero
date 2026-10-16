@@ -1,4 +1,4 @@
-import { IPodSize } from "../config.interface";
+import type { IPodSize } from "../config.interface";
 
 export class PodSize implements IPodSize {
 	public id?: string | undefined;

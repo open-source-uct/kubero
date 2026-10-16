@@ -1,9 +1,9 @@
-import { AuditService } from "../audit/audit.service";
-import { EventsGateway } from "../events/events.gateway";
-import { KubernetesService } from "../kubernetes/kubernetes.service";
-import { INotification, INotificationConfig } from "./notifications.interface";
+import type { AuditService } from "../audit/audit.service";
+import type { EventsGateway } from "../events/events.gateway";
+import type { KubernetesService } from "../kubernetes/kubernetes.service";
+import type { INotification, INotificationConfig } from "./notifications.interface";
 import { NotificationsService } from "./notifications.service";
-import { NotificationsDbService } from "./notifications-db.service";
+import type { NotificationsDbService } from "./notifications-db.service";
 
 jest.mock("node-fetch", () => ({
 	__esModule: true,

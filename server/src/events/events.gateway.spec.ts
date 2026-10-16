@@ -1,4 +1,4 @@
-import { Server, Socket } from "socket.io";
+import type { Server, Socket } from "socket.io";
 import { EventsGateway } from "./events.gateway";
 
 const user = (over: any = {}) => ({

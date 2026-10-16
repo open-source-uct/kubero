@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, HttpException, Injectable, Logger } from "@nestjs/common";
+import { type CanActivate, type ExecutionContext, HttpException, Injectable, Logger } from "@nestjs/common";
 
 /* DEPRECATED: This guard is deprecated and will be removed in future versions in favour of Kubero roles*/
 @Injectable()

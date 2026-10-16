@@ -1,14 +1,14 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { IUser } from "src/auth/auth.interface";
-import { IPodSize, ISecurityContext } from "src/config/config.interface";
-import { IKubectlApp } from "src/kubernetes/kubernetes.interface";
+import { Test, type TestingModule } from "@nestjs/testing";
+import type { IUser } from "src/auth/auth.interface";
+import type { IPodSize, ISecurityContext } from "src/config/config.interface";
+import type { IKubectlApp } from "src/kubernetes/kubernetes.interface";
 import { ConfigService } from "../config/config.service";
 import { EventsGateway } from "../events/events.gateway";
 import { KubernetesService } from "../kubernetes/kubernetes.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PipelinesService } from "../pipelines/pipelines.service";
 import { App } from "./app/app";
-import { IApp } from "./apps.interface";
+import type { IApp } from "./apps.interface";
 import { AppsService } from "./apps.service";
 
 const podsize: IPodSize = {

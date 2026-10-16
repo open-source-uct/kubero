@@ -1,4 +1,4 @@
-import { registerDecorator, ValidationArguments, ValidationOptions } from "class-validator";
+import { registerDecorator, type ValidationArguments, type ValidationOptions } from "class-validator";
 
 const K8S_QUANTITY_REGEX =
 	/^[+]?(\d+(\.\d+)?|\.\d+)([eE][+-]?\d+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$/;

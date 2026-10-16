@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Command, CommandRunner } from "nest-commander";
-import { DatabaseService } from "../../database/database.service";
+import type { DatabaseService } from "../../database/database.service";
 
 @Command({
 	name: "reset-admin",

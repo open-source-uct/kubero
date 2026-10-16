@@ -15,8 +15,8 @@ import { PermissionsGuard } from "../auth/permissions.guard";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
 import { OKDTO } from "../common/dto/ok.dto";
 import { ReadonlyGuard } from "../common/guards/readonly.guard";
-import { CreateGroupDto, UpdateGroupDto } from "./dto/group.dto";
-import { GroupsService } from "./groups.service";
+import type { CreateGroupDto, UpdateGroupDto } from "./dto/group.dto";
+import type { GroupsService } from "./groups.service";
 
 @Controller({ path: "api/groups", version: "1" })
 export class GroupsController {

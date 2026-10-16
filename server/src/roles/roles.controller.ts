@@ -16,8 +16,8 @@ import { PermissionsGuard } from "../auth/permissions.guard";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
 import { OKDTO } from "../common/dto/ok.dto";
 import { ReadonlyGuard } from "../common/guards/readonly.guard";
-import { CreateRoleDto, UpdateRoleDto } from "./dto/role.dto";
-import { RolesService } from "./roles.service";
+import type { CreateRoleDto, UpdateRoleDto } from "./dto/role.dto";
+import type { RolesService } from "./roles.service";
 
 @Controller({ path: "api/roles", version: "1" })
 export class RolesController {

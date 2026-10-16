@@ -1,4 +1,4 @@
-import { CanActivate, Injectable, Logger } from "@nestjs/common";
+import { type CanActivate, Injectable, Logger } from "@nestjs/common";
 
 /**
  * Guard de los mensajes del websocket. La autenticación se hace al conectar

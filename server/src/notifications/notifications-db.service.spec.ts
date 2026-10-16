@@ -1,7 +1,7 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { CreateNotificationDto } from "./dto/notification.dto";
-import { INotificationConfig } from "./notifications.interface";
-import { NotificationDb, NotificationsDbService } from "./notifications-db.service";
+import { Test, type TestingModule } from "@nestjs/testing";
+import type { CreateNotificationDto } from "./dto/notification.dto";
+import type { INotificationConfig } from "./notifications.interface";
+import { type NotificationDb, NotificationsDbService } from "./notifications-db.service";
 
 // Mock PrismaClient
 const mockPrismaClient = {

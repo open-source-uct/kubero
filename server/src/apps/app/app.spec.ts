@@ -1,5 +1,5 @@
-import { IPodSize, ISecurityContext } from "../../config/config.interface";
-import { IApp } from "../apps.interface";
+import type { IPodSize, ISecurityContext } from "../../config/config.interface";
+import type { IApp } from "../apps.interface";
 import { App, KubectlApp } from "./app";
 
 jest.mock("bcrypt", () => ({

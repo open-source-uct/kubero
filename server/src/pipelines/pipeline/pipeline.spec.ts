@@ -1,4 +1,4 @@
-import { IPipeline } from "../pipelines.interface";
+import type { IPipeline } from "../pipelines.interface";
 import { Pipeline } from "./pipeline";
 
 describe("Pipeline", () => {

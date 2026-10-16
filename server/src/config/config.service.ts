@@ -1,14 +1,14 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Runpack as DBRunpack, PrismaClient } from "@prisma/client";
+import { type Runpack as DBRunpack, PrismaClient } from "@prisma/client";
 import * as dotenv from "dotenv";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
 import * as YAML from "yaml";
-import { KubernetesService } from "../kubernetes/kubernetes.service";
-import { INotification } from "../notifications/notifications.interface";
-import { NotificationsService } from "../notifications/notifications.service";
+import type { KubernetesService } from "../kubernetes/kubernetes.service";
+import type { INotification } from "../notifications/notifications.interface";
+import type { NotificationsService } from "../notifications/notifications.service";
 import { Runpack } from "./buildpack/runpack";
-import { IKuberoConfig, IKuberoCRD, IRegistry } from "./config.interface";
+import type { IKuberoConfig, IKuberoCRD, IRegistry } from "./config.interface";
 import { KuberoConfig } from "./kubero-config/kubero-config";
 import { PodSize } from "./podsize/podsize";
 

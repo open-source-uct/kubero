@@ -1,13 +1,13 @@
 import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
-import { JwtService } from "@nestjs/jwt";
+import type { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import * as dotenv from "dotenv";
-import { AuditService } from "../audit/audit.service";
+import type { AuditService } from "../audit/audit.service";
 import { ConfigService } from "../config/config.service";
-import { KubernetesService } from "../kubernetes/kubernetes.service";
-import { RolesService } from "../roles/roles.service";
-import { UsersService } from "../users/users.service";
+import type { KubernetesService } from "../kubernetes/kubernetes.service";
+import type { RolesService } from "../roles/roles.service";
+import type { UsersService } from "../users/users.service";
 import { getJwtSecret } from "./jwt-secret";
 
 dotenv.config();

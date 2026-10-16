@@ -1,4 +1,4 @@
-import { IApp } from "../../apps/apps.interface";
+import type { IApp } from "../../apps/apps.interface";
 import { KubectlTemplate } from "./templates";
 
 describe("KubectlTemplate", () => {

@@ -6,7 +6,7 @@ import {
 	Injectable,
 	Logger,
 } from "@nestjs/common";
-import { PrismaClient, User as PrismaUser } from "@prisma/client";
+import { PrismaClient, type User as PrismaUser } from "@prisma/client";
 import * as dotenv from "dotenv";
 
 dotenv.config();

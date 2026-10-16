@@ -1,9 +1,9 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { InjectMetric } from "@willsoto/nestjs-prometheus";
-import { Gauge } from "prom-client";
-import { AppsService } from "../apps/apps.service";
-import { PipelinesService } from "../pipelines/pipelines.service";
+import type { Gauge } from "prom-client";
+import type { AppsService } from "../apps/apps.service";
+import type { PipelinesService } from "../pipelines/pipelines.service";
 
 @Injectable()
 export class StatusService {

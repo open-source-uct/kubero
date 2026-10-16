@@ -2,11 +2,11 @@ import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import {
 	PrometheusDriver,
 	//PrometheusQueryDate,
-	QueryResult,
-	RuleGroup,
+	type QueryResult,
+	type RuleGroup,
 } from "prometheus-query";
-import { KubernetesService } from "../kubernetes/kubernetes.service";
-import { IMetric, MetricsOptions, PrometheusQuery, Rule } from "./metrics.interface";
+import type { KubernetesService } from "../kubernetes/kubernetes.service";
+import type { IMetric, MetricsOptions, PrometheusQuery, Rule } from "./metrics.interface";
 
 @Injectable()
 export class MetricsService {

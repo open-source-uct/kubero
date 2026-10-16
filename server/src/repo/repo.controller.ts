@@ -5,8 +5,8 @@ import { PermissionsGuard } from "../auth/permissions.guard";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
 import { OKDTO } from "../common/dto/ok.dto";
 import { ReadonlyGuard } from "../common/guards/readonly.guard";
-import { ConnectRepoDto } from "./dto/connect-repo.dto";
-import { RepoService } from "./repo.service";
+import type { ConnectRepoDto } from "./dto/connect-repo.dto";
+import type { RepoService } from "./repo.service";
 
 @Controller({ path: "api/repo", version: "1" })
 export class RepoController {

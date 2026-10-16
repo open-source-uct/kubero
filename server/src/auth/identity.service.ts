@@ -1,6 +1,6 @@
 import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
-import { RolesService } from "../roles/roles.service";
-import { UsersService } from "../users/users.service";
+import type { RolesService } from "../roles/roles.service";
+import type { UsersService } from "../users/users.service";
 
 export interface AuthenticatedUser {
 	userId: string;

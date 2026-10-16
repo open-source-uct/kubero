@@ -16,9 +16,9 @@ import { Permissions } from "../auth/permissions.decorator";
 import { PermissionsGuard } from "../auth/permissions.guard";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
 import { ReadonlyGuard } from "../common/guards/readonly.guard";
-import { CreateNotificationDto, UpdateNotificationDto } from "./dto/notification.dto";
-import { INotificationConfig } from "./notifications.interface";
-import { NotificationsDbService } from "./notifications-db.service";
+import type { CreateNotificationDto, UpdateNotificationDto } from "./dto/notification.dto";
+import type { INotificationConfig } from "./notifications.interface";
+import type { NotificationsDbService } from "./notifications-db.service";
 
 export interface ApiResponse<T = any> {
 	success: boolean;

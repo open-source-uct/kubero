@@ -1,5 +1,5 @@
-import { IApp } from "src/apps/apps.interface";
-import { IPipeline } from "../pipelines/pipelines.interface";
+import type { IApp } from "src/apps/apps.interface";
+import type { IPipeline } from "../pipelines/pipelines.interface";
 
 export interface IKubectlPipelineList {
 	apiVersion: string;

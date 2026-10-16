@@ -1,14 +1,14 @@
-import { V1JobList } from "@kubernetes/client-node";
+import type { V1JobList } from "@kubernetes/client-node";
 import { Injectable, Logger } from "@nestjs/common";
-import { AppsService } from "../apps/apps.service";
-import { IUser } from "../auth/auth.interface";
-import { KubernetesService } from "../kubernetes/kubernetes.service";
-import { ILoglines } from "../logs/logs.interface";
-import { LogsService } from "../logs/logs.service";
-import { INotification } from "../notifications/notifications.interface";
-import { NotificationsService } from "../notifications/notifications.service";
-import { PipelinesService } from "../pipelines/pipelines.service";
-import { IKuberoBuildjob } from "./deployments.interface";
+import type { AppsService } from "../apps/apps.service";
+import type { IUser } from "../auth/auth.interface";
+import type { KubernetesService } from "../kubernetes/kubernetes.service";
+import type { ILoglines } from "../logs/logs.interface";
+import type { LogsService } from "../logs/logs.service";
+import type { INotification } from "../notifications/notifications.interface";
+import type { NotificationsService } from "../notifications/notifications.service";
+import type { PipelinesService } from "../pipelines/pipelines.service";
+import type { IKuberoBuildjob } from "./deployments.interface";
 
 @Injectable()
 export class DeploymentsService {

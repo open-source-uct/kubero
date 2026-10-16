@@ -3,7 +3,7 @@ import debug from "debug";
 import * as gitUrlParse from "git-url-parse";
 import { verifyHmacSha256, webhookSecret } from "../../common/utils/webhook.util";
 import { Repo } from "./repo";
-import { IDeploykeyR, IPullrequest, IRepository, IWebhook, IWebhookR } from "./types";
+import type { IDeploykeyR, IPullrequest, IRepository, IWebhook, IWebhookR } from "./types";
 
 debug("app:kubero:gitea:api");
 

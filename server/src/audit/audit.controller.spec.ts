@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
-import { Test, TestingModule } from "@nestjs/testing";
+import { Test, type TestingModule } from "@nestjs/testing";
 import { PipelinesService } from "../pipelines/pipelines.service";
 import { AuditController } from "./audit.controller";
 import { AuditService } from "./audit.service";

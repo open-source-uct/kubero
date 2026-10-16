@@ -20,11 +20,11 @@ import { PermissionsGuard } from "../auth/permissions.guard";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
 import { OKDTO } from "../common/dto/ok.dto";
 import { ReadonlyGuard } from "../common/guards/readonly.guard";
-import { CreateUserDto } from "./dto/create-user.dto";
-import { UpdateMyPasswordDto, UpdatePasswordDto } from "./dto/password.dto";
-import { UpdateUserDto } from "./dto/update-user.dto";
+import type { CreateUserDto } from "./dto/create-user.dto";
+import type { UpdateMyPasswordDto, UpdatePasswordDto } from "./dto/password.dto";
+import type { UpdateUserDto } from "./dto/update-user.dto";
 import { GetAllUsersDTO } from "./dto/users.dto";
-import { User, UsersService } from "./users.service";
+import type { User, UsersService } from "./users.service";
 
 @Controller({ path: "api/users", version: "1" })
 export class UsersController {

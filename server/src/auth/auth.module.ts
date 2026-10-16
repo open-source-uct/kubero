@@ -1,4 +1,4 @@
-import { Module, Provider } from "@nestjs/common";
+import { Module, type Provider } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
 import * as dotenv from "dotenv";

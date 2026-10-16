@@ -1,7 +1,7 @@
-import { createServer, Server as HttpServer } from "http";
-import { AddressInfo } from "net";
+import { createServer, type Server as HttpServer } from "http";
+import type { AddressInfo } from "net";
 import { Server } from "socket.io";
-import { Socket as ClientSocket, io as connect } from "socket.io-client";
+import { type Socket as ClientSocket, io as connect } from "socket.io-client";
 import { WsJwtGuard } from "../auth/strategies/ws-jwt.guard";
 import { EventsGateway } from "./events.gateway";
 

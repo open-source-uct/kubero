@@ -3,35 +3,35 @@ import {
 	BatchV1Api,
 	CoreV1Api,
 	CoreV1Event,
-	CoreV1EventList,
+	type CoreV1EventList,
 	CustomObjectsApi,
 	Exec,
 	KubeConfig,
 	Log as KubeLog,
 	Metrics,
 	NetworkingV1Api,
-	NodeMetric,
+	type NodeMetric,
 	PatchUtils,
 	StorageV1Api,
-	V1Job,
-	V1Namespace,
-	V1Pod,
-	V1Secret,
+	type V1Job,
+	type V1Namespace,
+	type V1Pod,
+	type V1Secret,
 	VersionApi,
 	VersionInfo,
 } from "@kubernetes/client-node";
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import stream from "stream";
-import internal from "stream";
-import { WebSocket } from "ws";
+import type stream from "stream";
+import type internal from "stream";
+import type { WebSocket } from "ws";
 import * as YAML from "yaml";
-import { App, KubectlApp } from "../apps/app/app";
+import { type App, KubectlApp } from "../apps/app/app";
 import { buildpacksTemplate } from "../deployments/templates/buildpacks.yaml";
 import { dockerfileTemplate } from "../deployments/templates/dockerfile.yaml";
 import { nixpacksTemplate } from "../deployments/templates/nixpacks.yaml";
 import { KubectlPipeline } from "../pipelines/pipeline/pipeline";
-import { IPipeline } from "../pipelines/pipelines.interface";
-import {
+import type { IPipeline } from "../pipelines/pipelines.interface";
+import type {
 	IKubectlApp,
 	IKubectlAppList,
 	IKubectlPipeline,

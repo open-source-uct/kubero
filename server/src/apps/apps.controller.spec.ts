@@ -1,10 +1,10 @@
 import { HttpException } from "@nestjs/common";
-import { Test, TestingModule } from "@nestjs/testing";
-import { IPodSize, ISecurityContext } from "src/config/config.interface";
-import { IKubectlApp } from "src/kubernetes/kubernetes.interface";
+import { Test, type TestingModule } from "@nestjs/testing";
+import type { IPodSize, ISecurityContext } from "src/config/config.interface";
+import type { IKubectlApp } from "src/kubernetes/kubernetes.interface";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
 import { AppsController } from "./apps.controller";
-import { IApp } from "./apps.interface";
+import type { IApp } from "./apps.interface";
 import { AppsService } from "./apps.service";
 
 const podsize: IPodSize = {

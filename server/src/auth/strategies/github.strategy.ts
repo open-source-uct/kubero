@@ -1,9 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import * as dotenv from "dotenv";
-import { Request } from "express";
-import { AuthenticateOptions } from "passport";
-import { Profile, Strategy, StrategyOptions } from "passport-github2";
+import type { Request } from "express";
+import type { AuthenticateOptions } from "passport";
+import { type Profile, Strategy, type StrategyOptions } from "passport-github2";
 import { ConfigService } from "../../config/config.service";
 
 dotenv.config();

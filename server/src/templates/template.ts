@@ -1,7 +1,7 @@
-import { IAddon } from "../addons/addons.interface";
-import { IApp, ICronjob, IExtraVolume } from "../apps/apps.interface";
-import { IKubectlMetadata } from "../kubernetes/kubernetes.interface";
-import { IKubectlTemplate, ITemplate } from "./templates.interface";
+import type { IAddon } from "../addons/addons.interface";
+import type { IApp, ICronjob, IExtraVolume } from "../apps/apps.interface";
+import type { IKubectlMetadata } from "../kubernetes/kubernetes.interface";
+import type { IKubectlTemplate, ITemplate } from "./templates.interface";
 
 export class Template implements ITemplate {
 	public name: string;

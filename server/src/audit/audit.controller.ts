@@ -14,10 +14,10 @@ import { Permissions } from "../auth/permissions.decorator";
 import { PermissionsGuard } from "../auth/permissions.guard";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
 import { OKDTO } from "../common/dto/ok.dto";
-import { PipelinesService } from "../pipelines/pipelines.service";
-import { AuditService } from "./audit.service";
-import { AuditQueryDto } from "./audit-query.dto";
-import { AuditSuggestionsDto } from "./audit-suggestions.dto";
+import type { PipelinesService } from "../pipelines/pipelines.service";
+import type { AuditService } from "./audit.service";
+import type { AuditQueryDto } from "./audit-query.dto";
+import type { AuditSuggestionsDto } from "./audit-suggestions.dto";
 
 @Controller({ path: "api/audit", version: "1" })
 export class AuditController {

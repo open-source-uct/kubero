@@ -1,6 +1,6 @@
 import { Controller, Get, Logger, Res } from "@nestjs/common";
 import { PrometheusController } from "@willsoto/nestjs-prometheus";
-import { Response } from "express";
+import type { Response } from "express";
 
 @Controller("status")
 export class StatusController extends PrometheusController {

@@ -1,13 +1,13 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { AppsService } from "../apps/apps.service";
-import { INotification } from "../notifications/notifications.interface";
-import { NotificationsService } from "../notifications/notifications.service";
+import type { AppsService } from "../apps/apps.service";
+import type { INotification } from "../notifications/notifications.interface";
+import type { NotificationsService } from "../notifications/notifications.service";
 import { BitbucketApi } from "./git/bitbucket";
 import { GiteaApi } from "./git/gitea";
 import { GithubApi } from "./git/github";
 import { GitlabApi } from "./git/gitlab";
 import { GogsApi } from "./git/gogs";
-import { IPullrequest, IWebhook } from "./git/types";
+import type { IPullrequest, IWebhook } from "./git/types";
 
 @Injectable()
 export class RepoService {

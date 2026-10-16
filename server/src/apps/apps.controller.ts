@@ -17,7 +17,7 @@ import {
 import { ApiBearerAuth, ApiForbiddenResponse, ApiOkResponse, ApiOperation } from "@nestjs/swagger";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
-import { IUser } from "../auth/auth.interface";
+import type { IUser } from "../auth/auth.interface";
 import { Permissions, PermissionsAll } from "../auth/permissions.decorator";
 import { PermissionsGuard } from "../auth/permissions.guard";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
@@ -25,9 +25,9 @@ import { OKDTO } from "../common/dto/ok.dto";
 import { ReadonlyGuard } from "../common/guards/readonly.guard";
 import { flattenValidationErrors } from "../common/utils/validation.util";
 import { GetAppDTO } from "./apps.dto";
-import { AppsService } from "./apps.service";
+import type { AppsService } from "./apps.service";
 import { AppValidationDto } from "./dto/app-validation.dto";
-import { ExecConsoleDto } from "./dto/exec-console.dto";
+import type { ExecConsoleDto } from "./dto/exec-console.dto";
 
 @Controller({ path: "api/apps", version: "1" })
 export class AppsController {

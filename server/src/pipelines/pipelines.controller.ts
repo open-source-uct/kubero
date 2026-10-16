@@ -15,16 +15,16 @@ import {
 	UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiForbiddenResponse, ApiOkResponse, ApiOperation } from "@nestjs/swagger";
-import { IUser } from "../auth/auth.interface";
+import type { IUser } from "../auth/auth.interface";
 import { Permissions } from "../auth/permissions.decorator";
 import { PermissionsGuard } from "../auth/permissions.guard";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
 import { OKDTO } from "../common/dto/ok.dto";
 import { ReadonlyGuard } from "../common/guards/readonly.guard";
 import { GetPipelineDTO } from "./dto/getPipeline.dto";
-import { CreatePipelineDTO } from "./dto/replacePipeline.dto";
-import { IPipeline } from "./pipelines.interface";
-import { PipelinesService } from "./pipelines.service";
+import type { CreatePipelineDTO } from "./dto/replacePipeline.dto";
+import type { IPipeline } from "./pipelines.interface";
+import type { PipelinesService } from "./pipelines.service";
 
 @Controller({ path: "api/pipelines", version: "1" })
 export class PipelinesController {

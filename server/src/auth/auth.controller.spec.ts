@@ -1,5 +1,5 @@
 import { HttpException } from "@nestjs/common";
-import { Test, TestingModule } from "@nestjs/testing";
+import { Test, type TestingModule } from "@nestjs/testing";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { AuthController } from "./auth.controller";

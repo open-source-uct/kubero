@@ -4,7 +4,7 @@ import { Permissions } from "../auth/permissions.decorator";
 import { PermissionsGuard } from "../auth/permissions.guard";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
 import { OKDTO } from "../common/dto/ok.dto";
-import { LogsService } from "./logs.service";
+import type { LogsService } from "./logs.service";
 
 @Controller({ path: "api/logs", version: "1" })
 export class LogsController {

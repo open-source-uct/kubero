@@ -4,8 +4,8 @@ import { Permissions } from "../auth/permissions.decorator";
 import { PermissionsGuard } from "../auth/permissions.guard";
 import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
 import { OKDTO } from "../common/dto/ok.dto";
-import { PipelinesService } from "../pipelines/pipelines.service";
-import { MetricsService } from "./metrics.service";
+import type { PipelinesService } from "../pipelines/pipelines.service";
+import type { MetricsService } from "./metrics.service";
 
 @Controller({ path: "api/metrics", version: "1" })
 export class MetricsController {
