@@ -69,6 +69,12 @@ const messages = {
           activePhases: 'Active phases',
           users: 'Users',
           teams: 'Teams',
+          cpuUsage: 'CPU usage',
+          memoryUsage: 'Memory usage',
+        },
+        usage: {
+          title: 'Resource usage',
+          description: 'Live CPU and memory usage across all apps deployed by Kubero in the cluster.',
         },
         charts: {
           appsByPipeline: 'Applications by pipeline',

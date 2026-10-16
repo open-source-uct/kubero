@@ -33,6 +33,51 @@
       </div>
     </section>
 
+    <section v-if="kubero.metricsEnabled" class="dashboard-panel resource-usage uct-card">
+      <div class="panel-heading">
+        <div>
+          <h2>{{ $t('overview.usage.title') }}</h2>
+          <p>{{ $t('overview.usage.description') }}</p>
+        </div>
+      </div>
+      <div class="resource-usage__tiles">
+        <div class="resource-usage__tile">
+          <v-progress-circular
+            v-if="!loading"
+            :model-value="Math.min(cpuPercent, 100)"
+            :size="72"
+            :width="6"
+            color="primary"
+          >
+            <span class="resource-usage__gauge-label">{{ cpuPercent.toFixed(1) }}%</span>
+          </v-progress-circular>
+          <v-skeleton-loader v-else type="avatar" width="72" height="72" />
+          <div>
+            <span>{{ $t('overview.metrics.cpuUsage') }}</span>
+            <v-skeleton-loader v-if="loading" type="text" width="80" />
+            <strong v-else>{{ cpuUsageLabel }} <small>/ {{ cpuCapacityCores }} cores</small></strong>
+          </div>
+        </div>
+        <div class="resource-usage__tile">
+          <v-progress-circular
+            v-if="!loading"
+            :model-value="Math.min(memoryPercent, 100)"
+            :size="72"
+            :width="6"
+            color="primary"
+          >
+            <span class="resource-usage__gauge-label">{{ memoryPercent.toFixed(1) }}%</span>
+          </v-progress-circular>
+          <v-skeleton-loader v-else type="avatar" width="72" height="72" />
+          <div>
+            <span>{{ $t('overview.metrics.memoryUsage') }}</span>
+            <v-skeleton-loader v-if="loading" type="text" width="80" />
+            <strong v-else>{{ memoryUsageValue }} <small>{{ memoryUsageUnit }}</small></strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <div class="chart-grid">
       <section class="dashboard-panel dashboard-panel--wide uct-card">
         <div class="panel-heading">
@@ -179,6 +224,10 @@ const loadError = ref(false)
 const pipelines = ref<PipelineRow[]>([])
 const userCount = ref(0)
 const teamCount = ref(0)
+const cpuCores = ref(0)
+const memoryBytes = ref(0)
+const cpuCapacityCores = ref(0)
+const memoryCapacityBytes = ref(0)
 const lastUpdated = ref<Date | null>(null)
 const doughnutCenter = ref({ left: '50%', top: '50%' })
 const doughnutCenterPlugin: Plugin<'doughnut'> = {
@@ -199,6 +248,26 @@ const enabledPhaseCount = computed(() => pipelines.value.reduce((sum, pipeline) 
 const hasPipelineData = computed(() => visiblePipelineRows.value.length > 0)
 const lastUpdatedLabel = computed(() => lastUpdated.value ? new Intl.DateTimeFormat(locale.value, { hour: '2-digit', minute: '2-digit' }).format(lastUpdated.value) : '—')
 const barChartStyle = computed(() => ({ height: `${Math.max(260, visiblePipelineRows.value.length * 42)}px` }))
+
+// 4 decimales: con apps en reposo el uso real (ej. 0.002 cores) redondeaba a
+// 0.00 con 2 decimales y parecía que no había actividad.
+const cpuUsageLabel = computed(() => `${cpuCores.value.toFixed(4)}`)
+// GiB es una unidad demasiado grande para un cluster chico (de prueba): un
+// total de unas pocas decenas de MB redondeaba a 0.02 GiB, dando la misma
+// sensación de "no hay actividad" que tenía la CPU. Se muestra en MiB
+// mientras el total no llegue a 1 GiB, y en GiB una vez que sí lo supera.
+const memoryUsageGiB = computed(() => memoryBytes.value / 1024 ** 3)
+const memoryUsageValue = computed(() => (
+  memoryUsageGiB.value >= 1
+    ? memoryUsageGiB.value.toFixed(2)
+    : (memoryBytes.value / 1024 ** 2).toFixed(2)
+))
+const memoryUsageUnit = computed(() => (memoryUsageGiB.value >= 1 ? 'GiB' : 'MiB'))
+// % contra la capacidad real del cluster (kube_node_status_allocatable), no
+// un total inventado — así el número significa algo aunque el cluster sea
+// chico (de prueba) o grande (producción)
+const cpuPercent = computed(() => (cpuCapacityCores.value > 0 ? (cpuCores.value / cpuCapacityCores.value) * 100 : 0))
+const memoryPercent = computed(() => (memoryCapacityBytes.value > 0 ? (memoryBytes.value / memoryCapacityBytes.value) * 100 : 0))
 
 const metrics = computed(() => [
   { label: t('overview.metrics.pipelines'), value: pipelines.value.length },
@@ -297,10 +366,11 @@ async function loadOverview() {
   loading.value = true
   loadError.value = false
 
-  const [pipelinesResult, usersResult, groupsResult] = await Promise.allSettled([
+  const [pipelinesResult, usersResult, groupsResult, usageResult] = await Promise.allSettled([
     axios.get('/api/pipelines'),
     axios.get('/api/users/count'),
     axios.get('/api/groups'),
+    axios.get('/api/metrics/cluster-usage'),
   ])
 
   if (pipelinesResult.status === 'fulfilled') {
@@ -314,6 +384,15 @@ async function loadOverview() {
   else loadError.value = true
   if (groupsResult.status === 'fulfilled') teamCount.value = Array.isArray(groupsResult.value.data) ? groupsResult.value.data.length : 0
   else loadError.value = true
+  if (usageResult.status === 'fulfilled') {
+    cpuCores.value = Number(usageResult.value.data?.cpuCores) || 0
+    memoryBytes.value = Number(usageResult.value.data?.memoryBytes) || 0
+    cpuCapacityCores.value = Number(usageResult.value.data?.cpuCapacityCores) || 0
+    memoryCapacityBytes.value = Number(usageResult.value.data?.memoryCapacityBytes) || 0
+  }
+  // sin loadError acá: a diferencia de pipelines/usuarios/equipos, las
+  // métricas son opcionales (Prometheus puede no estar configurado) y no
+  // deben mostrar el aviso de carga incompleta si solo falta esto
 
   lastUpdated.value = new Date()
   loading.value = false
@@ -342,6 +421,13 @@ onMounted(() => {
 .operations-band__status strong, .operations-band__updated strong { font-size: .875rem; }
 .status-pulse { width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%; background: rgb(var(--v-theme-success)); box-shadow: 0 0 0 4px rgba(var(--v-theme-success), .12); }
 .status-pulse--error { background: rgb(var(--v-theme-error)); box-shadow: 0 0 0 4px rgba(var(--v-theme-error), .12); }
+.resource-usage { margin-bottom: 24px; }
+.resource-usage__tiles { display: flex; flex-wrap: wrap; gap: 20px; }
+.resource-usage__tile { display: flex; min-width: 220px; flex: 1; gap: 18px; align-items: center; padding: 16px 20px; background: rgba(var(--v-theme-primary), .06); border-radius: 8px; }
+.resource-usage__tile > div > span { display: block; color: rgb(var(--v-theme-on-cardBackground)); font-size: .6875rem; font-weight: 600; letter-spacing: .045em; text-transform: uppercase; opacity: .58; }
+.resource-usage__tile strong { display: block; margin-top: 2px; color: rgb(var(--v-theme-on-cardBackground)); font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.resource-usage__tile strong small { font-size: .75rem; font-weight: 500; opacity: .6; }
+.resource-usage__gauge-label { color: rgb(var(--v-theme-on-cardBackground)); font-size: .8125rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .chart-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(320px, .85fr); gap: 24px; margin-bottom: 24px; }
 .dashboard-panel { min-width: 0; padding: 24px; background: rgb(var(--v-theme-cardBackground)); }
 .panel-heading { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; margin-bottom: 20px; }

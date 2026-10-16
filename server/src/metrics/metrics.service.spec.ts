@@ -76,6 +76,42 @@ describe('MetricsService', () => {
     expect(result?.result[0].metric.labels.pod).toBe('pod1');
   });
 
+  describe('getClusterWideUsage', () => {
+    it('sums cpu and memory usage and cluster capacity via aggregate queries', async () => {
+      const prom = service['prom'] as any;
+      prom.instantQuery
+        .mockResolvedValueOnce({ result: [{ value: { value: 1.5 } }] })
+        .mockResolvedValueOnce({ result: [{ value: { value: 2048 } }] })
+        .mockResolvedValueOnce({ result: [{ value: { value: 16 } }] })
+        .mockResolvedValueOnce({ result: [{ value: { value: 32000000000 } }] });
+      const result = await service.getClusterWideUsage();
+      expect(prom.instantQuery).toHaveBeenCalledWith(
+        expect.stringContaining('container=~"kuberoapp-web|kuberoapp-worker"'),
+      );
+      expect(prom.instantQuery).toHaveBeenCalledWith(
+        expect.stringContaining('kube_node_status_allocatable{resource="cpu"}'),
+      );
+      expect(result).toEqual({
+        cpuCores: 1.5,
+        memoryBytes: 2048,
+        cpuCapacityCores: 16,
+        memoryCapacityBytes: 32000000000,
+      });
+    });
+
+    it('returns zeros instead of throwing when Prometheus is unreachable', async () => {
+      const prom = service['prom'] as any;
+      prom.instantQuery.mockRejectedValueOnce(new Error('unreachable'));
+      const result = await service.getClusterWideUsage();
+      expect(result).toEqual({
+        cpuCores: 0,
+        memoryBytes: 0,
+        cpuCapacityCores: 0,
+        memoryCapacityBytes: 0,
+      });
+    });
+  });
+
   it('should queryMetrics', async () => {
     const q = { pipeline: 'pipe', phase: 'phase', app: 'app', scale: '24h' };
     const result = await service.queryMetrics('container_memory_rss', q as any);
