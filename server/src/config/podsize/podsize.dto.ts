@@ -1,47 +1,41 @@
-import { Type } from 'class-transformer';
-import {
-  IsString,
-  IsNotEmpty,
-  IsOptional,
-  IsBoolean,
-  ValidateNested,
-} from 'class-validator';
-import { IsK8sQuantity } from '../../common/validators/k8s-quantity.validator';
+import { Type } from "class-transformer";
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, ValidateNested } from "class-validator";
+import { IsK8sQuantity } from "../../common/validators/k8s-quantity.validator";
 
 export class ResourceQuantitiesDto {
-  @IsK8sQuantity()
-  cpu: string;
+	@IsK8sQuantity()
+	cpu: string;
 
-  @IsK8sQuantity()
-  memory: string;
+	@IsK8sQuantity()
+	memory: string;
 }
 
 export class PodSizeResourcesDto {
-  @ValidateNested()
-  @Type(() => ResourceQuantitiesDto)
-  requests: ResourceQuantitiesDto;
+	@ValidateNested()
+	@Type(() => ResourceQuantitiesDto)
+	requests: ResourceQuantitiesDto;
 
-  @ValidateNested()
-  @Type(() => ResourceQuantitiesDto)
-  limits: ResourceQuantitiesDto;
+	@ValidateNested()
+	@Type(() => ResourceQuantitiesDto)
+	limits: ResourceQuantitiesDto;
 }
 
 export class CreatePodSizeDto {
-  @IsString()
-  @IsNotEmpty()
-  name: string;
+	@IsString()
+	@IsNotEmpty()
+	name: string;
 
-  @IsString()
-  @IsNotEmpty()
-  description: string;
+	@IsString()
+	@IsNotEmpty()
+	description: string;
 
-  @IsOptional()
-  @IsBoolean()
-  default?: boolean;
+	@IsOptional()
+	@IsBoolean()
+	default?: boolean;
 
-  @ValidateNested()
-  @Type(() => PodSizeResourcesDto)
-  resources: PodSizeResourcesDto;
+	@ValidateNested()
+	@Type(() => PodSizeResourcesDto)
+	resources: PodSizeResourcesDto;
 }
 
 export class UpdatePodSizeDto extends CreatePodSizeDto {}

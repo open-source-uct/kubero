@@ -1,329 +1,297 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpException,
-  HttpStatus,
-  Logger,
-  Param,
-  Post,
-  Put,
-  UseGuards,
-  Request,
-} from '@nestjs/common';
-import { AppsService } from './apps.service';
-import { IUser } from '../auth/auth.interface';
-import {
-  ApiForbiddenResponse,
-  ApiOkResponse,
-  ApiOperation,
-} from '@nestjs/swagger';
-import { ApiBearerAuth } from '@nestjs/swagger';
-import { GetAppDTO } from './apps.dto';
-import { OKDTO } from '../common/dto/ok.dto';
-import { JwtAuthGuard } from '../auth/strategies/jwt.guard';
-import { ReadonlyGuard } from '../common/guards/readonly.guard';
-import { PermissionsGuard } from '../auth/permissions.guard';
-import { Permissions, PermissionsAll } from '../auth/permissions.decorator';
-import { ExecConsoleDto } from './dto/exec-console.dto';
-import { validate } from 'class-validator';
-import { plainToInstance } from 'class-transformer';
-import { BadRequestException } from '@nestjs/common';
-import { AppValidationDto } from './dto/app-validation.dto';
-import { flattenValidationErrors } from '../common/utils/validation.util';
+	BadRequestException,
+	Body,
+	Controller,
+	Delete,
+	Get,
+	HttpCode,
+	HttpException,
+	HttpStatus,
+	Logger,
+	Param,
+	Post,
+	Put,
+	Request,
+	UseGuards,
+} from "@nestjs/common";
+import { ApiBearerAuth, ApiForbiddenResponse, ApiOkResponse, ApiOperation } from "@nestjs/swagger";
+import { plainToInstance } from "class-transformer";
+import { validate } from "class-validator";
+import { IUser } from "../auth/auth.interface";
+import { Permissions, PermissionsAll } from "../auth/permissions.decorator";
+import { PermissionsGuard } from "../auth/permissions.guard";
+import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
+import { OKDTO } from "../common/dto/ok.dto";
+import { ReadonlyGuard } from "../common/guards/readonly.guard";
+import { flattenValidationErrors } from "../common/utils/validation.util";
+import { GetAppDTO } from "./apps.dto";
+import { AppsService } from "./apps.service";
+import { AppValidationDto } from "./dto/app-validation.dto";
+import { ExecConsoleDto } from "./dto/exec-console.dto";
 
-@Controller({ path: 'api/apps', version: '1' })
+@Controller({ path: "api/apps", version: "1" })
 export class AppsController {
-  constructor(private readonly appsService: AppsService) {}
+	constructor(private readonly appsService: AppsService) {}
 
-  @Get('/:pipeline/:phase/:app')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('app:read', 'app:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiOperation({
-    summary: 'Get app informations from  a specific app',
-    description: 'Returns the app information from a specific app',
-  })
-  @ApiOkResponse({
-    description: 'A List of App Informations',
-    type: GetAppDTO,
-    isArray: false,
-  })
-  async getApp(
-    @Param('pipeline') pipeline: string,
-    @Param('phase') phase: string,
-    @Param('app') app: string,
-    @Request() req: any,
-  ) {
-    return this.appsService.getApp(pipeline, phase, app, req.user.userGroups);
-  }
+	@Get("/:pipeline/:phase/:app")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("app:read", "app:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiOperation({
+		summary: "Get app informations from  a specific app",
+		description: "Returns the app information from a specific app",
+	})
+	@ApiOkResponse({
+		description: "A List of App Informations",
+		type: GetAppDTO,
+		isArray: false,
+	})
+	async getApp(
+		@Param("pipeline") pipeline: string,
+		@Param("phase") phase: string,
+		@Param("app") app: string,
+		@Request() req: any,
+	) {
+		return this.appsService.getApp(pipeline, phase, app, req.user.userGroups);
+	}
 
-  @Post('/:pipeline/:phase/:app')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('app:write')
-  @UseGuards(ReadonlyGuard)
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create an app' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiBearerAuth('bearerAuth')
-  async createApp(
-    @Param('pipeline') pipeline: string,
-    @Param('phase') phase: string,
-    @Param('app') appName: string,
-    @Body() app: any,
-    @Request() req: any,
-  ) {
-    const validationErrors = await validate(
-      plainToInstance(AppValidationDto, app),
-    );
-    if (validationErrors.length > 0) {
-      throw new BadRequestException(flattenValidationErrors(validationErrors));
-    }
+	@Post("/:pipeline/:phase/:app")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("app:write")
+	@UseGuards(ReadonlyGuard)
+	@HttpCode(HttpStatus.CREATED)
+	@ApiOperation({ summary: "Create an app" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiBearerAuth("bearerAuth")
+	async createApp(
+		@Param("pipeline") pipeline: string,
+		@Param("phase") phase: string,
+		@Param("app") appName: string,
+		@Body() app: any,
+		@Request() req: any,
+	) {
+		const validationErrors = await validate(plainToInstance(AppValidationDto, app));
+		if (validationErrors.length > 0) {
+			throw new BadRequestException(flattenValidationErrors(validationErrors));
+		}
 
-    if (appName !== 'new') {
-      const msg = 'App name does not match the URL';
-      Logger.error(msg);
-      throw new HttpException(msg, HttpStatus.BAD_REQUEST);
-    }
-    if (app.pipeline !== pipeline) {
-      const msg = 'Pipeline name does not match the URL';
-      Logger.error(msg);
-      throw new HttpException(msg, HttpStatus.BAD_REQUEST);
-    }
-    if (app.phase !== phase) {
-      const msg = 'Phase name does not match the URL';
-      Logger.error(msg);
-      throw new HttpException(msg, HttpStatus.BAD_REQUEST);
-    }
+		if (appName !== "new") {
+			const msg = "App name does not match the URL";
+			Logger.error(msg);
+			throw new HttpException(msg, HttpStatus.BAD_REQUEST);
+		}
+		if (app.pipeline !== pipeline) {
+			const msg = "Pipeline name does not match the URL";
+			Logger.error(msg);
+			throw new HttpException(msg, HttpStatus.BAD_REQUEST);
+		}
+		if (app.phase !== phase) {
+			const msg = "Phase name does not match the URL";
+			Logger.error(msg);
+			throw new HttpException(msg, HttpStatus.BAD_REQUEST);
+		}
 
-    const user: IUser = {
-      id: req.user.userId,
-      strategy: req.user.strategy,
-      username: req.user.username,
-    };
-    return this.appsService.createApp(app, user, req.user.userGroups);
-  }
+		const user: IUser = {
+			id: req.user.userId,
+			strategy: req.user.strategy,
+			username: req.user.username,
+		};
+		return this.appsService.createApp(app, user, req.user.userGroups);
+	}
 
-  @Put('/:pipeline/:phase/:app/:resourceVersion')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('app:write')
-  @UseGuards(ReadonlyGuard)
-  @ApiOperation({ summary: 'Update an app' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiBearerAuth('bearerAuth')
-  async updateApp(
-    @Param('pipeline') pipeline: string,
-    @Param('phase') phase: string,
-    @Param('app') appName: string,
-    @Param('resourceVersion') resourceVersion: string,
-    @Body() app: any,
-    @Request() req: any,
-  ) {
-    const validationErrors = await validate(
-      plainToInstance(AppValidationDto, app),
-    );
-    if (validationErrors.length > 0) {
-      throw new BadRequestException(flattenValidationErrors(validationErrors));
-    }
+	@Put("/:pipeline/:phase/:app/:resourceVersion")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("app:write")
+	@UseGuards(ReadonlyGuard)
+	@ApiOperation({ summary: "Update an app" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiBearerAuth("bearerAuth")
+	async updateApp(
+		@Param("pipeline") pipeline: string,
+		@Param("phase") phase: string,
+		@Param("app") appName: string,
+		@Param("resourceVersion") resourceVersion: string,
+		@Body() app: any,
+		@Request() req: any,
+	) {
+		const validationErrors = await validate(plainToInstance(AppValidationDto, app));
+		if (validationErrors.length > 0) {
+			throw new BadRequestException(flattenValidationErrors(validationErrors));
+		}
 
-    if (appName !== app.name) {
-      const msg =
-        'App name does not match the URL ' + appName + ' != ' + app.name;
-      Logger.error(msg);
-      throw new HttpException(msg, HttpStatus.BAD_REQUEST);
-    }
+		if (appName !== app.name) {
+			const msg = "App name does not match the URL " + appName + " != " + app.name;
+			Logger.error(msg);
+			throw new HttpException(msg, HttpStatus.BAD_REQUEST);
+		}
 
-    const user: IUser = {
-      id: req.user.userId,
-      strategy: req.user.strategy,
-      username: req.user.username,
-    };
-    return this.appsService.updateApp(
-      app,
-      resourceVersion,
-      user,
-      req.user.userGroups,
-    );
-  }
+		const user: IUser = {
+			id: req.user.userId,
+			strategy: req.user.strategy,
+			username: req.user.username,
+		};
+		return this.appsService.updateApp(app, resourceVersion, user, req.user.userGroups);
+	}
 
-  @Delete('/:pipeline/:phase/:app')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('app:write')
-  @UseGuards(ReadonlyGuard)
-  @ApiOperation({ summary: 'Delete an app' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiBearerAuth('bearerAuth')
-  async deleteApp(
-    @Param('pipeline') pipeline: string,
-    @Param('phase') phase: string,
-    @Param('app') app: string,
-    @Request() req: any,
-  ) {
-    const user: IUser = {
-      id: req.user.userId,
-      strategy: req.user.strategy,
-      username: req.user.username,
-    };
-    return this.appsService.deleteApp(
-      pipeline,
-      phase,
-      app,
-      user,
-      req.user.userGroups,
-    );
-  }
+	@Delete("/:pipeline/:phase/:app")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("app:write")
+	@UseGuards(ReadonlyGuard)
+	@ApiOperation({ summary: "Delete an app" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiBearerAuth("bearerAuth")
+	async deleteApp(
+		@Param("pipeline") pipeline: string,
+		@Param("phase") phase: string,
+		@Param("app") app: string,
+		@Request() req: any,
+	) {
+		const user: IUser = {
+			id: req.user.userId,
+			strategy: req.user.strategy,
+			username: req.user.username,
+		};
+		return this.appsService.deleteApp(pipeline, phase, app, user, req.user.userGroups);
+	}
 
-  @Post('/pullrequest')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('app:write')
-  @UseGuards(ReadonlyGuard)
-  @ApiOperation({ summary: 'Start a Pull Request App' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiBearerAuth('bearerAuth')
-  async startPullRequest(@Body() body: any, @Request() req: any) {
-    return this.appsService.createPRApp(
-      body.branch,
-      body.branch,
-      body.ssh_url,
-      body.pipelineName,
-      req.user.userGroups,
-    );
-  }
+	@Post("/pullrequest")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("app:write")
+	@UseGuards(ReadonlyGuard)
+	@ApiOperation({ summary: "Start a Pull Request App" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiBearerAuth("bearerAuth")
+	async startPullRequest(@Body() body: any, @Request() req: any) {
+		return this.appsService.createPRApp(
+			body.branch,
+			body.branch,
+			body.ssh_url,
+			body.pipelineName,
+			req.user.userGroups,
+		);
+	}
 
-  @Get('/:pipeline/:phase/:app/download')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('app:read', 'app:write')
-  @ApiOperation({ summary: 'Download the app templates' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiBearerAuth('bearerAuth')
-  async downloadAppTemplates(
-    @Param('pipeline') pipeline: string,
-    @Param('phase') phase: string,
-    @Param('app') app: string,
-    @Request() req: any,
-  ) {
-    return this.appsService.getTemplate(
-      pipeline,
-      phase,
-      app,
-      req.user.userGroups,
-    );
-  }
+	@Get("/:pipeline/:phase/:app/download")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("app:read", "app:write")
+	@ApiOperation({ summary: "Download the app templates" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiBearerAuth("bearerAuth")
+	async downloadAppTemplates(
+		@Param("pipeline") pipeline: string,
+		@Param("phase") phase: string,
+		@Param("app") app: string,
+		@Request() req: any,
+	) {
+		return this.appsService.getTemplate(pipeline, phase, app, req.user.userGroups);
+	}
 
-  @Get('/:pipeline/:phase/:app/restart')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('app:write')
-  @UseGuards(ReadonlyGuard)
-  @ApiOperation({ summary: 'Restart/Reload an app' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiBearerAuth('bearerAuth')
-  async restartApp(
-    @Param('pipeline') pipeline: string,
-    @Param('phase') phase: string,
-    @Param('app') app: string,
-    @Request() req: any,
-  ) {
-    const user: IUser = {
-      id: req.user.userId,
-      strategy: req.user.strategy,
-      username: req.user.username,
-    };
+	@Get("/:pipeline/:phase/:app/restart")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("app:write")
+	@UseGuards(ReadonlyGuard)
+	@ApiOperation({ summary: "Restart/Reload an app" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiBearerAuth("bearerAuth")
+	async restartApp(
+		@Param("pipeline") pipeline: string,
+		@Param("phase") phase: string,
+		@Param("app") app: string,
+		@Request() req: any,
+	) {
+		const user: IUser = {
+			id: req.user.userId,
+			strategy: req.user.strategy,
+			username: req.user.username,
+		};
 
-    return this.appsService.restartApp(
-      pipeline,
-      phase,
-      app,
-      user,
-      req.user.userGroups,
-    );
-  }
+		return this.appsService.restartApp(pipeline, phase, app, user, req.user.userGroups);
+	}
 
-  @Get('/:pipeline/:phase/:app/pods')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('app:read', 'app:write')
-  @ApiOperation({ summary: 'Get the app pods' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiBearerAuth('bearerAuth')
-  async getPods(
-    @Param('pipeline') pipeline: string,
-    @Param('phase') phase: string,
-    @Param('app') app: string,
-    @Request() req: any,
-  ) {
-    return this.appsService.getPods(pipeline, phase, app, req.user.userGroups);
-  }
+	@Get("/:pipeline/:phase/:app/pods")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("app:read", "app:write")
+	@ApiOperation({ summary: "Get the app pods" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiBearerAuth("bearerAuth")
+	async getPods(
+		@Param("pipeline") pipeline: string,
+		@Param("phase") phase: string,
+		@Param("app") app: string,
+		@Request() req: any,
+	) {
+		return this.appsService.getPods(pipeline, phase, app, req.user.userGroups);
+	}
 
-  @Post('/:pipeline/:phase/:app/console')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  // console:ok se siembra y se edita en la UI de roles pero no se comprobaba en
-  // ningún lado: un rol con "console: none" y app:write igual abría la consola
-  @PermissionsAll('app:write', 'console:ok')
-  @UseGuards(ReadonlyGuard)
-  @ApiOperation({ summary: 'Start a container console' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiBearerAuth('bearerAuth')
-  async execInContainer(
-    @Param('pipeline') pipeline: string,
-    @Param('phase') phase: string,
-    @Param('app') app: string,
-    @Body() body: ExecConsoleDto,
-    @Request() req: any,
-  ) {
-    if (process.env.KUBERO_CONSOLE_ENABLED !== 'true') {
-      const msg = 'Console is not enabled';
-      Logger.warn(msg);
-      throw new HttpException(msg, HttpStatus.BAD_REQUEST);
-    }
+	@Post("/:pipeline/:phase/:app/console")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	// console:ok se siembra y se edita en la UI de roles pero no se comprobaba en
+	// ningún lado: un rol con "console: none" y app:write igual abría la consola
+	@PermissionsAll("app:write", "console:ok")
+	@UseGuards(ReadonlyGuard)
+	@ApiOperation({ summary: "Start a container console" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiBearerAuth("bearerAuth")
+	async execInContainer(
+		@Param("pipeline") pipeline: string,
+		@Param("phase") phase: string,
+		@Param("app") app: string,
+		@Body() body: ExecConsoleDto,
+		@Request() req: any,
+	) {
+		if (process.env.KUBERO_CONSOLE_ENABLED !== "true") {
+			const msg = "Console is not enabled";
+			Logger.warn(msg);
+			throw new HttpException(msg, HttpStatus.BAD_REQUEST);
+		}
 
-    const user: IUser = {
-      id: req.user.userId,
-      strategy: req.user.strategy,
-      username: req.user.username,
-    };
+		const user: IUser = {
+			id: req.user.userId,
+			strategy: req.user.strategy,
+			username: req.user.username,
+		};
 
-    return this.appsService.execInContainer(
-      pipeline,
-      phase,
-      app,
-      body.podName,
-      body.containerName,
-      body.command,
-      user,
-      req.user.userGroups,
-    );
-  }
+		return this.appsService.execInContainer(
+			pipeline,
+			phase,
+			app,
+			body.podName,
+			body.containerName,
+			body.command,
+			user,
+			req.user.userGroups,
+		);
+	}
 }

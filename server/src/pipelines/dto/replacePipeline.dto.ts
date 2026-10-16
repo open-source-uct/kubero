@@ -1,145 +1,145 @@
-import { Type } from 'class-transformer';
+import { ApiProperty } from "@nestjs/swagger";
+import { Type } from "class-transformer";
 import {
-  IsString,
-  IsNotEmpty,
-  IsBoolean,
-  IsIn,
-  IsOptional,
-  IsArray,
-  ValidateNested,
-} from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
-import { RunpackPhaseDto } from '../../config/dto/runpack.dto';
+	IsArray,
+	IsBoolean,
+	IsIn,
+	IsNotEmpty,
+	IsOptional,
+	IsString,
+	ValidateNested,
+} from "class-validator";
+import { RunpackPhaseDto } from "../../config/dto/runpack.dto";
 
 class BuildpackDto {
-  @IsString()
-  @IsNotEmpty()
-  name: string;
+	@IsString()
+	@IsNotEmpty()
+	name: string;
 
-  @IsString()
-  @IsNotEmpty()
-  language: string;
+	@IsString()
+	@IsNotEmpty()
+	language: string;
 
-  @ValidateNested()
-  @Type(() => RunpackPhaseDto)
-  fetch: RunpackPhaseDto;
+	@ValidateNested()
+	@Type(() => RunpackPhaseDto)
+	fetch: RunpackPhaseDto;
 
-  @ValidateNested()
-  @Type(() => RunpackPhaseDto)
-  build: RunpackPhaseDto;
+	@ValidateNested()
+	@Type(() => RunpackPhaseDto)
+	build: RunpackPhaseDto;
 
-  @ValidateNested()
-  @Type(() => RunpackPhaseDto)
-  run: RunpackPhaseDto;
+	@ValidateNested()
+	@Type(() => RunpackPhaseDto)
+	run: RunpackPhaseDto;
 
-  @IsOptional()
-  @IsString()
-  tag?: string;
+	@IsOptional()
+	@IsString()
+	tag?: string;
 }
 
 class GitLinkDto {
-  keys: { priv?: string; pub?: string };
+	keys: { priv?: string; pub?: string };
 
-  @IsOptional()
-  @IsString()
-  provider?: string;
+	@IsOptional()
+	@IsString()
+	provider?: string;
 
-  @IsOptional()
-  repository?: any;
+	@IsOptional()
+	repository?: any;
 
-  webhook: object;
+	webhook: object;
 }
 
 class RegistryDto {
-  @IsOptional()
-  @IsString()
-  host?: string;
+	@IsOptional()
+	@IsString()
+	host?: string;
 
-  @IsOptional()
-  @IsString()
-  username?: string;
+	@IsOptional()
+	@IsString()
+	username?: string;
 
-  @IsOptional()
-  @IsString()
-  password?: string;
+	@IsOptional()
+	@IsString()
+	password?: string;
 }
 
 class PipelinePhaseDto {
-  @IsString()
-  @IsNotEmpty()
-  name: string;
+	@IsString()
+	@IsNotEmpty()
+	name: string;
 
-  @IsBoolean()
-  enabled: boolean;
+	@IsBoolean()
+	enabled: boolean;
 
-  @IsString()
-  context: string;
+	@IsString()
+	context: string;
 
-  @IsString()
-  domain: string;
+	@IsString()
+	domain: string;
 
-  @IsArray()
-  defaultEnvvars: any[];
+	@IsArray()
+	defaultEnvvars: any[];
 }
 
 export class CreatePipelineDTO {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  pipelineName: string;
+	@ApiProperty()
+	@IsString()
+	@IsNotEmpty()
+	pipelineName: string;
 
-  @ApiProperty()
-  @IsString()
-  domain: string;
+	@ApiProperty()
+	@IsString()
+	domain: string;
 
-  @ApiProperty()
-  @IsBoolean()
-  reviewapps: boolean;
+	@ApiProperty()
+	@IsBoolean()
+	reviewapps: boolean;
 
-  @ApiProperty()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => PipelinePhaseDto)
-  phases: PipelinePhaseDto[];
+	@ApiProperty()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => PipelinePhaseDto)
+	phases: PipelinePhaseDto[];
 
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => BuildpackDto)
-  buildpack?: BuildpackDto;
+	@ApiProperty({ required: false })
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => BuildpackDto)
+	buildpack?: BuildpackDto;
 
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => GitLinkDto)
-  git?: GitLinkDto;
+	@ApiProperty({ required: false })
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => GitLinkDto)
+	git?: GitLinkDto;
 
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => RegistryDto)
-  registry?: RegistryDto;
+	@ApiProperty({ required: false })
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => RegistryDto)
+	registry?: RegistryDto;
 
-  @ApiProperty()
-  @IsString()
-  dockerimage: string;
+	@ApiProperty()
+	@IsString()
+	dockerimage: string;
 
-  @ApiProperty()
-  @IsIn(['git', 'docker'])
-  deploymentstrategy: 'git' | 'docker';
+	@ApiProperty()
+	@IsIn(["git", "docker"])
+	deploymentstrategy: "git" | "docker";
 
-  @ApiProperty()
-  @IsIn(['plain', 'dockerfile', 'nixpacks', 'buildpacks'])
-  buildstrategy: 'plain' | 'dockerfile' | 'nixpacks' | 'buildpacks';
+	@ApiProperty()
+	@IsIn(["plain", "dockerfile", "nixpacks", "buildpacks"])
+	buildstrategy: "plain" | "dockerfile" | "nixpacks" | "buildpacks";
 
-  @ApiProperty()
-  @IsOptional()
-  @IsString()
-  resourceVersion?: string;
+	@ApiProperty()
+	@IsOptional()
+	@IsString()
+	resourceVersion?: string;
 
-  @ApiProperty({ required: false })
-  @IsOptional()
-  access?: {
-    teams?: string[];
-  };
+	@ApiProperty({ required: false })
+	@IsOptional()
+	access?: {
+		teams?: string[];
+	};
 }

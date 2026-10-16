@@ -1,26 +1,22 @@
-import {
-  ExecutionContext,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import * as dotenv from 'dotenv';
+import { ExecutionContext, Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
+import * as dotenv from "dotenv";
+
 dotenv.config();
 
 @Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {
-  private logger = new Logger(JwtAuthGuard.name);
+export class JwtAuthGuard extends AuthGuard("jwt") {
+	private logger = new Logger(JwtAuthGuard.name);
 
-  canActivate(context: ExecutionContext) {
-    //console.log('JwtAuthGuard.canActivate');
-    return super.canActivate(context);
-  }
+	canActivate(context: ExecutionContext) {
+		//console.log('JwtAuthGuard.canActivate');
+		return super.canActivate(context);
+	}
 
-  handleRequest(err, user, info) {
-    // Disabling authentication when no auth method is defined
+	handleRequest(err, user, info) {
+		// Disabling authentication when no auth method is defined
 
-    /* Disabling for RBAC
+		/* Disabling for RBAC
     if (
       !process.env.KUBERO_USERS &&
       !process.env.GITHUB_CLIENT_SECRET &&
@@ -30,12 +26,12 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     }
     */
 
-    if (err || !user) {
-      //this.logger.debug('JwtAuthGuard.handleRequest Error', err, user, info);
-      this.logger.warn('Authentication failed: ' + info);
-      throw err || new UnauthorizedException();
-    }
-    //this.logger.debug(user, info);
-    return user;
-  }
+		if (err || !user) {
+			//this.logger.debug('JwtAuthGuard.handleRequest Error', err, user, info);
+			this.logger.warn("Authentication failed: " + info);
+			throw err || new UnauthorizedException();
+		}
+		//this.logger.debug(user, info);
+		return user;
+	}
 }

@@ -1,5 +1,5 @@
 module.exports = {
-  Octokit: class {
-    /* empty stub */
-  },
+	Octokit: class {
+		/* empty stub */
+	},
 };

@@ -1,52 +1,47 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpException,
-  HttpStatus,
-  Param,
-  Post,
-  UseGuards,
-  Request,
-} from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiForbiddenResponse,
-  ApiOkResponse,
-  ApiOperation,
-} from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/strategies/jwt.guard';
-import { OKDTO } from '../common/dto/ok.dto';
-import { TokenService } from './token.service';
-import { PermissionsGuard } from '../auth/permissions.guard';
-import { Permissions } from '../auth/permissions.decorator';
-import { ReadonlyGuard } from '../common/guards/readonly.guard';
-import { CreateTokenDto } from './dto/create-token.dto';
+	Body,
+	Controller,
+	Delete,
+	Get,
+	HttpException,
+	HttpStatus,
+	Param,
+	Post,
+	Request,
+	UseGuards,
+} from "@nestjs/common";
+import { ApiBearerAuth, ApiForbiddenResponse, ApiOkResponse, ApiOperation } from "@nestjs/swagger";
+import { Permissions } from "../auth/permissions.decorator";
+import { PermissionsGuard } from "../auth/permissions.guard";
+import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
+import { OKDTO } from "../common/dto/ok.dto";
+import { ReadonlyGuard } from "../common/guards/readonly.guard";
+import { CreateTokenDto } from "./dto/create-token.dto";
+import { TokenService } from "./token.service";
 
-@Controller({ path: 'api/tokens', version: '1' })
+@Controller({ path: "api/tokens", version: "1" })
 export class TokenController {
-  constructor(private tokenService: TokenService) {}
+	constructor(private tokenService: TokenService) {}
 
-  @Get('/')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('token:write', 'token:read')
-  @ApiBearerAuth('bearerAuth')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOkResponse({
-    description: 'A List of Tokens',
-    type: OKDTO,
-    isArray: true,
-  })
-  @ApiOperation({ summary: 'Get all Tokens' })
-  async getTokens() {
-    return this.tokenService.findAll();
-  }
-  /*
+	@Get("/")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("token:write", "token:read")
+	@ApiBearerAuth("bearerAuth")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOkResponse({
+		description: "A List of Tokens",
+		type: OKDTO,
+		isArray: true,
+	})
+	@ApiOperation({ summary: "Get all Tokens" })
+	async getTokens() {
+		return this.tokenService.findAll();
+	}
+	/*
     @Post('/user/:userId')
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth('bearerAuth')
@@ -68,113 +63,106 @@ export class TokenController {
         return this.tokenService.create(tokenData, userId);
     }
 */
-  @Post('/my')
-  @UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
-  @Permissions('token:ok', 'token:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOkResponse({
-    description: 'Token created successfully',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOperation({
-    summary: 'Create a new Token for the current logged in user',
-  })
-  async createToken(@Body() tokenData: CreateTokenDto, @Request() req: any) {
-    // el rol, los equipos y los permisos del token se leen desde la base de
-    // datos dentro de tokenService.create(), no desde la sesión del usuario
-    const token = this.tokenService.create(
-      tokenData.name,
-      tokenData.expiresAt,
-      req.user.userId,
-    );
-    return token;
-  }
+	@Post("/my")
+	@UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
+	@Permissions("token:ok", "token:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOkResponse({
+		description: "Token created successfully",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOperation({
+		summary: "Create a new Token for the current logged in user",
+	})
+	async createToken(@Body() tokenData: CreateTokenDto, @Request() req: any) {
+		// el rol, los equipos y los permisos del token se leen desde la base de
+		// datos dentro de tokenService.create(), no desde la sesión del usuario
+		const token = this.tokenService.create(tokenData.name, tokenData.expiresAt, req.user.userId);
+		return token;
+	}
 
-  @Delete('/:id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
-  @Permissions('token:ok', 'token:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOkResponse({
-    description: 'Token deleted successfully',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOperation({ summary: 'Delete a Token' })
-  async deleteToken(@Param('id') id: string, @Request() req: any) {
-    if (!id) {
-      throw new HttpException('Token ID is required', HttpStatus.BAD_REQUEST);
-    }
-    return this.tokenService.delete(
-      id,
-      req.user.userId,
-      req.user.permissions?.includes('token:write'),
-    );
-  }
+	@Delete("/:id")
+	@UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
+	@Permissions("token:ok", "token:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOkResponse({
+		description: "Token deleted successfully",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOperation({ summary: "Delete a Token" })
+	async deleteToken(@Param("id") id: string, @Request() req: any) {
+		if (!id) {
+			throw new HttpException("Token ID is required", HttpStatus.BAD_REQUEST);
+		}
+		return this.tokenService.delete(
+			id,
+			req.user.userId,
+			req.user.permissions?.includes("token:write"),
+		);
+	}
 
-  @Get('/my')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('token:ok', 'token:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOkResponse({
-    description: 'A List of Tokens for the current user',
-    type: OKDTO,
-    isArray: true,
-  })
-  @ApiOperation({ summary: 'Get all Tokens for the current user' })
-  async getMyTokens(@Request() req: any) {
-    const userId = req.user.userId;
-    if (!userId) {
-      throw new HttpException('User ID is required', HttpStatus.BAD_REQUEST);
-    }
-    return this.tokenService
-      .findAll()
-      .then((tokens) => tokens.filter((token) => token.user.id === userId));
-  }
+	@Get("/my")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("token:ok", "token:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOkResponse({
+		description: "A List of Tokens for the current user",
+		type: OKDTO,
+		isArray: true,
+	})
+	@ApiOperation({ summary: "Get all Tokens for the current user" })
+	async getMyTokens(@Request() req: any) {
+		const userId = req.user.userId;
+		if (!userId) {
+			throw new HttpException("User ID is required", HttpStatus.BAD_REQUEST);
+		}
+		return this.tokenService
+			.findAll()
+			.then((tokens) => tokens.filter((token) => token.user.id === userId));
+	}
 
-  @Delete('/my/:id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
-  @Permissions('token:ok', 'token:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOkResponse({
-    description: 'Token deleted successfully for the current user',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOperation({ summary: 'Delete a Token for the current user' })
-  async deleteMyToken(@Param('id') id: string, @Request() req: any) {
-    const userId = req.user.userId;
-    if (!id || !userId) {
-      throw new HttpException(
-        'Token ID and User ID are required',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-    // siempre restringido al propio: este endpoint es "mi token", nunca el de otro
-    await this.tokenService.delete(id, userId);
-    // devuelve los tokens que le quedan al usuario (antes la promesa interna
-    // no se retornaba y la respuesta salía vacía)
-    const tokens = await this.tokenService.findAll();
-    return tokens.filter((token) => token.user.id === userId);
-  }
+	@Delete("/my/:id")
+	@UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
+	@Permissions("token:ok", "token:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOkResponse({
+		description: "Token deleted successfully for the current user",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOperation({ summary: "Delete a Token for the current user" })
+	async deleteMyToken(@Param("id") id: string, @Request() req: any) {
+		const userId = req.user.userId;
+		if (!id || !userId) {
+			throw new HttpException("Token ID and User ID are required", HttpStatus.BAD_REQUEST);
+		}
+		// siempre restringido al propio: este endpoint es "mi token", nunca el de otro
+		await this.tokenService.delete(id, userId);
+		// devuelve los tokens que le quedan al usuario (antes la promesa interna
+		// no se retornaba y la respuesta salía vacía)
+		const tokens = await this.tokenService.findAll();
+		return tokens.filter((token) => token.user.id === userId);
+	}
 }

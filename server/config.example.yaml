@@ -17,12 +17,12 @@ clusterissuer: letsencrypt-prod
 templates:
   enabled: true
   catalogs:
-  - name: "Kubero"
-    description: "Kubero templates"
-    templateBasePath: "https://raw.githubusercontent.com/kubero-dev/kubero/main/services/"
-    index: 
-      url: "https://raw.githubusercontent.com/kubero-dev/templates/main/index.json"
-      format: "json" # json or yaml # TODO has no effect yet. json is always used
+    - name: "Kubero"
+      description: "Kubero templates"
+      templateBasePath: "https://raw.githubusercontent.com/kubero-dev/kubero/main/services/"
+      index:
+        url: "https://raw.githubusercontent.com/kubero-dev/templates/main/index.json"
+        format: "json" # json or yaml # TODO has no effect yet. json is always used
 notifications:
   - name: "Slack"
     enabled: false
@@ -164,14 +164,14 @@ buildPacks:
       command: ". .venv/bin/activate && python3 main.py"
       readOnlyAppStorage: true
       securityContext:
-          runAsUser: 0
-          runAsGroup: 0
-          runAsNonRoot: false
-          readOnlyRootFilesystem: false
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
+        runAsUser: 0
+        runAsGroup: 0
+        runAsNonRoot: false
+        readOnlyRootFilesystem: false
+        allowPrivilegeEscalation: false
+        capabilities:
+          add: []
+          drop: []
   - name: GoLang
     language: GoLang
     fetch:
@@ -179,14 +179,14 @@ buildPacks:
       tag: v1.2
       readOnlyAppStorage: false
       securityContext:
-          runAsUser: 0
-          runAsGroup: 0
-          runAsNonRoot: false
-          readOnlyRootFilesystem: false
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
+        runAsUser: 0
+        runAsGroup: 0
+        runAsNonRoot: false
+        readOnlyRootFilesystem: false
+        allowPrivilegeEscalation: false
+        capabilities:
+          add: []
+          drop: []
     build:
       repository: golang
       tag: alpine
@@ -346,7 +346,7 @@ buildPacks:
           drop: []
 podSizeList:
   - name: small
-    description: 'Small (CPU: 0.25, Memory: 0.5Gi)'
+    description: "Small (CPU: 0.25, Memory: 0.5Gi)"
     default: true
     resources:
       requests:
@@ -356,7 +356,7 @@ podSizeList:
         memory: 1Gi
         cpu: 500m
   - name: medium
-    description: 'Medium (CPU: 1, Memory: 2Gi)'
+    description: "Medium (CPU: 1, Memory: 2Gi)"
     resources:
       requests:
         memory: 2Gi
@@ -365,7 +365,7 @@ podSizeList:
         memory: 4Gi
         cpu: 2000m
   - name: large
-    description: 'Large (CPU: 2, Memory: 4Gi)'
+    description: "Large (CPU: 2, Memory: 4Gi)"
     active: false
     resources:
       requests:

@@ -1,47 +1,47 @@
-import { IExtraVolume, ICronjob } from '../apps/apps.interface';
-import { IKubectlMetadata } from '../kubernetes/kubernetes.interface';
-import { ISecurityContext } from '../config/config.interface';
-import { IAddon } from '../addons/addons.interface';
+import { IAddon } from "../addons/addons.interface";
+import { ICronjob, IExtraVolume } from "../apps/apps.interface";
+import { ISecurityContext } from "../config/config.interface";
+import { IKubectlMetadata } from "../kubernetes/kubernetes.interface";
 
 export interface ITemplate {
-  name: string;
-  deploymentstrategy: 'git' | 'docker';
-  envVars: object[];
-  serviceAccount?: {
-    annotations: object;
-    create: boolean;
-    name: string;
-  };
-  image: {
-    repository: string;
-    tag: string;
-    pullPolicy?: 'Always';
-    containerPort: number;
-    run?: {
-      repository: string;
-      readOnlyAppStorage?: boolean;
-      tag: string;
-      readOnly?: boolean;
-      securityContext: ISecurityContext;
-    };
-  };
+	name: string;
+	deploymentstrategy: "git" | "docker";
+	envVars: object[];
+	serviceAccount?: {
+		annotations: object;
+		create: boolean;
+		name: string;
+	};
+	image: {
+		repository: string;
+		tag: string;
+		pullPolicy?: "Always";
+		containerPort: number;
+		run?: {
+			repository: string;
+			readOnlyAppStorage?: boolean;
+			tag: string;
+			readOnly?: boolean;
+			securityContext: ISecurityContext;
+		};
+	};
 
-  web: {
-    replicaCount: number;
-  };
+	web: {
+		replicaCount: number;
+	};
 
-  worker: {
-    replicaCount: number;
-  };
+	worker: {
+		replicaCount: number;
+	};
 
-  extraVolumes: IExtraVolume[];
-  cronjobs: ICronjob[];
-  addons: IAddon[];
+	extraVolumes: IExtraVolume[];
+	cronjobs: ICronjob[];
+	addons: IAddon[];
 }
 
 export interface IKubectlTemplate {
-  apiVersion: string;
-  kind: string;
-  metadata: IKubectlMetadata;
-  spec: ITemplate;
+	apiVersion: string;
+	kind: string;
+	metadata: IKubectlMetadata;
+	spec: ITemplate;
 }

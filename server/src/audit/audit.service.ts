@@ -1,256 +1,240 @@
-import { Injectable } from '@nestjs/common';
-import { AuditEntry } from './audit.interface';
-import { Logger } from '@nestjs/common';
-import { Prisma, PrismaClient } from '@prisma/client';
-import { AuditQueryDto } from './audit-query.dto';
-import { AuditSuggestionsDto } from './audit-suggestions.dto';
+import { Injectable, Logger } from "@nestjs/common";
+import { Prisma, PrismaClient } from "@prisma/client";
+import { AuditEntry } from "./audit.interface";
+import { AuditQueryDto } from "./audit-query.dto";
+import { AuditSuggestionsDto } from "./audit-suggestions.dto";
 
 @Injectable()
 export class AuditService {
-  private logmaxbackups: number = 1000;
-  private enabled: boolean = true;
-  private readonly logger = new Logger(AuditService.name);
-  private prisma = new PrismaClient();
+	private logmaxbackups: number = 1000;
+	private enabled: boolean = true;
+	private readonly logger = new Logger(AuditService.name);
+	private prisma = new PrismaClient();
 
-  constructor() {
-    this.logmaxbackups = process.env.KUBERO_AUDIT_LIMIT
-      ? parseInt(process.env.KUBERO_AUDIT_LIMIT)
-      : 1000;
+	constructor() {
+		this.logmaxbackups = process.env.KUBERO_AUDIT_LIMIT
+			? parseInt(process.env.KUBERO_AUDIT_LIMIT)
+			: 1000;
 
-    if (process.env.KUBERO_AUDIT === 'false') {
-      this.enabled = false;
-      Logger.log('⏸️ Audit logging not enabled', 'Feature');
-      return;
-    } else {
-      Logger.log('✅ Audit logging enabled', 'Feature');
-    }
-    this.init();
-  }
+		if (process.env.KUBERO_AUDIT === "false") {
+			this.enabled = false;
+			Logger.log("⏸️ Audit logging not enabled", "Feature");
+			return;
+		} else {
+			Logger.log("✅ Audit logging enabled", "Feature");
+		}
+		this.init();
+	}
 
-  public init() {
-    if (!this.enabled) {
-      return;
-    }
-    const auditEntry: AuditEntry = {
-      user: '1',
-      severity: 'normal',
-      action: 'start',
-      namespace: '',
-      phase: '',
-      app: '',
-      pipeline: '',
-      resource: 'system',
-      message: 'server started',
-    };
+	public init() {
+		if (!this.enabled) {
+			return;
+		}
+		const auditEntry: AuditEntry = {
+			user: "1",
+			severity: "normal",
+			action: "start",
+			namespace: "",
+			phase: "",
+			app: "",
+			pipeline: "",
+			resource: "system",
+			message: "server started",
+		};
 
-    this.logDelayed(auditEntry, 5000);
-  }
+		this.logDelayed(auditEntry, 5000);
+	}
 
-  public logDelayed(entry: AuditEntry, delay: number = 1000) {
-    setTimeout(() => {
-      void this.log(entry); // log maneja sus propios errores
-    }, delay);
-  }
+	public logDelayed(entry: AuditEntry, delay: number = 1000) {
+		setTimeout(() => {
+			void this.log(entry); // log maneja sus propios errores
+		}, delay);
+	}
 
-  public async log(entry: AuditEntry) {
-    if (!this.enabled) {
-      return;
-    }
-    try {
-      if (entry.user === '' || entry.user === null) {
-        this.logger.debug(
-          'Audit log entry without user. Defaulting to system user.',
-        );
-        entry.user = '1'; // Default to system user if not provided
-      }
-      await this.prisma.audit.create({
-        data: {
-          user: entry.user,
-          severity: entry.severity || 'normal',
-          action: entry.action,
-          namespace: entry.namespace,
-          phase: entry.phase,
-          app: entry.app,
-          pipeline: entry.pipeline,
-          resource: entry.resource,
-          message: entry.message,
-        },
-      });
-      await this.limit(this.logmaxbackups);
-    } catch (err) {
-      this.logger.error(err);
-    }
-  }
+	public async log(entry: AuditEntry) {
+		if (!this.enabled) {
+			return;
+		}
+		try {
+			if (entry.user === "" || entry.user === null) {
+				this.logger.debug("Audit log entry without user. Defaulting to system user.");
+				entry.user = "1"; // Default to system user if not provided
+			}
+			await this.prisma.audit.create({
+				data: {
+					user: entry.user,
+					severity: entry.severity || "normal",
+					action: entry.action,
+					namespace: entry.namespace,
+					phase: entry.phase,
+					app: entry.app,
+					pipeline: entry.pipeline,
+					resource: entry.resource,
+					message: entry.message,
+				},
+			});
+			await this.limit(this.logmaxbackups);
+		} catch (err) {
+			this.logger.error(err);
+		}
+	}
 
-  // `pipelines` restringe el resultado a esos pipelines (para usuarios que no
-  // son admin); sin él devuelve todo el registro.
-  public async get(
-    limit: number = 100,
-    pipelines?: string[],
-    filters: AuditQueryDto = {},
-  ): Promise<{
-    audit: AuditEntry[];
-    count: number;
-    limit: number;
-    page: number;
-    enabled: boolean;
-  }> {
-    const page = filters.page ?? 1;
-    if (!this.enabled) {
-      return { audit: [], count: 0, limit, page, enabled: false };
-    }
-    const where: Prisma.AuditWhereInput = {
-      AND: [
-        ...(pipelines ? [{ pipeline: { in: pipelines } }] : []),
-        ...(filters.pipeline ? [{ pipeline: filters.pipeline }] : []),
-      ],
-      ...(filters.action ? { action: filters.action } : {}),
-      ...(filters.username
-        ? { users: { username: { contains: filters.username } } }
-        : {}),
-      ...(filters.from || filters.to
-        ? {
-            timestamp: {
-              ...(filters.from ? { gte: new Date(filters.from) } : {}),
-              ...(filters.to ? { lt: new Date(filters.to) } : {}),
-            },
-          }
-        : {}),
-    };
-    const audit = await this.prisma.audit.findMany({
-      where,
-      orderBy: [{ timestamp: 'desc' }, { id: 'desc' }],
-      take: limit,
-      skip: (page - 1) * limit,
-      include: {
-        users: {
-          select: { username: true },
-        },
-      },
-    });
-    const count = await this.prisma.audit.count({ where });
-    return { audit, count, limit, page, enabled: true };
-  }
+	// `pipelines` restringe el resultado a esos pipelines (para usuarios que no
+	// son admin); sin él devuelve todo el registro.
+	public async get(
+		limit: number = 100,
+		pipelines?: string[],
+		filters: AuditQueryDto = {},
+	): Promise<{
+		audit: AuditEntry[];
+		count: number;
+		limit: number;
+		page: number;
+		enabled: boolean;
+	}> {
+		const page = filters.page ?? 1;
+		if (!this.enabled) {
+			return { audit: [], count: 0, limit, page, enabled: false };
+		}
+		const where: Prisma.AuditWhereInput = {
+			AND: [
+				...(pipelines ? [{ pipeline: { in: pipelines } }] : []),
+				...(filters.pipeline ? [{ pipeline: filters.pipeline }] : []),
+			],
+			...(filters.action ? { action: filters.action } : {}),
+			...(filters.username ? { users: { username: { contains: filters.username } } } : {}),
+			...(filters.from || filters.to
+				? {
+						timestamp: {
+							...(filters.from ? { gte: new Date(filters.from) } : {}),
+							...(filters.to ? { lt: new Date(filters.to) } : {}),
+						},
+					}
+				: {}),
+		};
+		const audit = await this.prisma.audit.findMany({
+			where,
+			orderBy: [{ timestamp: "desc" }, { id: "desc" }],
+			take: limit,
+			skip: (page - 1) * limit,
+			include: {
+				users: {
+					select: { username: true },
+				},
+			},
+		});
+		const count = await this.prisma.audit.count({ where });
+		return { audit, count, limit, page, enabled: true };
+	}
 
-  public async getSuggestions(
-    query: AuditSuggestionsDto,
-    pipelines?: string[],
-  ): Promise<string[]> {
-    if (!this.enabled) return [];
-    const access: Prisma.AuditWhereInput[] = pipelines
-      ? [{ pipeline: { in: pipelines } }]
-      : [];
-    const search = query.q?.trim() ?? '';
-    if (query.kind === 'pipeline') {
-      const rows = await this.prisma.audit.findMany({
-        where: {
-          AND: [...access, { pipeline: { not: '', contains: search } }],
-        },
-        select: { pipeline: true },
-        distinct: ['pipeline'],
-        orderBy: { pipeline: 'asc' },
-        take: 20,
-      });
-      return rows.map((row) => row.pipeline);
-    }
-    const rows = await this.prisma.audit.findMany({
-      where: {
-        AND: [
-          ...access,
-          ...(query.pipeline ? [{ pipeline: query.pipeline }] : []),
-        ],
-        users: { username: { contains: search } },
-      },
-      select: { users: { select: { username: true } } },
-      distinct: ['user'],
-      orderBy: { users: { username: 'asc' } },
-      take: 20,
-    });
-    return rows.map((row) => row.users.username);
-  }
+	public async getSuggestions(query: AuditSuggestionsDto, pipelines?: string[]): Promise<string[]> {
+		if (!this.enabled) return [];
+		const access: Prisma.AuditWhereInput[] = pipelines ? [{ pipeline: { in: pipelines } }] : [];
+		const search = query.q?.trim() ?? "";
+		if (query.kind === "pipeline") {
+			const rows = await this.prisma.audit.findMany({
+				where: {
+					AND: [...access, { pipeline: { not: "", contains: search } }],
+				},
+				select: { pipeline: true },
+				distinct: ["pipeline"],
+				orderBy: { pipeline: "asc" },
+				take: 20,
+			});
+			return rows.map((row) => row.pipeline);
+		}
+		const rows = await this.prisma.audit.findMany({
+			where: {
+				AND: [...access, ...(query.pipeline ? [{ pipeline: query.pipeline }] : [])],
+				users: { username: { contains: search } },
+			},
+			select: { users: { select: { username: true } } },
+			distinct: ["user"],
+			orderBy: { users: { username: "asc" } },
+			take: 20,
+		});
+		return rows.map((row) => row.users.username);
+	}
 
-  public async getFiltered(
-    limit: number = 100,
-    filter: string = '',
-  ): Promise<AuditEntry[]> {
-    if (!this.enabled) {
-      return [];
-    }
-    return this.prisma.audit.findMany({
-      where: {
-        message: { contains: filter },
-      },
-      orderBy: { timestamp: 'desc' },
-      take: limit,
-      include: {
-        users: {
-          select: { username: true },
-        },
-      },
-    });
-  }
+	public async getFiltered(limit: number = 100, filter: string = ""): Promise<AuditEntry[]> {
+		if (!this.enabled) {
+			return [];
+		}
+		return this.prisma.audit.findMany({
+			where: {
+				message: { contains: filter },
+			},
+			orderBy: { timestamp: "desc" },
+			take: limit,
+			include: {
+				users: {
+					select: { username: true },
+				},
+			},
+		});
+	}
 
-  public async getAppEntries(
-    pipeline: string,
-    phase: string,
-    app: string,
-    limit: number = 100,
-  ): Promise<{ audit: AuditEntry[]; count: number; limit: number }> {
-    if (!this.enabled) {
-      return { audit: [], count: 0, limit: limit };
-    }
-    const audit = await this.prisma.audit.findMany({
-      where: { pipeline, phase, app },
-      orderBy: { timestamp: 'desc' },
-      take: limit,
-      include: {
-        users: {
-          select: { username: true },
-        },
-      },
-    });
-    const count = await this.prisma.audit.count({
-      where: { pipeline, phase, app },
-    });
-    return { audit, count, limit };
-  }
+	public async getAppEntries(
+		pipeline: string,
+		phase: string,
+		app: string,
+		limit: number = 100,
+	): Promise<{ audit: AuditEntry[]; count: number; limit: number }> {
+		if (!this.enabled) {
+			return { audit: [], count: 0, limit: limit };
+		}
+		const audit = await this.prisma.audit.findMany({
+			where: { pipeline, phase, app },
+			orderBy: { timestamp: "desc" },
+			take: limit,
+			include: {
+				users: {
+					select: { username: true },
+				},
+			},
+		});
+		const count = await this.prisma.audit.count({
+			where: { pipeline, phase, app },
+		});
+		return { audit, count, limit };
+	}
 
-  private async flush(): Promise<void> {
-    await this.prisma.audit.deleteMany({});
-  }
+	private async flush(): Promise<void> {
+		await this.prisma.audit.deleteMany({});
+	}
 
-  public async reset(): Promise<void> {
-    if (!this.enabled) {
-      return;
-    }
-    await this.flush();
-    this.logger.log('Audit log reset.');
-  }
+	public async reset(): Promise<void> {
+		if (!this.enabled) {
+			return;
+		}
+		await this.flush();
+		this.logger.log("Audit log reset.");
+	}
 
-  // remove the oldest entries from database if the limit is reached
-  private async limit(limit: number = 1000) {
-    const count = await this.prisma.audit.count();
-    if (count > limit) {
-      const toDelete = count - limit;
-      const oldest = await this.prisma.audit.findMany({
-        orderBy: { timestamp: 'asc' },
-        take: toDelete,
-        select: { id: true },
-      });
-      await this.prisma.audit.deleteMany({
-        where: { id: { in: oldest.map((e) => e.id) } },
-      });
-    }
-  }
+	// remove the oldest entries from database if the limit is reached
+	private async limit(limit: number = 1000) {
+		const count = await this.prisma.audit.count();
+		if (count > limit) {
+			const toDelete = count - limit;
+			const oldest = await this.prisma.audit.findMany({
+				orderBy: { timestamp: "asc" },
+				take: toDelete,
+				select: { id: true },
+			});
+			await this.prisma.audit.deleteMany({
+				where: { id: { in: oldest.map((e) => e.id) } },
+			});
+		}
+	}
 
-  public async count(): Promise<number> {
-    if (!this.enabled) {
-      return 0;
-    }
-    return this.prisma.audit.count();
-  }
+	public async count(): Promise<number> {
+		if (!this.enabled) {
+			return 0;
+		}
+		return this.prisma.audit.count();
+	}
 
-  public getAuditEnabled(): boolean {
-    return this.enabled;
-  }
+	public getAuditEnabled(): boolean {
+		return this.enabled;
+	}
 }

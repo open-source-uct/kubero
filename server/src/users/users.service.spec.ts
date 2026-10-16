@@ -1,1158 +1,1076 @@
-import { ConflictException, ForbiddenException } from '@nestjs/common';
-import { UsersService } from './users.service';
-import { User as PrismaUser } from '@prisma/client';
-import { HttpException } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
-import axios from 'axios';
+import { ConflictException, ForbiddenException, HttpException } from "@nestjs/common";
+import { User as PrismaUser } from "@prisma/client";
+import axios from "axios";
+import * as bcrypt from "bcrypt";
+import { UsersService } from "./users.service";
 
 // Mock bcrypt
-jest.mock('bcrypt');
+jest.mock("bcrypt");
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
 // Mock axios
-jest.mock('axios');
+jest.mock("axios");
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-describe('UsersService', () => {
-  let service: UsersService;
-  let prismaMock: {
-    user: {
-      findUnique: jest.Mock;
-      findMany: jest.Mock;
-      create: jest.Mock;
-      update: jest.Mock;
-      delete: jest.Mock;
-      count: jest.Mock;
-    };
-    role: {
-      findFirst: jest.Mock;
-      findMany: jest.Mock;
-      findUnique: jest.Mock;
-    };
-    userGroup: {
-      findFirst: jest.Mock;
-      findMany: jest.Mock;
-    };
-  };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-
-    prismaMock = {
-      user: {
-        findUnique: jest.fn(),
-        findMany: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn(),
-        count: jest.fn(),
-      },
-      role: {
-        findFirst: jest.fn(),
-        findMany: jest.fn(),
-        findUnique: jest.fn(),
-      },
-      userGroup: {
-        findFirst: jest.fn(),
-        findMany: jest.fn(),
-      },
-    };
-
-    // Mock bcrypt methods
-    (mockedBcrypt.compare as jest.Mock).mockImplementation(() =>
-      Promise.resolve(true),
-    );
-    (mockedBcrypt.hash as jest.Mock).mockImplementation(() =>
-      Promise.resolve('hashedPassword'),
-    );
-    (mockedBcrypt.hashSync as jest.Mock).mockImplementation(
-      () => 'hashedPassword',
-    );
-
-    service = new UsersService();
-    // @ts-expect-error prisma es privado; se reemplaza por un mock
-    service['prisma'] = prismaMock;
-  });
-
-  it('should find a user by username', async () => {
-    const mockUser = { id: '1', username: 'user1' } as PrismaUser;
-    prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
-    const user = await service.findOne('user1');
-    expect(user).toBe(mockUser);
-    expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
-      where: { username: 'user1' },
-    });
-  });
-
-  it('should find a user by id', async () => {
-    const mockUser = { id: '1', username: 'user1' } as PrismaUser;
-    prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
-    const user = await service.findById('1');
-    expect(user).toBe(mockUser);
-    expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
-      where: { id: '1' },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        image: true,
-        provider: true,
-        providerId: true,
-        providerData: true,
-        isActive: true,
-        lastLogin: true,
-        lastIp: true,
-        createdAt: true,
-        updatedAt: true,
-        role: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-          },
-        },
-        userGroups: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-          },
-        },
-      },
-    });
-  });
-
-  it('findById rejects a cross-team lookup for a scoped caller', async () => {
-    prismaMock.user.findUnique.mockResolvedValueOnce({
-      id: '1',
-      username: 'user1',
-      userGroups: [{ name: 'OtroEquipo' }],
-    });
-    await expect(service.findById('1', ['MiEquipo'], true)).rejects.toThrow(
-      ForbiddenException,
-    );
-  });
-
-  it('findById allows a same-team lookup for a scoped caller', async () => {
-    const mockUser = {
-      id: '1',
-      username: 'user1',
-      userGroups: [{ name: 'MiEquipo' }],
-    };
-    prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
-    await expect(service.findById('1', ['MiEquipo'], true)).resolves.toBe(
-      mockUser,
-    );
-  });
-
-  it('should find all users', async () => {
-    const mockUsers = [
-      { id: '1', username: 'user1' },
-      { id: '2', username: 'user2' },
-    ] as PrismaUser[];
-    prismaMock.user.findMany.mockResolvedValueOnce(mockUsers);
-    const users = await service.findAll();
-    expect(users).toBe(mockUsers);
-    expect(prismaMock.user.findMany).toHaveBeenCalled();
-  });
-
-  it('should create a user', async () => {
-    const newUser = {
-      username: 'user3',
-      password: 'pass3',
-    } as Partial<PrismaUser>;
-    const createdUser = {
-      id: '3',
-      username: 'user3',
-      password: 'pass3',
-    } as PrismaUser;
-    prismaMock.user.create.mockResolvedValueOnce(createdUser);
-    const user = await service.create(newUser);
-    expect(user).toBe(createdUser);
-    expect(prismaMock.user.create).toHaveBeenCalledWith({
-      omit: { password: true, twoFaSecret: true },
-      data: expect.objectContaining({
-        username: 'user3',
-        password: expect.any(String), // password will be hashed
-      }),
-    });
-  });
-
-  it('should update a user', async () => {
-    const updatedUser = {
-      id: '1',
-      username: 'user1',
-      password: 'newpass',
-    } as PrismaUser;
-    prismaMock.user.update.mockResolvedValueOnce(updatedUser);
-    const user = await service.update('1', { username: 'user2' });
-    expect(user).toEqual(updatedUser); // Use toEqual instead of toBe
-    expect(prismaMock.user.update).toHaveBeenCalledWith({
-      where: { id: '1' },
-      data: { username: 'user2' },
-      omit: { password: true, twoFaSecret: true },
-    });
-  });
-
-  it('should return undefined if update fails', async () => {
-    prismaMock.user.update.mockRejectedValueOnce(new Error('Not found'));
-    const user = await service.update('1', { password: 'fail' });
-    expect(user).toBeUndefined();
-  });
-
-  it('should update password', async () => {
-    const updatedUser = {
-      id: '1',
-      username: 'user1',
-      password: 'newpass',
-    } as PrismaUser;
-    prismaMock.user.update.mockResolvedValueOnce(updatedUser);
-    const user = await service.updatePassword('1', 'newpass');
-    expect(user).toBe(updatedUser);
-    expect(prismaMock.user.update).toHaveBeenCalledWith({
-      omit: { password: true, twoFaSecret: true },
-      where: { id: '1' },
-      data: { password: expect.any(String) }, // password will be hashed
-    });
-  });
-
-  it('updatePassword rejects resetting a cross-team user password for a scoped caller', async () => {
-    prismaMock.user.findUnique.mockResolvedValueOnce({
-      userGroups: [{ name: 'OtroEquipo' }],
-    });
-    await expect(
-      service.updatePassword('1', 'newpass', ['MiEquipo'], true),
-    ).rejects.toThrow(ForbiddenException);
-    expect(prismaMock.user.update).not.toHaveBeenCalled();
-  });
-
-  it('updatePassword allows resetting a same-team user password for a scoped caller', async () => {
-    prismaMock.user.findUnique.mockResolvedValueOnce({
-      userGroups: [{ name: 'MiEquipo' }],
-    });
-    prismaMock.user.update.mockResolvedValueOnce({ id: '1' } as PrismaUser);
-    await expect(
-      service.updatePassword('1', 'newpass', ['MiEquipo'], true),
-    ).resolves.toEqual({ id: '1' });
-  });
-
-  it('should not pass unexpected fields to create', async () => {
-    prismaMock.user.create.mockResolvedValueOnce({ id: '4' } as PrismaUser);
-    await service.create({
-      username: 'user4',
-      password: 'pass4',
-      roleId: 'admin-role-id',
-      twoFaEnabled: true,
-      twoFaSecret: 'secret',
-      id: 'forced-id',
-    });
-    const data = prismaMock.user.create.mock.calls[0][0].data;
-    expect(data).not.toHaveProperty('roleId');
-    expect(data).not.toHaveProperty('twoFaEnabled');
-    expect(data).not.toHaveProperty('twoFaSecret');
-    expect(data).not.toHaveProperty('id');
-    expect(data.username).toBe('user4');
-  });
-
-  it('should return undefined if updatePassword fails', async () => {
-    prismaMock.user.update.mockRejectedValueOnce(new Error('Not found'));
-    const user = await service.updatePassword('1', 'fail');
-    expect(user).toBeUndefined();
-  });
-
-  it('should delete a user', async () => {
-    prismaMock.user.delete.mockResolvedValueOnce(undefined as any);
-    await expect(service.delete('1')).resolves.toBeUndefined();
-    expect(prismaMock.user.delete).toHaveBeenCalledWith({ where: { id: '1' } });
-  });
-
-  it('should count users', async () => {
-    prismaMock.user.count.mockResolvedValueOnce(2);
-    const count = await service.count();
-    expect(count).toBe(2);
-    expect(prismaMock.user.count).toHaveBeenCalled();
-  });
-
-  it('should check if user exists', async () => {
-    prismaMock.user.findUnique.mockResolvedValueOnce({
-      id: '1',
-      username: 'user1',
-    } as PrismaUser);
-    expect(await service.exists('user1')).toBe(true);
-    prismaMock.user.findUnique.mockResolvedValueOnce(null);
-    expect(await service.exists('notfound')).toBe(false);
-  });
-
-  describe('findOneFull', () => {
-    it('should find a user with full details including relations', async () => {
-      const mockUser = {
-        id: '1',
-        username: 'user1',
-        email: 'user1@example.com',
-        tokens: [
-          { id: 'token1', createdAt: new Date(), expiresAt: new Date() },
-        ],
-        role: { id: 'role1', name: 'admin', description: 'Administrator' },
-        userGroups: [
-          { id: 'group1', name: 'admins', description: 'Admin group' },
-        ],
-      };
-      prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
-
-      const result = await service.findOneFull('user1');
-
-      expect(result).toBe(mockUser);
-      expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
-        where: { username: 'user1' },
-        include: {
-          tokens: {
-            select: {
-              id: true,
-              createdAt: true,
-              expiresAt: true,
-            },
-          },
-          role: {
-            select: {
-              id: true,
-              name: true,
-              description: true,
-            },
-          },
-          userGroups: {
-            select: {
-              id: true,
-              name: true,
-              description: true,
-            },
-          },
-        },
-      });
-    });
-
-    it('should return null if user not found', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce(null);
-
-      const result = await service.findOneFull('nonexistent');
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('findOneOrCreate', () => {
-    it('should return existing user if found', async () => {
-      const existingUser = {
-        id: '1',
-        username: 'existinguser',
-        email: 'existing@example.com',
-      };
-      prismaMock.user.findUnique.mockResolvedValueOnce(existingUser);
-
-      const result = await service.findOneOrCreate(
-        'existinguser',
-        'existing@example.com',
-        'oauth2',
-        'https://example.com/avatar.jpg',
-      );
-
-      expect(result).toBe(existingUser);
-    });
-
-    it('should create new user if not found', async () => {
-      const mockRole = { id: 'role1', name: 'guest' };
-      const mockUserGroup = { id: 'group1', name: 'everyone' };
-      const newUser = { id: '2', username: 'newuser' };
-
-      prismaMock.user.findUnique.mockResolvedValueOnce(null); // User not found
-      prismaMock.role.findFirst.mockResolvedValueOnce(mockRole);
-      prismaMock.userGroup.findFirst.mockResolvedValueOnce(mockUserGroup);
-      prismaMock.user.create.mockResolvedValueOnce(newUser);
-
-      // Mock axios for image processing
-      mockedAxios.get.mockResolvedValueOnce({
-        status: 200,
-        data: Buffer.from('fake-image-data'),
-        headers: { 'content-type': 'image/jpeg' },
-      });
-
-      const result = await service.findOneOrCreate(
-        'newuser',
-        'new@example.com',
-        'oauth2',
-        'https://example.com/avatar.jpg',
-      );
-
-      expect(result).toBe(newUser);
-      expect(prismaMock.user.create).toHaveBeenCalled();
-    });
-
-    it('should throw error if default role not found', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce(null);
-      prismaMock.role.findFirst.mockResolvedValueOnce(null);
-
-      await expect(
-        service.findOneOrCreate('newuser', 'new@example.com', 'oauth2', ''),
-      ).rejects.toThrow('Default role not found');
-    });
-
-    it('should throw error if default user group not found', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce(null);
-      prismaMock.role.findFirst.mockResolvedValueOnce({
-        id: 'role1',
-        name: 'guest',
-      });
-      prismaMock.userGroup.findFirst.mockResolvedValueOnce(null);
-
-      await expect(
-        service.findOneOrCreate('newuser', 'new@example.com', 'oauth2', ''),
-      ).rejects.toThrow('Default user group not found');
-    });
-  });
-
-  describe('findByUsername', () => {
-    it('should find user by username', async () => {
-      const mockUser = { id: '1', username: 'testuser', userGroups: [] };
-      prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
-
-      const result = await service.findByUsername('testuser');
-
-      expect(result).toBe(mockUser);
-      expect(prismaMock.user.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { username: 'testuser' } }),
-      );
-    });
-
-    it('never returns the password hash or 2FA secret', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce({
-        id: '1',
-        username: 'testuser',
-        userGroups: [],
-      });
-      await service.findByUsername('testuser');
-      const call = prismaMock.user.findUnique.mock.calls[0][0];
-      expect(call.select.password).toBeUndefined();
-      expect(call.select.twoFaSecret).toBeUndefined();
-    });
-
-    it('rejects a cross-team lookup for a scoped caller', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce({
-        id: '1',
-        username: 'testuser',
-        userGroups: [{ name: 'OtroEquipo' }],
-      });
-      await expect(
-        service.findByUsername('testuser', ['MiEquipo'], true),
-      ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('allows a same-team lookup for a scoped caller', async () => {
-      const mockUser = {
-        id: '1',
-        username: 'testuser',
-        userGroups: [{ name: 'MiEquipo' }],
-      };
-      prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
-      await expect(
-        service.findByUsername('testuser', ['MiEquipo'], true),
-      ).resolves.toBe(mockUser);
-    });
-  });
-
-  describe('updateMyPassword', () => {
-    it('should update password when current password is correct', async () => {
-      const mockUser = { id: '1', password: 'hashedCurrentPassword' };
-      const updatedUser = { id: '1', password: 'hashedNewPassword' };
-
-      prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
-      (mockedBcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
-      (mockedBcrypt.hash as jest.Mock).mockResolvedValueOnce(
-        'hashedNewPassword',
-      );
-      prismaMock.user.update.mockResolvedValueOnce(updatedUser);
-
-      const result = await service.updateMyPassword(
-        '1',
-        'currentPass',
-        'newPassword123',
-      );
-
-      expect(result).toBe(updatedUser);
-      expect(mockedBcrypt.compare).toHaveBeenCalledWith(
-        'currentPass',
-        'hashedCurrentPassword',
-      );
-      expect(mockedBcrypt.hash).toHaveBeenCalledWith('newPassword123', 10);
-    });
-
-    it('should return undefined for invalid input parameters', async () => {
-      const result1 = await service.updateMyPassword('1', '', 'newPassword123');
-      const result2 = await service.updateMyPassword('1', 'currentPass', '');
-      const result3 = await service.updateMyPassword(
-        '1',
-        'currentPass',
-        'short',
-      );
-
-      expect(result1).toBeUndefined();
-      expect(result2).toBeUndefined();
-      expect(result3).toBeUndefined();
-    });
-
-    it('should return undefined when user not found', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce(null);
-
-      const result = await service.updateMyPassword(
-        '1',
-        'currentPass',
-        'newPassword123',
-      );
-
-      expect(result).toBeUndefined();
-    });
-
-    it('should throw HttpException when current password is incorrect', async () => {
-      const mockUser = { id: '1', password: 'hashedCurrentPassword' };
-      prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
-      (mockedBcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
-
-      await expect(
-        service.updateMyPassword('1', 'wrongPassword', 'newPassword123'),
-      ).rejects.toThrow(HttpException);
-    });
-
-    it('should propagate database errors', async () => {
-      const mockUser = { id: '1', password: 'hashedCurrentPassword' };
-      prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
-      (mockedBcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
-      (mockedBcrypt.hash as jest.Mock).mockResolvedValueOnce(
-        'hashedNewPassword',
-      );
-      prismaMock.user.update.mockRejectedValueOnce(new Error('Database error'));
-
-      await expect(
-        service.updateMyPassword('1', 'currentPass', 'newPassword123'),
-      ).rejects.toThrow('Database error');
-    });
-  });
-
-  describe('listUsersByGroup', () => {
-    it('should return users belonging to a specific group', async () => {
-      const mockUsers = [
-        { id: '1', username: 'user1' },
-        { id: '2', username: 'user2' },
-      ];
-      prismaMock.user.findMany.mockResolvedValueOnce(mockUsers);
-
-      const result = await service.listUsersByGroup('group1');
-
-      expect(result).toBe(mockUsers);
-      expect(prismaMock.user.findMany).toHaveBeenCalledWith({
-        where: {
-          userGroups: {
-            some: {
-              id: 'group1',
-            },
-          },
-        },
-      });
-    });
-  });
-
-  describe('findAllRoles', () => {
-    it('should return all roles', async () => {
-      const mockRoles = [
-        { id: '1', name: 'admin', description: 'Administrator' },
-        { id: '2', name: 'user', description: 'Regular user' },
-      ];
-      prismaMock.role.findMany.mockResolvedValueOnce(mockRoles);
-
-      const result = await service.findAllRoles();
-
-      expect(result).toBe(mockRoles);
-      expect(prismaMock.role.findMany).toHaveBeenCalledWith({
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-    });
-  });
-
-  describe('updateAvatar', () => {
-    it('should update user avatar successfully', async () => {
-      const mockFile = {
-        buffer: Buffer.from('fake-image-data'),
-        mimetype: 'image/jpeg',
-      };
-      const updatedUser = {
-        id: '1',
-        image: 'data:image/jpeg;base64,ZmFrZS1pbWFnZS1kYXRh',
-      };
-
-      prismaMock.user.update.mockResolvedValueOnce(updatedUser);
-
-      const result = await service.updateAvatar('1', mockFile);
-
-      expect(result).toBe(updatedUser);
-      expect(prismaMock.user.update).toHaveBeenCalledWith({
-        where: { id: '1' },
-        data: { image: 'data:image/jpeg;base64,ZmFrZS1pbWFnZS1kYXRh' },
-      });
-    });
-
-    it('should return undefined when no file buffer provided', async () => {
-      const result1 = await service.updateAvatar('1', null);
-      const result2 = await service.updateAvatar('1', { buffer: null });
-
-      expect(result1).toBeUndefined();
-      expect(result2).toBeUndefined();
-    });
-
-    it('should return undefined when update fails', async () => {
-      const mockFile = {
-        buffer: Buffer.from('fake-image-data'),
-        mimetype: 'image/jpeg',
-      };
-      prismaMock.user.update.mockRejectedValueOnce(new Error('User not found'));
-
-      const result = await service.updateAvatar('1', mockFile);
-
-      expect(result).toBeUndefined();
-    });
-  });
-
-  describe('getAvatar', () => {
-    it('should return user avatar', async () => {
-      const mockUser = { image: 'data:image/jpeg;base64,ZmFrZS1pbWFnZS1kYXRh' };
-      prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
-
-      const result = await service.getAvatar('1');
-
-      expect(result).toBe(mockUser.image);
-      expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
-        where: { id: '1' },
-        select: { image: true },
-      });
-    });
-
-    it('should return null when user not found', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce(null);
-
-      const result = await service.getAvatar('1');
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('generateUserDataFromImageUrl', () => {
-    it('should generate base64 image data from URL', async () => {
-      const imageBuffer = Buffer.from('fake-image-data');
-      mockedAxios.get.mockResolvedValueOnce({
-        status: 200,
-        data: imageBuffer,
-        headers: { 'content-type': 'image/jpeg' },
-      });
-
-      const result = await (service as any).generateUserDataFromImageUrl(
-        'https://example.com/image.jpg',
-      );
-
-      expect(result).toBe(
-        `data:image/jpeg;base64,${imageBuffer.toString('base64')}`,
-      );
-      expect(mockedAxios.get).toHaveBeenCalledWith(
-        'https://example.com/image.jpg',
-        {
-          responseType: 'arraybuffer',
-        },
-      );
-    });
-
-    it('should throw error when image fetch fails', async () => {
-      mockedAxios.get.mockResolvedValueOnce({
-        status: 404,
-        data: null,
-        headers: {},
-      });
-
-      await expect(
-        (service as any).generateUserDataFromImageUrl(
-          'https://example.com/notfound.jpg',
-        ),
-      ).rejects.toThrow('Failed to fetch image from URL');
-    });
-
-    it('should throw error for invalid MIME type', async () => {
-      mockedAxios.get.mockResolvedValueOnce({
-        status: 200,
-        data: Buffer.from('not-an-image'),
-        headers: { 'content-type': 'text/plain' },
-      });
-
-      await expect(
-        (service as any).generateUserDataFromImageUrl(
-          'https://example.com/text.txt',
-        ),
-      ).rejects.toThrow('Invalid image MIME type');
-    });
-
-    it('should default to image/jpeg when no content-type header', async () => {
-      const imageBuffer = Buffer.from('fake-image-data');
-      mockedAxios.get.mockResolvedValueOnce({
-        status: 200,
-        data: imageBuffer,
-        headers: {},
-      });
-
-      const result = await (service as any).generateUserDataFromImageUrl(
-        'https://example.com/image',
-      );
-
-      expect(result).toBe(
-        `data:image/jpeg;base64,${imageBuffer.toString('base64')}`,
-      );
-    });
-  });
-
-  describe('create with error handling', () => {
-    it('should throw error when no password provided', async () => {
-      const userWithoutPassword = {
-        username: 'testuser',
-        email: 'test@example.com',
-      };
-
-      await expect(service.create(userWithoutPassword)).rejects.toThrow(
-        'Password is required for user creation.',
-      );
-    });
-
-    it('should throw error when empty password provided', async () => {
-      const userWithEmptyPassword = {
-        username: 'testuser',
-        password: '',
-        email: 'test@example.com',
-      };
-
-      await expect(service.create(userWithEmptyPassword)).rejects.toThrow(
-        'Password is required for user creation.',
-      );
-    });
-  });
-
-  describe('updatePassword edge cases', () => {
-    it('should return undefined for invalid password parameters', async () => {
-      const result1 = await service.updatePassword('1', '');
-      const result2 = await service.updatePassword('1', null as any);
-      const result3 = await service.updatePassword('1', 123 as any);
-
-      expect(result1).toBeUndefined();
-      expect(result2).toBeUndefined();
-      expect(result3).toBeUndefined();
-    });
-  });
-
-  describe('update edge cases', () => {
-    it('should return undefined when no valid fields provided', async () => {
-      const result = await service.update('1', {
-        id: 'ignored',
-        createdAt: 'ignored',
-        updatedAt: 'ignored',
-        password: 'ignored',
-      });
-
-      expect(result).toBeUndefined();
-    });
-
-    it('should handle role and userGroups relations correctly', async () => {
-      const updatedUser = { id: '1', username: 'updated' };
-      prismaMock.user.update.mockResolvedValueOnce(updatedUser);
-
-      const updateData = {
-        username: 'newusername',
-        role: 'role123',
-        userGroups: [{ id: 'group1' }, 'group2'],
-      };
-
-      const result = await service.update('1', updateData);
-
-      expect(result).toBe(updatedUser);
-      expect(prismaMock.user.update).toHaveBeenCalledWith({
-        omit: { password: true, twoFaSecret: true },
-        where: { id: '1' },
-        data: {
-          username: 'newusername',
-          role: { connect: { id: 'role123' } },
-          userGroups: {
-            set: [],
-            connect: [{ id: 'group1' }, { id: 'group2' }],
-          },
-        },
-      });
-    });
-  });
-
-  describe('delete error handling', () => {
-    it('should handle deletion errors gracefully', async () => {
-      prismaMock.user.delete.mockRejectedValueOnce(new Error('User not found'));
-
-      // Should not throw, but handle gracefully
-      await expect(service.delete('nonexistent')).resolves.toBeUndefined();
-    });
-  });
-
-  describe('scopeToOwnTeam', () => {
-    it('findAll filters by the caller teams when the role is scoped', async () => {
-      prismaMock.user.findMany.mockResolvedValueOnce([]);
-      await service.findAll(['Taller1'], true);
-      expect(prismaMock.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { userGroups: { some: { name: { in: ['Taller1'] } } } },
-        }),
-      );
-    });
-
-    it('findAll does not filter when the role is not scoped', async () => {
-      prismaMock.user.findMany.mockResolvedValueOnce([]);
-      await service.findAll(['Taller1'], false);
-      expect(prismaMock.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: undefined }),
-      );
-    });
-
-    it('create rejects assigning a team outside the caller teams', async () => {
-      prismaMock.userGroup.findMany.mockResolvedValueOnce([
-        { id: 'g-taller2', name: 'Taller2' },
-      ]);
-      await expect(
-        service.create(
-          { username: 'ana', password: 'pass', userGroups: ['g-taller2'] },
-          ['Taller1'],
-          true,
-        ),
-      ).rejects.toThrow(ForbiddenException);
-      expect(prismaMock.user.create).not.toHaveBeenCalled();
-    });
-
-    it('create rejects assigning a role with higher priority than the caller', async () => {
-      prismaMock.role.findUnique.mockResolvedValueOnce({ priority: 100 });
-      await expect(
-        service.create(
-          { username: 'ana', password: 'pass', role: 'admin-role-id' },
-          ['Taller1'],
-          true,
-          50,
-        ),
-      ).rejects.toThrow(ForbiddenException);
-      expect(prismaMock.user.create).not.toHaveBeenCalled();
-    });
-
-    it('create rejects assigning an unscoped role even with a low/default priority (e.g. member, priority 0)', async () => {
-      // la prioridad baja no basta: un rol sin acotar deja a quien lo reciba
-      // viendo todo el sistema, sin importar su número de prioridad
-      prismaMock.role.findUnique.mockResolvedValueOnce({
-        priority: 0,
-        scopeToOwnTeam: false,
-      });
-      await expect(
-        service.create(
-          { username: 'ana', password: 'pass', role: 'member-role-id' },
-          ['Taller1'],
-          true,
-          50,
-        ),
-      ).rejects.toThrow(ForbiddenException);
-      expect(prismaMock.user.create).not.toHaveBeenCalled();
-    });
-
-    it('create allows assigning a role with the same priority as the caller', async () => {
-      prismaMock.role.findUnique.mockResolvedValueOnce({
-        priority: 50,
-        scopeToOwnTeam: true,
-      });
-      prismaMock.userGroup.findMany.mockResolvedValueOnce([
-        { id: 'g-taller1', name: 'Taller1' },
-      ]);
-      prismaMock.user.create.mockResolvedValueOnce({ id: 'u-new' });
-      await expect(
-        service.create(
-          {
-            username: 'ana',
-            password: 'pass',
-            role: 'webmaster-role-id',
-            userGroups: ['g-taller1'],
-          },
-          ['Taller1'],
-          true,
-          50,
-        ),
-      ).resolves.toEqual({ id: 'u-new' });
-    });
-
-    it('create allows assigning a role with lower priority than the caller', async () => {
-      prismaMock.role.findUnique.mockResolvedValueOnce({
-        priority: 10,
-        scopeToOwnTeam: true,
-      });
-      prismaMock.userGroup.findMany.mockResolvedValueOnce([
-        { id: 'g-taller1', name: 'Taller1' },
-      ]);
-      prismaMock.user.create.mockResolvedValueOnce({ id: 'u-new' });
-      await expect(
-        service.create(
-          {
-            username: 'ana',
-            password: 'pass',
-            role: 'student-role-id',
-            userGroups: ['g-taller1'],
-          },
-          ['Taller1'],
-          true,
-          50,
-        ),
-      ).resolves.toEqual({ id: 'u-new' });
-    });
-
-    it('create allows a team that the caller belongs to', async () => {
-      prismaMock.userGroup.findMany.mockResolvedValueOnce([
-        { id: 'g-taller1', name: 'Taller1' },
-      ]);
-      prismaMock.user.create.mockResolvedValueOnce({ id: 'u-new' });
-      await service.create(
-        { username: 'ana', password: 'pass', userGroups: ['g-taller1'] },
-        ['Taller1'],
-        true,
-      );
-      expect(prismaMock.user.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            userGroups: { connect: [{ id: 'g-taller1' }] },
-          }),
-        }),
-      );
-    });
-
-    it('create rejects leaving a new user with no team at all (it would become invisible)', async () => {
-      await expect(
-        service.create(
-          { username: 'ana', password: 'pass', userGroups: [] },
-          ['Taller1'],
-          true,
-        ),
-      ).rejects.toThrow(ForbiddenException);
-      expect(prismaMock.user.create).not.toHaveBeenCalled();
-    });
-
-    it('create rejects omitting userGroups entirely when scoped', async () => {
-      await expect(
-        service.create(
-          { username: 'ana', password: 'pass' },
-          ['Taller1'],
-          true,
-        ),
-      ).rejects.toThrow(ForbiddenException);
-      expect(prismaMock.user.create).not.toHaveBeenCalled();
-    });
-
-    it('update rejects touching a user that shares no team with the caller', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce({
-        userGroups: [{ name: 'Taller2' }],
-      });
-      await expect(
-        service.update('u1', { username: 'x' }, ['Taller1'], true),
-      ).rejects.toThrow(ForbiddenException);
-      expect(prismaMock.user.update).not.toHaveBeenCalled();
-    });
-
-    it('update allows touching a user that shares a team with the caller', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce({
-        userGroups: [{ name: 'Taller1' }],
-      });
-      prismaMock.user.update.mockResolvedValueOnce({ id: 'u1' });
-      await expect(
-        service.update('u1', { username: 'x' }, ['Taller1'], true),
-      ).resolves.toEqual({ id: 'u1' });
-    });
-
-    it('update never wipes a team membership outside the caller own scope', async () => {
-      // el estudiante está en Taller1 (del profesor) y en Taller2 (ajeno);
-      // el profesor solo puede tocar su propia membresía
-      prismaMock.user.findUnique.mockResolvedValueOnce({
-        userGroups: [{ name: 'Taller1' }, { name: 'Taller2' }],
-      });
-      prismaMock.userGroup.findMany.mockResolvedValueOnce([
-        { id: 'g-taller1', name: 'Taller1' },
-      ]);
-      prismaMock.userGroup.findMany.mockResolvedValueOnce([
-        { id: 'g-taller1' },
-      ]);
-      prismaMock.user.update.mockResolvedValueOnce({ id: 'u1' });
-
-      await service.update(
-        'u1',
-        { userGroups: ['g-taller1'] },
-        ['Taller1'],
-        true,
-      );
-
-      expect(prismaMock.user.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            userGroups: {
-              disconnect: [],
-              connect: [{ id: 'g-taller1' }],
-            },
-          }),
-        }),
-      );
-    });
-
-    it('disconnects only the caller own team when removing the user from it, leaving unrelated teams untouched', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce({
-        userGroups: [{ name: 'Taller1' }, { name: 'Taller2' }],
-      });
-      // el profesor quita al estudiante de Taller1 (no manda ningún equipo)
-      prismaMock.userGroup.findMany.mockResolvedValueOnce([
-        { id: 'g-taller1' },
-      ]);
-      prismaMock.user.update.mockResolvedValueOnce({ id: 'u1' });
-
-      await service.update('u1', { userGroups: [] }, ['Taller1'], true);
-
-      expect(prismaMock.user.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            userGroups: {
-              disconnect: [{ id: 'g-taller1' }],
-              connect: [],
-            },
-          }),
-        }),
-      );
-    });
-
-    it('delete rejects removing a user that shares no team with the caller', async () => {
-      // assertSharesTeam corre antes que assertAnotherAdminRemains
-      prismaMock.user.findUnique.mockResolvedValueOnce({
-        userGroups: [{ name: 'Taller2' }],
-      });
-      await expect(
-        service.delete('u1', 'caller', ['Taller1'], true),
-      ).rejects.toThrow(ForbiddenException);
-      expect(prismaMock.user.delete).not.toHaveBeenCalled();
-    });
-  });
+describe("UsersService", () => {
+	let service: UsersService;
+	let prismaMock: {
+		user: {
+			findUnique: jest.Mock;
+			findMany: jest.Mock;
+			create: jest.Mock;
+			update: jest.Mock;
+			delete: jest.Mock;
+			count: jest.Mock;
+		};
+		role: {
+			findFirst: jest.Mock;
+			findMany: jest.Mock;
+			findUnique: jest.Mock;
+		};
+		userGroup: {
+			findFirst: jest.Mock;
+			findMany: jest.Mock;
+		};
+	};
+
+	beforeEach(() => {
+		jest.clearAllMocks();
+
+		prismaMock = {
+			user: {
+				findUnique: jest.fn(),
+				findMany: jest.fn(),
+				create: jest.fn(),
+				update: jest.fn(),
+				delete: jest.fn(),
+				count: jest.fn(),
+			},
+			role: {
+				findFirst: jest.fn(),
+				findMany: jest.fn(),
+				findUnique: jest.fn(),
+			},
+			userGroup: {
+				findFirst: jest.fn(),
+				findMany: jest.fn(),
+			},
+		};
+
+		// Mock bcrypt methods
+		(mockedBcrypt.compare as jest.Mock).mockImplementation(() => Promise.resolve(true));
+		(mockedBcrypt.hash as jest.Mock).mockImplementation(() => Promise.resolve("hashedPassword"));
+		(mockedBcrypt.hashSync as jest.Mock).mockImplementation(() => "hashedPassword");
+
+		service = new UsersService();
+		// @ts-expect-error prisma es privado; se reemplaza por un mock
+		service["prisma"] = prismaMock;
+	});
+
+	it("should find a user by username", async () => {
+		const mockUser = { id: "1", username: "user1" } as PrismaUser;
+		prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
+		const user = await service.findOne("user1");
+		expect(user).toBe(mockUser);
+		expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+			where: { username: "user1" },
+		});
+	});
+
+	it("should find a user by id", async () => {
+		const mockUser = { id: "1", username: "user1" } as PrismaUser;
+		prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
+		const user = await service.findById("1");
+		expect(user).toBe(mockUser);
+		expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+			where: { id: "1" },
+			select: {
+				id: true,
+				username: true,
+				email: true,
+				firstName: true,
+				lastName: true,
+				image: true,
+				provider: true,
+				providerId: true,
+				providerData: true,
+				isActive: true,
+				lastLogin: true,
+				lastIp: true,
+				createdAt: true,
+				updatedAt: true,
+				role: {
+					select: {
+						id: true,
+						name: true,
+						description: true,
+					},
+				},
+				userGroups: {
+					select: {
+						id: true,
+						name: true,
+						description: true,
+					},
+				},
+			},
+		});
+	});
+
+	it("findById rejects a cross-team lookup for a scoped caller", async () => {
+		prismaMock.user.findUnique.mockResolvedValueOnce({
+			id: "1",
+			username: "user1",
+			userGroups: [{ name: "OtroEquipo" }],
+		});
+		await expect(service.findById("1", ["MiEquipo"], true)).rejects.toThrow(ForbiddenException);
+	});
+
+	it("findById allows a same-team lookup for a scoped caller", async () => {
+		const mockUser = {
+			id: "1",
+			username: "user1",
+			userGroups: [{ name: "MiEquipo" }],
+		};
+		prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
+		await expect(service.findById("1", ["MiEquipo"], true)).resolves.toBe(mockUser);
+	});
+
+	it("should find all users", async () => {
+		const mockUsers = [
+			{ id: "1", username: "user1" },
+			{ id: "2", username: "user2" },
+		] as PrismaUser[];
+		prismaMock.user.findMany.mockResolvedValueOnce(mockUsers);
+		const users = await service.findAll();
+		expect(users).toBe(mockUsers);
+		expect(prismaMock.user.findMany).toHaveBeenCalled();
+	});
+
+	it("should create a user", async () => {
+		const newUser = {
+			username: "user3",
+			password: "pass3",
+		} as Partial<PrismaUser>;
+		const createdUser = {
+			id: "3",
+			username: "user3",
+			password: "pass3",
+		} as PrismaUser;
+		prismaMock.user.create.mockResolvedValueOnce(createdUser);
+		const user = await service.create(newUser);
+		expect(user).toBe(createdUser);
+		expect(prismaMock.user.create).toHaveBeenCalledWith({
+			omit: { password: true, twoFaSecret: true },
+			data: expect.objectContaining({
+				username: "user3",
+				password: expect.any(String), // password will be hashed
+			}),
+		});
+	});
+
+	it("should update a user", async () => {
+		const updatedUser = {
+			id: "1",
+			username: "user1",
+			password: "newpass",
+		} as PrismaUser;
+		prismaMock.user.update.mockResolvedValueOnce(updatedUser);
+		const user = await service.update("1", { username: "user2" });
+		expect(user).toEqual(updatedUser); // Use toEqual instead of toBe
+		expect(prismaMock.user.update).toHaveBeenCalledWith({
+			where: { id: "1" },
+			data: { username: "user2" },
+			omit: { password: true, twoFaSecret: true },
+		});
+	});
+
+	it("should return undefined if update fails", async () => {
+		prismaMock.user.update.mockRejectedValueOnce(new Error("Not found"));
+		const user = await service.update("1", { password: "fail" });
+		expect(user).toBeUndefined();
+	});
+
+	it("should update password", async () => {
+		const updatedUser = {
+			id: "1",
+			username: "user1",
+			password: "newpass",
+		} as PrismaUser;
+		prismaMock.user.update.mockResolvedValueOnce(updatedUser);
+		const user = await service.updatePassword("1", "newpass");
+		expect(user).toBe(updatedUser);
+		expect(prismaMock.user.update).toHaveBeenCalledWith({
+			omit: { password: true, twoFaSecret: true },
+			where: { id: "1" },
+			data: { password: expect.any(String) }, // password will be hashed
+		});
+	});
+
+	it("updatePassword rejects resetting a cross-team user password for a scoped caller", async () => {
+		prismaMock.user.findUnique.mockResolvedValueOnce({
+			userGroups: [{ name: "OtroEquipo" }],
+		});
+		await expect(service.updatePassword("1", "newpass", ["MiEquipo"], true)).rejects.toThrow(
+			ForbiddenException,
+		);
+		expect(prismaMock.user.update).not.toHaveBeenCalled();
+	});
+
+	it("updatePassword allows resetting a same-team user password for a scoped caller", async () => {
+		prismaMock.user.findUnique.mockResolvedValueOnce({
+			userGroups: [{ name: "MiEquipo" }],
+		});
+		prismaMock.user.update.mockResolvedValueOnce({ id: "1" } as PrismaUser);
+		await expect(service.updatePassword("1", "newpass", ["MiEquipo"], true)).resolves.toEqual({
+			id: "1",
+		});
+	});
+
+	it("should not pass unexpected fields to create", async () => {
+		prismaMock.user.create.mockResolvedValueOnce({ id: "4" } as PrismaUser);
+		await service.create({
+			username: "user4",
+			password: "pass4",
+			roleId: "admin-role-id",
+			twoFaEnabled: true,
+			twoFaSecret: "secret",
+			id: "forced-id",
+		});
+		const data = prismaMock.user.create.mock.calls[0][0].data;
+		expect(data).not.toHaveProperty("roleId");
+		expect(data).not.toHaveProperty("twoFaEnabled");
+		expect(data).not.toHaveProperty("twoFaSecret");
+		expect(data).not.toHaveProperty("id");
+		expect(data.username).toBe("user4");
+	});
+
+	it("should return undefined if updatePassword fails", async () => {
+		prismaMock.user.update.mockRejectedValueOnce(new Error("Not found"));
+		const user = await service.updatePassword("1", "fail");
+		expect(user).toBeUndefined();
+	});
+
+	it("should delete a user", async () => {
+		prismaMock.user.delete.mockResolvedValueOnce(undefined as any);
+		await expect(service.delete("1")).resolves.toBeUndefined();
+		expect(prismaMock.user.delete).toHaveBeenCalledWith({ where: { id: "1" } });
+	});
+
+	it("should count users", async () => {
+		prismaMock.user.count.mockResolvedValueOnce(2);
+		const count = await service.count();
+		expect(count).toBe(2);
+		expect(prismaMock.user.count).toHaveBeenCalled();
+	});
+
+	it("should check if user exists", async () => {
+		prismaMock.user.findUnique.mockResolvedValueOnce({
+			id: "1",
+			username: "user1",
+		} as PrismaUser);
+		expect(await service.exists("user1")).toBe(true);
+		prismaMock.user.findUnique.mockResolvedValueOnce(null);
+		expect(await service.exists("notfound")).toBe(false);
+	});
+
+	describe("findOneFull", () => {
+		it("should find a user with full details including relations", async () => {
+			const mockUser = {
+				id: "1",
+				username: "user1",
+				email: "user1@example.com",
+				tokens: [{ id: "token1", createdAt: new Date(), expiresAt: new Date() }],
+				role: { id: "role1", name: "admin", description: "Administrator" },
+				userGroups: [{ id: "group1", name: "admins", description: "Admin group" }],
+			};
+			prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
+
+			const result = await service.findOneFull("user1");
+
+			expect(result).toBe(mockUser);
+			expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+				where: { username: "user1" },
+				include: {
+					tokens: {
+						select: {
+							id: true,
+							createdAt: true,
+							expiresAt: true,
+						},
+					},
+					role: {
+						select: {
+							id: true,
+							name: true,
+							description: true,
+						},
+					},
+					userGroups: {
+						select: {
+							id: true,
+							name: true,
+							description: true,
+						},
+					},
+				},
+			});
+		});
+
+		it("should return null if user not found", async () => {
+			prismaMock.user.findUnique.mockResolvedValueOnce(null);
+
+			const result = await service.findOneFull("nonexistent");
+
+			expect(result).toBeNull();
+		});
+	});
+
+	describe("findOneOrCreate", () => {
+		it("should return existing user if found", async () => {
+			const existingUser = {
+				id: "1",
+				username: "existinguser",
+				email: "existing@example.com",
+			};
+			prismaMock.user.findUnique.mockResolvedValueOnce(existingUser);
+
+			const result = await service.findOneOrCreate(
+				"existinguser",
+				"existing@example.com",
+				"oauth2",
+				"https://example.com/avatar.jpg",
+			);
+
+			expect(result).toBe(existingUser);
+		});
+
+		it("should create new user if not found", async () => {
+			const mockRole = { id: "role1", name: "guest" };
+			const mockUserGroup = { id: "group1", name: "everyone" };
+			const newUser = { id: "2", username: "newuser" };
+
+			prismaMock.user.findUnique.mockResolvedValueOnce(null); // User not found
+			prismaMock.role.findFirst.mockResolvedValueOnce(mockRole);
+			prismaMock.userGroup.findFirst.mockResolvedValueOnce(mockUserGroup);
+			prismaMock.user.create.mockResolvedValueOnce(newUser);
+
+			// Mock axios for image processing
+			mockedAxios.get.mockResolvedValueOnce({
+				status: 200,
+				data: Buffer.from("fake-image-data"),
+				headers: { "content-type": "image/jpeg" },
+			});
+
+			const result = await service.findOneOrCreate(
+				"newuser",
+				"new@example.com",
+				"oauth2",
+				"https://example.com/avatar.jpg",
+			);
+
+			expect(result).toBe(newUser);
+			expect(prismaMock.user.create).toHaveBeenCalled();
+		});
+
+		it("should throw error if default role not found", async () => {
+			prismaMock.user.findUnique.mockResolvedValueOnce(null);
+			prismaMock.role.findFirst.mockResolvedValueOnce(null);
+
+			await expect(
+				service.findOneOrCreate("newuser", "new@example.com", "oauth2", ""),
+			).rejects.toThrow("Default role not found");
+		});
+
+		it("should throw error if default user group not found", async () => {
+			prismaMock.user.findUnique.mockResolvedValueOnce(null);
+			prismaMock.role.findFirst.mockResolvedValueOnce({
+				id: "role1",
+				name: "guest",
+			});
+			prismaMock.userGroup.findFirst.mockResolvedValueOnce(null);
+
+			await expect(
+				service.findOneOrCreate("newuser", "new@example.com", "oauth2", ""),
+			).rejects.toThrow("Default user group not found");
+		});
+	});
+
+	describe("findByUsername", () => {
+		it("should find user by username", async () => {
+			const mockUser = { id: "1", username: "testuser", userGroups: [] };
+			prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
+
+			const result = await service.findByUsername("testuser");
+
+			expect(result).toBe(mockUser);
+			expect(prismaMock.user.findUnique).toHaveBeenCalledWith(
+				expect.objectContaining({ where: { username: "testuser" } }),
+			);
+		});
+
+		it("never returns the password hash or 2FA secret", async () => {
+			prismaMock.user.findUnique.mockResolvedValueOnce({
+				id: "1",
+				username: "testuser",
+				userGroups: [],
+			});
+			await service.findByUsername("testuser");
+			const call = prismaMock.user.findUnique.mock.calls[0][0];
+			expect(call.select.password).toBeUndefined();
+			expect(call.select.twoFaSecret).toBeUndefined();
+		});
+
+		it("rejects a cross-team lookup for a scoped caller", async () => {
+			prismaMock.user.findUnique.mockResolvedValueOnce({
+				id: "1",
+				username: "testuser",
+				userGroups: [{ name: "OtroEquipo" }],
+			});
+			await expect(service.findByUsername("testuser", ["MiEquipo"], true)).rejects.toThrow(
+				ForbiddenException,
+			);
+		});
+
+		it("allows a same-team lookup for a scoped caller", async () => {
+			const mockUser = {
+				id: "1",
+				username: "testuser",
+				userGroups: [{ name: "MiEquipo" }],
+			};
+			prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
+			await expect(service.findByUsername("testuser", ["MiEquipo"], true)).resolves.toBe(mockUser);
+		});
+	});
+
+	describe("updateMyPassword", () => {
+		it("should update password when current password is correct", async () => {
+			const mockUser = { id: "1", password: "hashedCurrentPassword" };
+			const updatedUser = { id: "1", password: "hashedNewPassword" };
+
+			prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
+			(mockedBcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
+			(mockedBcrypt.hash as jest.Mock).mockResolvedValueOnce("hashedNewPassword");
+			prismaMock.user.update.mockResolvedValueOnce(updatedUser);
+
+			const result = await service.updateMyPassword("1", "currentPass", "newPassword123");
+
+			expect(result).toBe(updatedUser);
+			expect(mockedBcrypt.compare).toHaveBeenCalledWith("currentPass", "hashedCurrentPassword");
+			expect(mockedBcrypt.hash).toHaveBeenCalledWith("newPassword123", 10);
+		});
+
+		it("should return undefined for invalid input parameters", async () => {
+			const result1 = await service.updateMyPassword("1", "", "newPassword123");
+			const result2 = await service.updateMyPassword("1", "currentPass", "");
+			const result3 = await service.updateMyPassword("1", "currentPass", "short");
+
+			expect(result1).toBeUndefined();
+			expect(result2).toBeUndefined();
+			expect(result3).toBeUndefined();
+		});
+
+		it("should return undefined when user not found", async () => {
+			prismaMock.user.findUnique.mockResolvedValueOnce(null);
+
+			const result = await service.updateMyPassword("1", "currentPass", "newPassword123");
+
+			expect(result).toBeUndefined();
+		});
+
+		it("should throw HttpException when current password is incorrect", async () => {
+			const mockUser = { id: "1", password: "hashedCurrentPassword" };
+			prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
+			(mockedBcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
+
+			await expect(
+				service.updateMyPassword("1", "wrongPassword", "newPassword123"),
+			).rejects.toThrow(HttpException);
+		});
+
+		it("should propagate database errors", async () => {
+			const mockUser = { id: "1", password: "hashedCurrentPassword" };
+			prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
+			(mockedBcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
+			(mockedBcrypt.hash as jest.Mock).mockResolvedValueOnce("hashedNewPassword");
+			prismaMock.user.update.mockRejectedValueOnce(new Error("Database error"));
+
+			await expect(service.updateMyPassword("1", "currentPass", "newPassword123")).rejects.toThrow(
+				"Database error",
+			);
+		});
+	});
+
+	describe("listUsersByGroup", () => {
+		it("should return users belonging to a specific group", async () => {
+			const mockUsers = [
+				{ id: "1", username: "user1" },
+				{ id: "2", username: "user2" },
+			];
+			prismaMock.user.findMany.mockResolvedValueOnce(mockUsers);
+
+			const result = await service.listUsersByGroup("group1");
+
+			expect(result).toBe(mockUsers);
+			expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+				where: {
+					userGroups: {
+						some: {
+							id: "group1",
+						},
+					},
+				},
+			});
+		});
+	});
+
+	describe("findAllRoles", () => {
+		it("should return all roles", async () => {
+			const mockRoles = [
+				{ id: "1", name: "admin", description: "Administrator" },
+				{ id: "2", name: "user", description: "Regular user" },
+			];
+			prismaMock.role.findMany.mockResolvedValueOnce(mockRoles);
+
+			const result = await service.findAllRoles();
+
+			expect(result).toBe(mockRoles);
+			expect(prismaMock.role.findMany).toHaveBeenCalledWith({
+				select: {
+					id: true,
+					name: true,
+					description: true,
+					createdAt: true,
+					updatedAt: true,
+				},
+			});
+		});
+	});
+
+	describe("updateAvatar", () => {
+		it("should update user avatar successfully", async () => {
+			const mockFile = {
+				buffer: Buffer.from("fake-image-data"),
+				mimetype: "image/jpeg",
+			};
+			const updatedUser = {
+				id: "1",
+				image: "data:image/jpeg;base64,ZmFrZS1pbWFnZS1kYXRh",
+			};
+
+			prismaMock.user.update.mockResolvedValueOnce(updatedUser);
+
+			const result = await service.updateAvatar("1", mockFile);
+
+			expect(result).toBe(updatedUser);
+			expect(prismaMock.user.update).toHaveBeenCalledWith({
+				where: { id: "1" },
+				data: { image: "data:image/jpeg;base64,ZmFrZS1pbWFnZS1kYXRh" },
+			});
+		});
+
+		it("should return undefined when no file buffer provided", async () => {
+			const result1 = await service.updateAvatar("1", null);
+			const result2 = await service.updateAvatar("1", { buffer: null });
+
+			expect(result1).toBeUndefined();
+			expect(result2).toBeUndefined();
+		});
+
+		it("should return undefined when update fails", async () => {
+			const mockFile = {
+				buffer: Buffer.from("fake-image-data"),
+				mimetype: "image/jpeg",
+			};
+			prismaMock.user.update.mockRejectedValueOnce(new Error("User not found"));
+
+			const result = await service.updateAvatar("1", mockFile);
+
+			expect(result).toBeUndefined();
+		});
+	});
+
+	describe("getAvatar", () => {
+		it("should return user avatar", async () => {
+			const mockUser = { image: "data:image/jpeg;base64,ZmFrZS1pbWFnZS1kYXRh" };
+			prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
+
+			const result = await service.getAvatar("1");
+
+			expect(result).toBe(mockUser.image);
+			expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+				where: { id: "1" },
+				select: { image: true },
+			});
+		});
+
+		it("should return null when user not found", async () => {
+			prismaMock.user.findUnique.mockResolvedValueOnce(null);
+
+			const result = await service.getAvatar("1");
+
+			expect(result).toBeNull();
+		});
+	});
+
+	describe("generateUserDataFromImageUrl", () => {
+		it("should generate base64 image data from URL", async () => {
+			const imageBuffer = Buffer.from("fake-image-data");
+			mockedAxios.get.mockResolvedValueOnce({
+				status: 200,
+				data: imageBuffer,
+				headers: { "content-type": "image/jpeg" },
+			});
+
+			const result = await (service as any).generateUserDataFromImageUrl(
+				"https://example.com/image.jpg",
+			);
+
+			expect(result).toBe(`data:image/jpeg;base64,${imageBuffer.toString("base64")}`);
+			expect(mockedAxios.get).toHaveBeenCalledWith("https://example.com/image.jpg", {
+				responseType: "arraybuffer",
+			});
+		});
+
+		it("should throw error when image fetch fails", async () => {
+			mockedAxios.get.mockResolvedValueOnce({
+				status: 404,
+				data: null,
+				headers: {},
+			});
+
+			await expect(
+				(service as any).generateUserDataFromImageUrl("https://example.com/notfound.jpg"),
+			).rejects.toThrow("Failed to fetch image from URL");
+		});
+
+		it("should throw error for invalid MIME type", async () => {
+			mockedAxios.get.mockResolvedValueOnce({
+				status: 200,
+				data: Buffer.from("not-an-image"),
+				headers: { "content-type": "text/plain" },
+			});
+
+			await expect(
+				(service as any).generateUserDataFromImageUrl("https://example.com/text.txt"),
+			).rejects.toThrow("Invalid image MIME type");
+		});
+
+		it("should default to image/jpeg when no content-type header", async () => {
+			const imageBuffer = Buffer.from("fake-image-data");
+			mockedAxios.get.mockResolvedValueOnce({
+				status: 200,
+				data: imageBuffer,
+				headers: {},
+			});
+
+			const result = await (service as any).generateUserDataFromImageUrl(
+				"https://example.com/image",
+			);
+
+			expect(result).toBe(`data:image/jpeg;base64,${imageBuffer.toString("base64")}`);
+		});
+	});
+
+	describe("create with error handling", () => {
+		it("should throw error when no password provided", async () => {
+			const userWithoutPassword = {
+				username: "testuser",
+				email: "test@example.com",
+			};
+
+			await expect(service.create(userWithoutPassword)).rejects.toThrow(
+				"Password is required for user creation.",
+			);
+		});
+
+		it("should throw error when empty password provided", async () => {
+			const userWithEmptyPassword = {
+				username: "testuser",
+				password: "",
+				email: "test@example.com",
+			};
+
+			await expect(service.create(userWithEmptyPassword)).rejects.toThrow(
+				"Password is required for user creation.",
+			);
+		});
+	});
+
+	describe("updatePassword edge cases", () => {
+		it("should return undefined for invalid password parameters", async () => {
+			const result1 = await service.updatePassword("1", "");
+			const result2 = await service.updatePassword("1", null as any);
+			const result3 = await service.updatePassword("1", 123 as any);
+
+			expect(result1).toBeUndefined();
+			expect(result2).toBeUndefined();
+			expect(result3).toBeUndefined();
+		});
+	});
+
+	describe("update edge cases", () => {
+		it("should return undefined when no valid fields provided", async () => {
+			const result = await service.update("1", {
+				id: "ignored",
+				createdAt: "ignored",
+				updatedAt: "ignored",
+				password: "ignored",
+			});
+
+			expect(result).toBeUndefined();
+		});
+
+		it("should handle role and userGroups relations correctly", async () => {
+			const updatedUser = { id: "1", username: "updated" };
+			prismaMock.user.update.mockResolvedValueOnce(updatedUser);
+
+			const updateData = {
+				username: "newusername",
+				role: "role123",
+				userGroups: [{ id: "group1" }, "group2"],
+			};
+
+			const result = await service.update("1", updateData);
+
+			expect(result).toBe(updatedUser);
+			expect(prismaMock.user.update).toHaveBeenCalledWith({
+				omit: { password: true, twoFaSecret: true },
+				where: { id: "1" },
+				data: {
+					username: "newusername",
+					role: { connect: { id: "role123" } },
+					userGroups: {
+						set: [],
+						connect: [{ id: "group1" }, { id: "group2" }],
+					},
+				},
+			});
+		});
+	});
+
+	describe("delete error handling", () => {
+		it("should handle deletion errors gracefully", async () => {
+			prismaMock.user.delete.mockRejectedValueOnce(new Error("User not found"));
+
+			// Should not throw, but handle gracefully
+			await expect(service.delete("nonexistent")).resolves.toBeUndefined();
+		});
+	});
+
+	describe("scopeToOwnTeam", () => {
+		it("findAll filters by the caller teams when the role is scoped", async () => {
+			prismaMock.user.findMany.mockResolvedValueOnce([]);
+			await service.findAll(["Taller1"], true);
+			expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+				expect.objectContaining({
+					where: { userGroups: { some: { name: { in: ["Taller1"] } } } },
+				}),
+			);
+		});
+
+		it("findAll does not filter when the role is not scoped", async () => {
+			prismaMock.user.findMany.mockResolvedValueOnce([]);
+			await service.findAll(["Taller1"], false);
+			expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+				expect.objectContaining({ where: undefined }),
+			);
+		});
+
+		it("create rejects assigning a team outside the caller teams", async () => {
+			prismaMock.userGroup.findMany.mockResolvedValueOnce([{ id: "g-taller2", name: "Taller2" }]);
+			await expect(
+				service.create(
+					{ username: "ana", password: "pass", userGroups: ["g-taller2"] },
+					["Taller1"],
+					true,
+				),
+			).rejects.toThrow(ForbiddenException);
+			expect(prismaMock.user.create).not.toHaveBeenCalled();
+		});
+
+		it("create rejects assigning a role with higher priority than the caller", async () => {
+			prismaMock.role.findUnique.mockResolvedValueOnce({ priority: 100 });
+			await expect(
+				service.create(
+					{ username: "ana", password: "pass", role: "admin-role-id" },
+					["Taller1"],
+					true,
+					50,
+				),
+			).rejects.toThrow(ForbiddenException);
+			expect(prismaMock.user.create).not.toHaveBeenCalled();
+		});
+
+		it("create rejects assigning an unscoped role even with a low/default priority (e.g. member, priority 0)", async () => {
+			// la prioridad baja no basta: un rol sin acotar deja a quien lo reciba
+			// viendo todo el sistema, sin importar su número de prioridad
+			prismaMock.role.findUnique.mockResolvedValueOnce({
+				priority: 0,
+				scopeToOwnTeam: false,
+			});
+			await expect(
+				service.create(
+					{ username: "ana", password: "pass", role: "member-role-id" },
+					["Taller1"],
+					true,
+					50,
+				),
+			).rejects.toThrow(ForbiddenException);
+			expect(prismaMock.user.create).not.toHaveBeenCalled();
+		});
+
+		it("create allows assigning a role with the same priority as the caller", async () => {
+			prismaMock.role.findUnique.mockResolvedValueOnce({
+				priority: 50,
+				scopeToOwnTeam: true,
+			});
+			prismaMock.userGroup.findMany.mockResolvedValueOnce([{ id: "g-taller1", name: "Taller1" }]);
+			prismaMock.user.create.mockResolvedValueOnce({ id: "u-new" });
+			await expect(
+				service.create(
+					{
+						username: "ana",
+						password: "pass",
+						role: "webmaster-role-id",
+						userGroups: ["g-taller1"],
+					},
+					["Taller1"],
+					true,
+					50,
+				),
+			).resolves.toEqual({ id: "u-new" });
+		});
+
+		it("create allows assigning a role with lower priority than the caller", async () => {
+			prismaMock.role.findUnique.mockResolvedValueOnce({
+				priority: 10,
+				scopeToOwnTeam: true,
+			});
+			prismaMock.userGroup.findMany.mockResolvedValueOnce([{ id: "g-taller1", name: "Taller1" }]);
+			prismaMock.user.create.mockResolvedValueOnce({ id: "u-new" });
+			await expect(
+				service.create(
+					{
+						username: "ana",
+						password: "pass",
+						role: "student-role-id",
+						userGroups: ["g-taller1"],
+					},
+					["Taller1"],
+					true,
+					50,
+				),
+			).resolves.toEqual({ id: "u-new" });
+		});
+
+		it("create allows a team that the caller belongs to", async () => {
+			prismaMock.userGroup.findMany.mockResolvedValueOnce([{ id: "g-taller1", name: "Taller1" }]);
+			prismaMock.user.create.mockResolvedValueOnce({ id: "u-new" });
+			await service.create(
+				{ username: "ana", password: "pass", userGroups: ["g-taller1"] },
+				["Taller1"],
+				true,
+			);
+			expect(prismaMock.user.create).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						userGroups: { connect: [{ id: "g-taller1" }] },
+					}),
+				}),
+			);
+		});
+
+		it("create rejects leaving a new user with no team at all (it would become invisible)", async () => {
+			await expect(
+				service.create({ username: "ana", password: "pass", userGroups: [] }, ["Taller1"], true),
+			).rejects.toThrow(ForbiddenException);
+			expect(prismaMock.user.create).not.toHaveBeenCalled();
+		});
+
+		it("create rejects omitting userGroups entirely when scoped", async () => {
+			await expect(
+				service.create({ username: "ana", password: "pass" }, ["Taller1"], true),
+			).rejects.toThrow(ForbiddenException);
+			expect(prismaMock.user.create).not.toHaveBeenCalled();
+		});
+
+		it("update rejects touching a user that shares no team with the caller", async () => {
+			prismaMock.user.findUnique.mockResolvedValueOnce({
+				userGroups: [{ name: "Taller2" }],
+			});
+			await expect(service.update("u1", { username: "x" }, ["Taller1"], true)).rejects.toThrow(
+				ForbiddenException,
+			);
+			expect(prismaMock.user.update).not.toHaveBeenCalled();
+		});
+
+		it("update allows touching a user that shares a team with the caller", async () => {
+			prismaMock.user.findUnique.mockResolvedValueOnce({
+				userGroups: [{ name: "Taller1" }],
+			});
+			prismaMock.user.update.mockResolvedValueOnce({ id: "u1" });
+			await expect(service.update("u1", { username: "x" }, ["Taller1"], true)).resolves.toEqual({
+				id: "u1",
+			});
+		});
+
+		it("update never wipes a team membership outside the caller own scope", async () => {
+			// el estudiante está en Taller1 (del profesor) y en Taller2 (ajeno);
+			// el profesor solo puede tocar su propia membresía
+			prismaMock.user.findUnique.mockResolvedValueOnce({
+				userGroups: [{ name: "Taller1" }, { name: "Taller2" }],
+			});
+			prismaMock.userGroup.findMany.mockResolvedValueOnce([{ id: "g-taller1", name: "Taller1" }]);
+			prismaMock.userGroup.findMany.mockResolvedValueOnce([{ id: "g-taller1" }]);
+			prismaMock.user.update.mockResolvedValueOnce({ id: "u1" });
+
+			await service.update("u1", { userGroups: ["g-taller1"] }, ["Taller1"], true);
+
+			expect(prismaMock.user.update).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						userGroups: {
+							disconnect: [],
+							connect: [{ id: "g-taller1" }],
+						},
+					}),
+				}),
+			);
+		});
+
+		it("disconnects only the caller own team when removing the user from it, leaving unrelated teams untouched", async () => {
+			prismaMock.user.findUnique.mockResolvedValueOnce({
+				userGroups: [{ name: "Taller1" }, { name: "Taller2" }],
+			});
+			// el profesor quita al estudiante de Taller1 (no manda ningún equipo)
+			prismaMock.userGroup.findMany.mockResolvedValueOnce([{ id: "g-taller1" }]);
+			prismaMock.user.update.mockResolvedValueOnce({ id: "u1" });
+
+			await service.update("u1", { userGroups: [] }, ["Taller1"], true);
+
+			expect(prismaMock.user.update).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						userGroups: {
+							disconnect: [{ id: "g-taller1" }],
+							connect: [],
+						},
+					}),
+				}),
+			);
+		});
+
+		it("delete rejects removing a user that shares no team with the caller", async () => {
+			// assertSharesTeam corre antes que assertAnotherAdminRemains
+			prismaMock.user.findUnique.mockResolvedValueOnce({
+				userGroups: [{ name: "Taller2" }],
+			});
+			await expect(service.delete("u1", "caller", ["Taller1"], true)).rejects.toThrow(
+				ForbiddenException,
+			);
+			expect(prismaMock.user.delete).not.toHaveBeenCalled();
+		});
+	});
 });
 
-describe('UsersService safeguards', () => {
-  let service: UsersService;
-  let prisma: any;
+describe("UsersService safeguards", () => {
+	let service: UsersService;
+	let prisma: any;
 
-  const admin = { isActive: true, role: { name: 'admin' } };
+	const admin = { isActive: true, role: { name: "admin" } };
 
-  beforeEach(() => {
-    prisma = {
-      user: {
-        findUnique: jest.fn(),
-        count: jest.fn().mockResolvedValue(1), // queda otro admin
-        delete: jest.fn().mockResolvedValue({}),
-        update: jest.fn().mockResolvedValue({}),
-      },
-      role: { findUnique: jest.fn() },
-    };
-    service = new UsersService();
-    // @ts-expect-error prisma es privado; se reemplaza por un mock
-    service['prisma'] = prisma;
-  });
+	beforeEach(() => {
+		prisma = {
+			user: {
+				findUnique: jest.fn(),
+				count: jest.fn().mockResolvedValue(1), // queda otro admin
+				delete: jest.fn().mockResolvedValue({}),
+				update: jest.fn().mockResolvedValue({}),
+			},
+			role: { findUnique: jest.fn() },
+		};
+		service = new UsersService();
+		// @ts-expect-error prisma es privado; se reemplaza por un mock
+		service["prisma"] = prisma;
+	});
 
-  describe('delete', () => {
-    it('refuses to delete your own account', async () => {
-      await expect(service.delete('u1', 'u1')).rejects.toThrow(
-        ForbiddenException,
-      );
-      expect(prisma.user.delete).not.toHaveBeenCalled();
-    });
+	describe("delete", () => {
+		it("refuses to delete your own account", async () => {
+			await expect(service.delete("u1", "u1")).rejects.toThrow(ForbiddenException);
+			expect(prisma.user.delete).not.toHaveBeenCalled();
+		});
 
-    it('refuses to delete the last active administrator', async () => {
-      prisma.user.findUnique.mockResolvedValue(admin);
-      prisma.user.count.mockResolvedValue(0);
-      await expect(service.delete('u1', 'someone-else')).rejects.toThrow(
-        ConflictException,
-      );
-      expect(prisma.user.delete).not.toHaveBeenCalled();
-    });
+		it("refuses to delete the last active administrator", async () => {
+			prisma.user.findUnique.mockResolvedValue(admin);
+			prisma.user.count.mockResolvedValue(0);
+			await expect(service.delete("u1", "someone-else")).rejects.toThrow(ConflictException);
+			expect(prisma.user.delete).not.toHaveBeenCalled();
+		});
 
-    it('deletes an administrator when another one remains', async () => {
-      prisma.user.findUnique.mockResolvedValue(admin);
-      await service.delete('u1', 'someone-else');
-      expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'u1' } });
-    });
+		it("deletes an administrator when another one remains", async () => {
+			prisma.user.findUnique.mockResolvedValue(admin);
+			await service.delete("u1", "someone-else");
+			expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: "u1" } });
+		});
 
-    it('does not count a non-admin as a protected account', async () => {
-      prisma.user.findUnique.mockResolvedValue({
-        isActive: true,
-        role: { name: 'student' },
-      });
-      prisma.user.count.mockResolvedValue(0);
-      await service.delete('u2', 'u1');
-      expect(prisma.user.delete).toHaveBeenCalled();
-    });
-  });
+		it("does not count a non-admin as a protected account", async () => {
+			prisma.user.findUnique.mockResolvedValue({
+				isActive: true,
+				role: { name: "student" },
+			});
+			prisma.user.count.mockResolvedValue(0);
+			await service.delete("u2", "u1");
+			expect(prisma.user.delete).toHaveBeenCalled();
+		});
+	});
 
-  describe('update', () => {
-    it('refuses to deactivate the last active administrator', async () => {
-      prisma.user.findUnique.mockResolvedValue(admin);
-      prisma.user.count.mockResolvedValue(0);
-      await expect(service.update('u1', { isActive: false })).rejects.toThrow(
-        ConflictException,
-      );
-      expect(prisma.user.update).not.toHaveBeenCalled();
-    });
+	describe("update", () => {
+		it("refuses to deactivate the last active administrator", async () => {
+			prisma.user.findUnique.mockResolvedValue(admin);
+			prisma.user.count.mockResolvedValue(0);
+			await expect(service.update("u1", { isActive: false })).rejects.toThrow(ConflictException);
+			expect(prisma.user.update).not.toHaveBeenCalled();
+		});
 
-    it('refuses to move the last administrator to another role', async () => {
-      prisma.user.findUnique.mockResolvedValue(admin);
-      prisma.user.count.mockResolvedValue(0);
-      prisma.role.findUnique.mockResolvedValue({ name: 'student' });
-      await expect(service.update('u1', { role: 'r-student' })).rejects.toThrow(
-        ConflictException,
-      );
-      expect(prisma.user.update).not.toHaveBeenCalled();
-    });
+		it("refuses to move the last administrator to another role", async () => {
+			prisma.user.findUnique.mockResolvedValue(admin);
+			prisma.user.count.mockResolvedValue(0);
+			prisma.role.findUnique.mockResolvedValue({ name: "student" });
+			await expect(service.update("u1", { role: "r-student" })).rejects.toThrow(ConflictException);
+			expect(prisma.user.update).not.toHaveBeenCalled();
+		});
 
-    it('lets the last administrator keep the admin role', async () => {
-      prisma.user.findUnique.mockResolvedValue(admin);
-      prisma.user.count.mockResolvedValue(0);
-      prisma.role.findUnique.mockResolvedValue({ name: 'admin' });
-      await service.update('u1', { role: 'r-admin', firstName: 'Ana' });
-      expect(prisma.user.update).toHaveBeenCalled();
-    });
-  });
+		it("lets the last administrator keep the admin role", async () => {
+			prisma.user.findUnique.mockResolvedValue(admin);
+			prisma.user.count.mockResolvedValue(0);
+			prisma.role.findUnique.mockResolvedValue({ name: "admin" });
+			await service.update("u1", { role: "r-admin", firstName: "Ana" });
+			expect(prisma.user.update).toHaveBeenCalled();
+		});
+	});
 
-  describe('findOneOrCreate (OAuth)', () => {
-    it('refuses to log in as a local user that has the same username', async () => {
-      // findOneFull devuelve al admin local; el login viene de GitHub
-      jest.spyOn(service, 'findOneFull').mockResolvedValue({
-        id: 'u1',
-        username: 'admin',
-        provider: 'local',
-      } as any);
-      await expect(
-        service.findOneOrCreate('admin', 'a@b.c', 'github', ''),
-      ).rejects.toThrow(ForbiddenException);
-    });
+	describe("findOneOrCreate (OAuth)", () => {
+		it("refuses to log in as a local user that has the same username", async () => {
+			// findOneFull devuelve al admin local; el login viene de GitHub
+			jest.spyOn(service, "findOneFull").mockResolvedValue({
+				id: "u1",
+				username: "admin",
+				provider: "local",
+			} as any);
+			await expect(service.findOneOrCreate("admin", "a@b.c", "github", "")).rejects.toThrow(
+				ForbiddenException,
+			);
+		});
 
-    it('lets a user of the same provider log in again', async () => {
-      jest.spyOn(service, 'findOneFull').mockResolvedValue({
-        id: 'u2',
-        username: 'ana',
-        provider: 'github',
-      } as any);
-      const user = await service.findOneOrCreate('ana', 'a@b.c', 'github', '');
-      expect(user).toMatchObject({ username: 'ana' });
-    });
-  });
+		it("lets a user of the same provider log in again", async () => {
+			jest.spyOn(service, "findOneFull").mockResolvedValue({
+				id: "u2",
+				username: "ana",
+				provider: "github",
+			} as any);
+			const user = await service.findOneOrCreate("ana", "a@b.c", "github", "");
+			expect(user).toMatchObject({ username: "ana" });
+		});
+	});
 });

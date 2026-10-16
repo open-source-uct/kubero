@@ -138,8 +138,8 @@ model Token {
   lastIp      String? // Last known IP address used for this token
   description String? // Description of the token's purpose
 
-  role        String
-  groups      String
+  role   String
+  groups String
 
   permissions Permission[] // Permissions associated with this token
 
@@ -160,102 +160,101 @@ model Permission {
   updatedAt DateTime @updatedAt
 }
 
-
-// CONFIGURATION 
+// CONFIGURATION
 model Runpack {
-  id          String         @id @default(cuid())
-  name        String
-  language    String
-  fetch       RunpackPhase @relation("fetch", fields: [fetchId], references: [id])
-  fetchId     String
-  build       RunpackPhase @relation("build", fields: [buildId], references: [id])
-  buildId     String
-  run         RunpackPhase @relation("run", fields: [runId], references: [id])
-  runId       String
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id        String       @id @default(cuid())
+  name      String
+  language  String
+  fetch     RunpackPhase @relation("fetch", fields: [fetchId], references: [id])
+  fetchId   String
+  build     RunpackPhase @relation("build", fields: [buildId], references: [id])
+  buildId   String
+  run       RunpackPhase @relation("run", fields: [runId], references: [id])
+  runId     String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 }
 
 model PodSize {
-  id          String   @id @default(cuid())
-  name        String
-  cpuLimit    String
-  memoryLimit String
-  cpuRequest  String
+  id            String   @id @default(cuid())
+  name          String
+  cpuLimit      String
+  memoryLimit   String
+  cpuRequest    String
   memoryRequest String
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model RunpackPhase {
-  id                   String                @id @default(cuid())
-  repository           String
-  tag                  String
-  command              String?
-  readOnlyAppStorage   Boolean
-  securityContext      SecurityContext       @relation("SecurityContextOnRunpackPhase", fields: [securityContextId], references: [id])
-  securityContextId    String
-  RunpacksFetch        Runpack[]           @relation("fetch")
-  RunpacksBuild        Runpack[]           @relation("build")
-  RunpacksRun          Runpack[]           @relation("run")
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  id                 String          @id @default(cuid())
+  repository         String
+  tag                String
+  command            String?
+  readOnlyAppStorage Boolean
+  securityContext    SecurityContext @relation("SecurityContextOnRunpackPhase", fields: [securityContextId], references: [id])
+  securityContextId  String
+  RunpacksFetch      Runpack[]       @relation("fetch")
+  RunpacksBuild      Runpack[]       @relation("build")
+  RunpacksRun        Runpack[]       @relation("run")
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 }
 
 model SecurityContext {
-  id                        String      @id @default(cuid())
-  runAsUser                 Int
-  runAsGroup                Int
-  runAsNonRoot              Boolean
-  readOnlyRootFilesystem    Boolean
-  allowPrivilegeEscalation  Boolean
-  capabilities              Capability[]
-  RunpackPhases             RunpackPhase[] @relation("SecurityContextOnRunpackPhase")
-  createdAt                 DateTime    @default(now())
-  updatedAt                 DateTime    @updatedAt
+  id                       String         @id @default(cuid())
+  runAsUser                Int
+  runAsGroup               Int
+  runAsNonRoot             Boolean
+  readOnlyRootFilesystem   Boolean
+  allowPrivilegeEscalation Boolean
+  capabilities             Capability[]
+  RunpackPhases            RunpackPhase[] @relation("SecurityContextOnRunpackPhase")
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
 }
 
 model Capability {
-  id            String   @id @default(cuid())
+  id            String           @id @default(cuid())
   add           CapabilityAdd[]
   drop          CapabilityDrop[]
   securityCtxId String
-  securityCtx   SecurityContext @relation(fields: [securityCtxId], references: [id])
+  securityCtx   SecurityContext  @relation(fields: [securityCtxId], references: [id])
 }
 
 model CapabilityAdd {
-  id           String      @id @default(cuid())
+  id           String     @id @default(cuid())
   value        String
-  capability   Capability  @relation(fields: [capabilityId], references: [id])
+  capability   Capability @relation(fields: [capabilityId], references: [id])
   capabilityId String
 }
 
 model CapabilityDrop {
-  id           String      @id @default(cuid())
+  id           String     @id @default(cuid())
   value        String
-  capability   Capability  @relation(fields: [capabilityId], references: [id])
+  capability   Capability @relation(fields: [capabilityId], references: [id])
   capabilityId String
 }
 
 // NOTIFICATIONS
 model Notification {
-  id          String   @id @default(cuid())
-  name        String
-  enabled     Boolean  @default(true)
-  type        NotificationType
-  pipelines   String   // JSON string array of pipeline names or "all"
-  events      String   // JSON string array of event names
-  
+  id        String           @id @default(cuid())
+  name      String
+  enabled   Boolean          @default(true)
+  type      NotificationType
+  pipelines String // JSON string array of pipeline names or "all"
+  events    String // JSON string array of event names
+
   // Configuration fields for different notification types
-  webhookUrl     String?
-  webhookSecret  String?
-  slackUrl       String?
-  slackChannel   String?
-  discordUrl     String?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  webhookUrl    String?
+  webhookSecret String?
+  slackUrl      String?
+  slackChannel  String?
+  discordUrl    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum NotificationType {

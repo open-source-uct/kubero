@@ -1,104 +1,104 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class StorageClassDTO {
-  @ApiProperty()
-  name: string;
+	@ApiProperty()
+	name: string;
 
-  @ApiProperty()
-  provisioner: string;
+	@ApiProperty()
+	provisioner: string;
 
-  @ApiProperty()
-  reclaimPolicy: string;
+	@ApiProperty()
+	reclaimPolicy: string;
 
-  @ApiProperty()
-  volumeBindingMode: string;
-  //allowVolumeExpansion: boolean;
-  //mountOptions: string[];
+	@ApiProperty()
+	volumeBindingMode: string;
+	//allowVolumeExpansion: boolean;
+	//mountOptions: string[];
 }
 
 export class ContextDTO {
-  @ApiProperty()
-  cluster: string;
+	@ApiProperty()
+	cluster: string;
 
-  @ApiProperty()
-  name: string;
+	@ApiProperty()
+	name: string;
 
-  @ApiProperty()
-  user: string;
+	@ApiProperty()
+	user: string;
 
-  @ApiPropertyOptional()
-  namespace?: string;
+	@ApiPropertyOptional()
+	namespace?: string;
 }
 
 export class GetEventsDTO {
-  @ApiProperty()
-  count: number;
+	@ApiProperty()
+	count: number;
 
-  @ApiProperty()
-  eventTime: any;
+	@ApiProperty()
+	eventTime: any;
 
-  @ApiProperty()
-  firstTimestamp: string;
+	@ApiProperty()
+	firstTimestamp: string;
 
-  @ApiProperty()
-  involvedObject: {
-    apiVersion: string;
-    kind: string;
-    name: string;
-    namespace: string;
-    resourceVersion: string;
-    uid: string;
-  };
+	@ApiProperty()
+	involvedObject: {
+		apiVersion: string;
+		kind: string;
+		name: string;
+		namespace: string;
+		resourceVersion: string;
+		uid: string;
+	};
 
-  @ApiProperty()
-  lastTimestamp: string;
+	@ApiProperty()
+	lastTimestamp: string;
 
-  @ApiProperty()
-  message: string;
+	@ApiProperty()
+	message: string;
 
-  @ApiProperty()
-  metadata: {
-    creationTimestamp: string;
-    managedFields: Array<{
-      apiVersion: string;
-      fieldsType: string;
-      fieldsV1: {
-        'f:count': object;
-        'f:firstTimestamp': object;
-        'f:involvedObject': object;
-        'f:lastTimestamp': object;
-        'f:message': object;
-        'f:reason': object;
-        'f:source': {
-          'f:component': object;
-        };
-        'f:type': object;
-        'f:reportingComponent'?: object;
-      };
-      manager: string;
-      operation: string;
-      time: string;
-    }>;
-    name: string;
-    namespace: string;
-    resourceVersion: string;
-    uid: string;
-  };
+	@ApiProperty()
+	metadata: {
+		creationTimestamp: string;
+		managedFields: Array<{
+			apiVersion: string;
+			fieldsType: string;
+			fieldsV1: {
+				"f:count": object;
+				"f:firstTimestamp": object;
+				"f:involvedObject": object;
+				"f:lastTimestamp": object;
+				"f:message": object;
+				"f:reason": object;
+				"f:source": {
+					"f:component": object;
+				};
+				"f:type": object;
+				"f:reportingComponent"?: object;
+			};
+			manager: string;
+			operation: string;
+			time: string;
+		}>;
+		name: string;
+		namespace: string;
+		resourceVersion: string;
+		uid: string;
+	};
 
-  @ApiProperty()
-  reason: string;
+	@ApiProperty()
+	reason: string;
 
-  @ApiProperty()
-  reportingComponent: string;
+	@ApiProperty()
+	reportingComponent: string;
 
-  @ApiProperty()
-  reportingInstance: string;
+	@ApiProperty()
+	reportingInstance: string;
 
-  @ApiProperty()
-  source: {
-    component: string;
-  };
+	@ApiProperty()
+	source: {
+		component: string;
+	};
 
-  @ApiProperty()
-  type: string;
+	@ApiProperty()
+	type: string;
 }

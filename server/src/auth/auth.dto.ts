@@ -1,55 +1,55 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty } from 'class-validator';
+import { ApiProperty } from "@nestjs/swagger";
+import { IsNotEmpty, IsString } from "class-validator";
 
 export class GetMethodsDTO {
-  @ApiProperty({ default: false })
-  local: boolean;
+	@ApiProperty({ default: false })
+	local: boolean;
 
-  @ApiProperty({ default: false })
-  github: boolean;
+	@ApiProperty({ default: false })
+	github: boolean;
 
-  @ApiProperty({ default: false })
-  oauth2: boolean;
+	@ApiProperty({ default: false })
+	oauth2: boolean;
 }
 
 export class LoginOKResponseDTO {
-  @ApiProperty()
-  access_token: string;
+	@ApiProperty()
+	access_token: string;
 }
 
 export class LoginDTO {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  username: string;
+	@ApiProperty()
+	@IsString()
+	@IsNotEmpty()
+	username: string;
 
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  password: string;
+	@ApiProperty()
+	@IsString()
+	@IsNotEmpty()
+	password: string;
 }
 
 export class GetSessionDTO {
-  @ApiProperty()
-  isAuthenticated: boolean;
-  @ApiProperty()
-  version: string;
-  @ApiProperty()
-  kubernetesVersion: string;
-  @ApiProperty()
-  operatorVersion: string;
-  @ApiProperty()
-  buildPipeline: boolean;
-  @ApiProperty()
-  templatesEnabled: boolean;
-  @ApiProperty()
-  auditEnabled: boolean;
-  @ApiProperty()
-  adminDisabled: boolean;
-  @ApiProperty()
-  consoleEnabled: boolean;
-  @ApiProperty()
-  metricsEnabled: boolean;
-  @ApiProperty()
-  sleepEnabled: boolean;
+	@ApiProperty()
+	isAuthenticated: boolean;
+	@ApiProperty()
+	version: string;
+	@ApiProperty()
+	kubernetesVersion: string;
+	@ApiProperty()
+	operatorVersion: string;
+	@ApiProperty()
+	buildPipeline: boolean;
+	@ApiProperty()
+	templatesEnabled: boolean;
+	@ApiProperty()
+	auditEnabled: boolean;
+	@ApiProperty()
+	adminDisabled: boolean;
+	@ApiProperty()
+	consoleEnabled: boolean;
+	@ApiProperty()
+	metricsEnabled: boolean;
+	@ApiProperty()
+	sleepEnabled: boolean;
 }
