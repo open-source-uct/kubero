@@ -1,25 +1,6 @@
 <template>
     <v-container>
         <v-row>
-            <v-col cols="6" sm="6" md="6" lg="6" xl="6">
-                <!--
-                <h1>
-                    Logs for {{ app }}
-                </h1>
-                -->
-            </v-col>
-            <v-col cols="6" sm="6" md="6" lg="6" xl="6" class="d-flex justify-end">
-                <v-btn
-                    class="ma-2"
-                    @click="openInWindow"
-                    color="secondary"
-                    >{{ $t('app.actions.openLogs') }}
-                    <v-icon right dark >mdi-open-in-new</v-icon>
-                </v-btn>
-                <p></p>
-            </v-col>
-        </v-row>
-        <v-row>
             <v-col cols="12" sm="12" md="12" style="height: calc(100vh - 400px);">
                 <Logs :pipeline=pipeline :phase=phase :app=app :deploymentstrategy=deploymentstrategy :buildstrategy=buildstrategy :hasAddons=hasAddons :addons=addons logType="runlogs" height="600px"/>
             </v-col>
@@ -67,11 +48,6 @@ export default defineComponent({
     }),
     components: {
         Logs,
-    },
-    methods: {
-        openInWindow() {
-            window.open(`/popup/logs/${this.pipeline}/${this.phase}/${this.app}/${this.deploymentstrategy}/${this.buildstrategy}?hasAddons=${this.hasAddons}`, '_blank', 'popup=yes,location=no,height=1000,width=1000,scrollbars=yes,status=no');
-        }
     },
 });
 </script>
