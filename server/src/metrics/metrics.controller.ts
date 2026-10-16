@@ -95,6 +95,22 @@ export class MetricsController {
     return this.metricsService.getLongTermMetrics('up');
   }
 
+  @Get('/cluster-usage')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('config:write') // agregado de todas las apps de Kubero, sin acotar por equipo
+  @ApiBearerAuth('bearerAuth')
+  @ApiForbiddenResponse({
+    description: 'Error: Unauthorized',
+    type: OKDTO,
+    isArray: false,
+  })
+  @ApiOperation({
+    summary: 'Get total CPU/memory usage across all Kubero apps',
+  })
+  async getClusterUsage() {
+    return this.metricsService.getClusterWideUsage();
+  }
+
   @Get('/timeseries/:type/:pipeline/:phase/:app')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('app:read', 'app:write')

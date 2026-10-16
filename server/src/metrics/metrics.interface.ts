@@ -22,6 +22,15 @@ export interface IMetric {
   }[];
 }
 
+// Agregado del uso real de CPU/memoria de todas las apps de Kubero del
+// cluster entero (no por pipeline) — usado en el panel de Overview.
+export interface IClusterUsage {
+  cpuCores: number;
+  memoryBytes: number;
+  cpuCapacityCores: number;
+  memoryCapacityBytes: number;
+}
+
 export type Rule = {
   alert: any;
   duration: number;
