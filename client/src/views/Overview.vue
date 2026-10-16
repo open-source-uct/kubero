@@ -60,8 +60,8 @@
         </div>
         <div v-if="loading" class="chart-loading"><v-progress-circular indeterminate color="primary" /></div>
         <div v-else-if="totalApps > 0" class="doughnut-chart">
-          <Doughnut :data="appsByPhaseData" :options="doughnutOptions" :aria-label="$t('overview.charts.appsByPhase')" />
-          <div class="doughnut-total" aria-hidden="true"><strong>{{ totalApps }}</strong><span>{{ $t('overview.metrics.apps') }}</span></div>
+          <Doughnut :data="appsByPhaseData" :options="doughnutOptions" :plugins="[doughnutCenterPlugin]" :aria-label="$t('overview.charts.appsByPhase')" />
+          <div class="doughnut-total" :style="doughnutCenter" aria-hidden="true"><strong>{{ totalApps }}</strong><span>{{ $t('overview.metrics.apps') }}</span></div>
         </div>
         <div v-else class="chart-empty"><v-icon icon="mdi-chart-donut" size="30" /><span>{{ $t('overview.charts.noData') }}</span></div>
       </section>
@@ -150,7 +150,7 @@ import { useRouter } from 'vue-router'
 import { useTheme } from 'vuetify'
 import axios from 'axios'
 import { Bar, Doughnut } from 'vue-chartjs'
-import { ArcElement, BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Tooltip, type ChartData, type ChartOptions } from 'chart.js'
+import { ArcElement, BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Tooltip, type ChartData, type ChartOptions, type Plugin } from 'chart.js'
 import { useAuthStore } from '@/stores/auth'
 import { useKuberoStore } from '@/stores/kubero'
 
@@ -180,6 +180,15 @@ const pipelines = ref<PipelineRow[]>([])
 const userCount = ref(0)
 const teamCount = ref(0)
 const lastUpdated = ref<Date | null>(null)
+const doughnutCenter = ref({ left: '50%', top: '50%' })
+const doughnutCenterPlugin: Plugin<'doughnut'> = {
+  id: 'overview-doughnut-center',
+  afterLayout(chart) {
+    // The legend changes the available plot area, especially when it wraps.
+    const { left, right, top, bottom } = chart.chartArea
+    doughnutCenter.value = { left: `${(left + right) / 2}px`, top: `${(top + bottom) / 2}px` }
+  },
+}
 
 const kubero = computed(() => kuberoStore.kubero)
 const clusterHealthy = computed(() => Boolean(kubero.value.kubernetesVersion && kubero.value.kubernetesVersion !== 'unknown'))
@@ -339,7 +348,7 @@ onMounted(() => {
 .panel-heading h2 { margin: 0; color: rgb(var(--v-theme-on-cardBackground)); font-size: 1rem; font-weight: 600; line-height: 1.4; }
 .bar-chart { min-height: 260px; }
 .doughnut-chart { position: relative; height: 320px; }
-.doughnut-total { position: absolute; inset: 42% 0 auto; display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+.doughnut-total { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; }
 .doughnut-total strong { color: rgb(var(--v-theme-on-cardBackground)); font-size: 1.5rem; line-height: 1.1; }
 .doughnut-total span { color: rgb(var(--v-theme-on-cardBackground)); font-size: .6875rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; opacity: .58; }
 .chart-loading, .chart-empty { display: flex; min-height: 280px; flex-direction: column; gap: 10px; align-items: center; justify-content: center; color: rgb(var(--v-theme-on-cardBackground)); opacity: .62; }
