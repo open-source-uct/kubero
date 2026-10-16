@@ -1,5 +1,7 @@
 {
 	"editor.formatOnSave": true,
+	"editor.tabSize": 2,
+	"editor.detectIndentation": false,
 	"biome.requireConfiguration": true,
 	"editor.codeActionsOnSave": {
 		"source.fixAll.biome": "explicit",
