@@ -37,7 +37,17 @@
 		}
 	},
 	"html": {
+		"formatter": {
+			"enabled": true,
+			"indentScriptAndStyle": true
+		},
 		"experimentalFullSupportEnabled": true
+	},
+	"css": {
+		"formatter": {
+			"indentStyle": "tab",
+			"indentWidth": 4
+		}
 	},
 	"assist": {
 		"enabled": true,
