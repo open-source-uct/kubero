@@ -1,215 +1,206 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Logger,
-  Param,
-  Post,
-  Put,
-  UseGuards,
-  Request,
-} from '@nestjs/common';
-import { DeploymentsService } from './deployments.service';
+	Body,
+	Controller,
+	Delete,
+	Get,
+	Logger,
+	Param,
+	Post,
+	Put,
+	Request,
+	UseGuards,
+} from "@nestjs/common";
 import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiForbiddenResponse,
-  ApiOperation,
-  ApiParam,
-} from '@nestjs/swagger';
-import { IUser } from '../auth/auth.interface';
-import { CreateBuild } from './dto/CreateBuild.dto';
-import { OKDTO } from '../common/dto/ok.dto';
-import { JwtAuthGuard } from '../auth/strategies/jwt.guard';
-import { PermissionsGuard } from '../auth/permissions.guard';
-import { Permissions } from '../auth/permissions.decorator';
-import { ReadonlyGuard } from '../common/guards/readonly.guard';
+	ApiBearerAuth,
+	ApiBody,
+	ApiForbiddenResponse,
+	ApiOperation,
+	ApiParam,
+} from "@nestjs/swagger";
+import type { IUser } from "../auth/auth.interface";
+import { Permissions } from "../auth/permissions.decorator";
+import { PermissionsGuard } from "../auth/permissions.guard";
+import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
+import { OKDTO } from "../common/dto/ok.dto";
+import { ReadonlyGuard } from "../common/guards/readonly.guard";
+import type { DeploymentsService } from "./deployments.service";
+import { CreateBuild } from "./dto/CreateBuild.dto";
 
-@Controller({ path: 'api/deployments', version: '1' })
+@Controller({ path: "api/deployments", version: "1" })
 export class DeploymentsController {
-  private readonly logger = new Logger(DeploymentsController.name);
+	private readonly logger = new Logger(DeploymentsController.name);
 
-  constructor(private readonly deploymentsService: DeploymentsService) {}
+	constructor(private readonly deploymentsService: DeploymentsService) {}
 
-  @Get('/:pipeline/:phase/:app')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('app:read', 'app:write')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiBearerAuth('bearerAuth')
-  @ApiOperation({ summary: 'List deployments for a specific app' })
-  @ApiParam({ name: 'pipeline', description: 'Pipeline name' })
-  @ApiParam({ name: 'phase', description: 'Phase name' })
-  @ApiParam({ name: 'app', description: 'App name' })
-  async getDeployments(
-    @Param('pipeline') pipeline: string,
-    @Param('phase') phase: string,
-    @Param('app') app: string,
-    @Request() req: any,
-  ) {
-    return this.deploymentsService.listBuildjobs(
-      pipeline,
-      phase,
-      app,
-      req.user.userGroups,
-    );
-  }
+	@Get("/:pipeline/:phase/:app")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("app:read", "app:write")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiBearerAuth("bearerAuth")
+	@ApiOperation({ summary: "List deployments for a specific app" })
+	@ApiParam({ name: "pipeline", description: "Pipeline name" })
+	@ApiParam({ name: "phase", description: "Phase name" })
+	@ApiParam({ name: "app", description: "App name" })
+	async getDeployments(
+		@Param("pipeline") pipeline: string,
+		@Param("phase") phase: string,
+		@Param("app") app: string,
+		@Request() req: any,
+	) {
+		return this.deploymentsService.listBuildjobs(pipeline, phase, app, req.user.userGroups);
+	}
 
-  @Post('/build/:pipeline/:phase/:app')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('app:write')
-  @UseGuards(ReadonlyGuard)
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiBearerAuth('bearerAuth')
-  @ApiOperation({ summary: 'Build a specific app' })
-  @ApiParam({ name: 'pipeline', description: 'Pipeline name' })
-  @ApiParam({ name: 'phase', description: 'Phase name' })
-  @ApiParam({ name: 'app', description: 'App name' })
-  @ApiBody({
-    type: CreateBuild,
-    required: true,
-    schema: { $ref: '#/components/schemas/CreateBuild' },
-  })
-  async buildApp(
-    @Param('pipeline') pipeline: string,
-    @Param('phase') phase: string,
-    @Param('app') app: string,
-    @Body() body: CreateBuild,
-    @Request() req: any,
-  ) {
-    const user: IUser = {
-      id: req.user.userId,
-      strategy: req.user.strategy,
-      username: req.user.username,
-    };
-    return this.deploymentsService.triggerBuildjob(
-      pipeline,
-      phase,
-      app,
-      body.buildstrategy,
-      body.repository,
-      body.reference,
-      body.dockerfilePath,
-      user,
-      req.user.userGroups,
-    );
-  }
+	@Post("/build/:pipeline/:phase/:app")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("app:write")
+	@UseGuards(ReadonlyGuard)
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiBearerAuth("bearerAuth")
+	@ApiOperation({ summary: "Build a specific app" })
+	@ApiParam({ name: "pipeline", description: "Pipeline name" })
+	@ApiParam({ name: "phase", description: "Phase name" })
+	@ApiParam({ name: "app", description: "App name" })
+	@ApiBody({
+		type: CreateBuild,
+		required: true,
+		schema: { $ref: "#/components/schemas/CreateBuild" },
+	})
+	async buildApp(
+		@Param("pipeline") pipeline: string,
+		@Param("phase") phase: string,
+		@Param("app") app: string,
+		@Body() body: CreateBuild,
+		@Request() req: any,
+	) {
+		const user: IUser = {
+			id: req.user.userId,
+			strategy: req.user.strategy,
+			username: req.user.username,
+		};
+		return this.deploymentsService.triggerBuildjob(
+			pipeline,
+			phase,
+			app,
+			body.buildstrategy,
+			body.repository,
+			body.reference,
+			body.dockerfilePath,
+			user,
+			req.user.userGroups,
+		);
+	}
 
-  @Delete('/:pipeline/:phase/:app/:buildName')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('app:write')
-  @UseGuards(ReadonlyGuard)
-  @ApiBearerAuth('bearerAuth')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOperation({ summary: 'Delete a specific build' })
-  @ApiParam({ name: 'pipeline', description: 'Pipeline name' })
-  @ApiParam({ name: 'phase', description: 'Phase name' })
-  @ApiParam({ name: 'app', description: 'App name' })
-  @ApiParam({ name: 'buildName', description: 'Build name' })
-  async deleteApp(
-    @Param('pipeline') pipeline: string,
-    @Param('phase') phase: string,
-    @Param('app') app: string,
-    @Param('buildName') buildName: string,
-    @Request() req: any,
-  ) {
-    const user: IUser = {
-      id: req.user.userId,
-      strategy: req.user.strategy,
-      username: req.user.username,
-    };
-    return this.deploymentsService.deleteBuildjob(
-      pipeline,
-      phase,
-      app,
-      buildName,
-      user,
-      req.user.userGroups,
-    );
-  }
+	@Delete("/:pipeline/:phase/:app/:buildName")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("app:write")
+	@UseGuards(ReadonlyGuard)
+	@ApiBearerAuth("bearerAuth")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOperation({ summary: "Delete a specific build" })
+	@ApiParam({ name: "pipeline", description: "Pipeline name" })
+	@ApiParam({ name: "phase", description: "Phase name" })
+	@ApiParam({ name: "app", description: "App name" })
+	@ApiParam({ name: "buildName", description: "Build name" })
+	async deleteApp(
+		@Param("pipeline") pipeline: string,
+		@Param("phase") phase: string,
+		@Param("app") app: string,
+		@Param("buildName") buildName: string,
+		@Request() req: any,
+	) {
+		const user: IUser = {
+			id: req.user.userId,
+			strategy: req.user.strategy,
+			username: req.user.username,
+		};
+		return this.deploymentsService.deleteBuildjob(
+			pipeline,
+			phase,
+			app,
+			buildName,
+			user,
+			req.user.userGroups,
+		);
+	}
 
-  @Get('/:pipeline/:phase/:app/:build/:container/history')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('logs:ok')
-  @ApiBearerAuth('bearerAuth')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOperation({ summary: 'Get logs for a specific build' })
-  @ApiParam({ name: 'pipeline', description: 'Pipeline name' })
-  @ApiParam({ name: 'phase', description: 'Phase name' })
-  @ApiParam({ name: 'app', description: 'App name' })
-  @ApiParam({ name: 'build', description: 'Build name' })
-  @ApiParam({ name: 'container', description: 'Container name' })
-  async getLogs(
-    @Param('pipeline') pipeline: string,
-    @Param('phase') phase: string,
-    @Param('app') app: string,
-    @Param('build') build: string,
-    @Param('container') container: string,
-    @Request() req: any,
-  ) {
-    return this.deploymentsService.getBuildLogs(
-      pipeline,
-      phase,
-      app,
-      build,
-      container,
-      req.user.userGroups,
-    );
-  }
+	@Get("/:pipeline/:phase/:app/:build/:container/history")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("logs:ok")
+	@ApiBearerAuth("bearerAuth")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOperation({ summary: "Get logs for a specific build" })
+	@ApiParam({ name: "pipeline", description: "Pipeline name" })
+	@ApiParam({ name: "phase", description: "Phase name" })
+	@ApiParam({ name: "app", description: "App name" })
+	@ApiParam({ name: "build", description: "Build name" })
+	@ApiParam({ name: "container", description: "Container name" })
+	async getLogs(
+		@Param("pipeline") pipeline: string,
+		@Param("phase") phase: string,
+		@Param("app") app: string,
+		@Param("build") build: string,
+		@Param("container") container: string,
+		@Request() req: any,
+	) {
+		return this.deploymentsService.getBuildLogs(
+			pipeline,
+			phase,
+			app,
+			build,
+			container,
+			req.user.userGroups,
+		);
+	}
 
-  @Put('/:pipeline/:phase/:app/:tag')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('app:write')
-  @UseGuards(ReadonlyGuard)
-  @ApiBearerAuth('bearerAuth')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOperation({ summary: 'Deploy a specific tag for an app' })
-  @ApiParam({ name: 'pipeline', description: 'Pipeline name' })
-  @ApiParam({ name: 'phase', description: 'Phase name' })
-  @ApiParam({ name: 'app', description: 'App name' })
-  @ApiParam({ name: 'tag', description: 'Tag to deploy' })
-  async deployTag(
-    @Param('pipeline') pipeline: string,
-    @Param('phase') phase: string,
-    @Param('app') app: string,
-    @Param('tag') tag: string,
-    @Request() req: any,
-  ): Promise<OKDTO> {
-    // el permiso se comprueba antes de responder (403 inmediato); solo el
-    // despliegue en sí corre en segundo plano y un fallo suyo se registra
-    await this.deploymentsService.assertAccess(
-      pipeline,
-      phase,
-      req.user.userGroups,
-    );
-    this.deploymentsService
-      .deployApp(pipeline, phase, app, tag, req.user.userGroups)
-      .catch((error) => {
-        this.logger.error(`deployApp failed for ${app}: ${error}`);
-      });
-    return {
-      message: `Deployment triggered for ${app} in ${pipeline} phase ${phase} with tag ${tag}`,
-      status: 'success',
-    };
-  }
+	@Put("/:pipeline/:phase/:app/:tag")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("app:write")
+	@UseGuards(ReadonlyGuard)
+	@ApiBearerAuth("bearerAuth")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOperation({ summary: "Deploy a specific tag for an app" })
+	@ApiParam({ name: "pipeline", description: "Pipeline name" })
+	@ApiParam({ name: "phase", description: "Phase name" })
+	@ApiParam({ name: "app", description: "App name" })
+	@ApiParam({ name: "tag", description: "Tag to deploy" })
+	async deployTag(
+		@Param("pipeline") pipeline: string,
+		@Param("phase") phase: string,
+		@Param("app") app: string,
+		@Param("tag") tag: string,
+		@Request() req: any,
+	): Promise<OKDTO> {
+		// el permiso se comprueba antes de responder (403 inmediato); solo el
+		// despliegue en sí corre en segundo plano y un fallo suyo se registra
+		await this.deploymentsService.assertAccess(pipeline, phase, req.user.userGroups);
+		this.deploymentsService
+			.deployApp(pipeline, phase, app, tag, req.user.userGroups)
+			.catch((error) => {
+				this.logger.error(`deployApp failed for ${app}: ${error}`);
+			});
+		return {
+			message: `Deployment triggered for ${app} in ${pipeline} phase ${phase} with tag ${tag}`,
+			status: "success",
+		};
+	}
 }

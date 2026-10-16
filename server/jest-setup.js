@@ -1,1 +1,1 @@
-process.env.LOGLEVEL = 'fatal';
+process.env.LOGLEVEL = "fatal";

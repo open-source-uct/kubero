@@ -1,319 +1,298 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ILoglines } from './logs.interface';
-import { KubernetesService } from '../kubernetes/kubernetes.service';
-import { PipelinesService } from '../pipelines/pipelines.service';
-import { AppsService } from '../apps/apps.service';
-import { EventsGateway } from '../events/events.gateway';
-import { Stream } from 'stream';
-import { v4 as uuidv4 } from 'uuid';
+import { Injectable, Logger } from "@nestjs/common";
+import { Stream } from "stream";
+import { v4 as uuidv4 } from "uuid";
+import type { AppsService } from "../apps/apps.service";
+import type { EventsGateway } from "../events/events.gateway";
+import type { KubernetesService } from "../kubernetes/kubernetes.service";
+import type { PipelinesService } from "../pipelines/pipelines.service";
+import type { ILoglines } from "./logs.interface";
 
 @Injectable()
 export class LogsService {
-  private logger = new Logger(LogsService.name);
-  private podLogStreams: string[] = [];
+	private logger = new Logger(LogsService.name);
+	private podLogStreams: string[] = [];
 
-  constructor(
-    private kubectl: KubernetesService,
-    private pipelinesService: PipelinesService,
-    private EventsGateway: EventsGateway,
-    private appsService: AppsService,
-  ) {}
+	constructor(
+		private kubectl: KubernetesService,
+		private pipelinesService: PipelinesService,
+		private EventsGateway: EventsGateway,
+		private appsService: AppsService,
+	) {}
 
-  // Nombre de la instancia de cada addon de la app (es el prefijo de sus pods).
-  // Se toma del recurso principal, igual que en la pestaña de logs del cliente.
-  private addonInstanceNames(app: any): string[] {
-    const names: string[] = [];
-    for (const addon of app?.spec?.addons || []) {
-      const definitions = addon.resourceDefinitions || {};
-      const crd =
-        definitions[addon.kind] ??
-        Object.values(definitions).find((r: any) => r?.kind !== 'Secret');
-      const name = crd?.metadata?.name;
-      if (name) {
-        names.push(name);
-      }
-    }
-    return names;
-  }
+	// Nombre de la instancia de cada addon de la app (es el prefijo de sus pods).
+	// Se toma del recurso principal, igual que en la pestaña de logs del cliente.
+	private addonInstanceNames(app: any): string[] {
+		const names: string[] = [];
+		for (const addon of app?.spec?.addons || []) {
+			const definitions = addon.resourceDefinitions || {};
+			const crd =
+				definitions[addon.kind] ??
+				Object.values(definitions).find((r: any) => r?.kind !== "Secret");
+			const name = crd?.metadata?.name;
+			if (name) {
+				names.push(name);
+			}
+		}
+		return names;
+	}
 
-  private logcolor(str: string) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    let color = '#';
-    for (let i = 0; i < 3; i++) {
-      const value = (hash >> (i * 8)) & 0xff;
-      color += ('00' + value.toString(16)).substring(2);
-    }
-    return color;
-  }
+	private logcolor(str: string) {
+		let hash = 0;
+		for (let i = 0; i < str.length; i++) {
+			hash = str.charCodeAt(i) + ((hash << 5) - hash);
+		}
+		let color = "#";
+		for (let i = 0; i < 3; i++) {
+			const value = (hash >> (i * 8)) & 0xff;
+			color += ("00" + value.toString(16)).substring(2);
+		}
+		return color;
+	}
 
-  public async emitLogs(
-    pipelineName: string,
-    phaseName: string,
-    appName: string,
-    podName: string,
-    container: string,
-    userGroups: string[],
-  ) {
-    const logStream = new Stream.PassThrough();
+	public async emitLogs(
+		pipelineName: string,
+		phaseName: string,
+		appName: string,
+		podName: string,
+		container: string,
+		userGroups: string[],
+	) {
+		const logStream = new Stream.PassThrough();
 
-    logStream.on('data', (chunk: any) => {
-      // use write rather than console.log to prevent double line feed
-      //process.stdout.write(chunk);
-      const roomname = `${pipelineName}-${phaseName}-${appName}`;
-      const logline = {
-        id: uuidv4(),
-        time: new Date().getTime(),
-        pipeline: pipelineName,
-        phase: phaseName,
-        app: appName,
-        pod: podName,
-        podID: podName.split('-')[3] + '-' + podName.split('-')[4],
-        container: container,
-        color: this.logcolor(podName),
-        log: chunk.toString(),
-      };
-      this.EventsGateway.sendLogline(roomname, logline);
-    });
+		logStream.on("data", (chunk: any) => {
+			// use write rather than console.log to prevent double line feed
+			//process.stdout.write(chunk);
+			const roomname = `${pipelineName}-${phaseName}-${appName}`;
+			const logline = {
+				id: uuidv4(),
+				time: new Date().getTime(),
+				pipeline: pipelineName,
+				phase: phaseName,
+				app: appName,
+				pod: podName,
+				podID: podName.split("-")[3] + "-" + podName.split("-")[4],
+				container: container,
+				color: this.logcolor(podName),
+				log: chunk.toString(),
+			};
+			this.EventsGateway.sendLogline(roomname, logline);
+		});
 
-    const contextName = await this.pipelinesService.getContext(
-      pipelineName,
-      phaseName,
-      userGroups,
-    );
-    const namespace = pipelineName + '-' + phaseName;
+		const contextName = await this.pipelinesService.getContext(pipelineName, phaseName, userGroups);
+		const namespace = pipelineName + "-" + phaseName;
 
-    if (contextName) {
-      this.kubectl.setCurrentContext(contextName);
+		if (contextName) {
+			this.kubectl.setCurrentContext(contextName);
 
-      // un pod puede tener varios contenedores, cada uno con su propio stream
-      const streamKey = podName + '/' + container;
+			// un pod puede tener varios contenedores, cada uno con su propio stream
+			const streamKey = podName + "/" + container;
 
-      if (!this.podLogStreams.includes(streamKey)) {
-        this.podLogStreams.push(streamKey);
-        // si el stream se corta o falla se libera, para poder abrirlo de nuevo
-        const release = () => {
-          this.podLogStreams = this.podLogStreams.filter(
-            (k) => k !== streamKey,
-          );
-        };
-        logStream.on('close', release);
-        logStream.on('error', release);
+			if (!this.podLogStreams.includes(streamKey)) {
+				this.podLogStreams.push(streamKey);
+				// si el stream se corta o falla se libera, para poder abrirlo de nuevo
+				const release = () => {
+					this.podLogStreams = this.podLogStreams.filter((k) => k !== streamKey);
+				};
+				logStream.on("close", release);
+				logStream.on("error", release);
 
-        this.kubectl.log
-          .log(namespace, podName, container, logStream, {
-            follow: true,
-            tailLines: 0,
-            pretty: false,
-            timestamps: false,
-          })
-          .then((_res) => {
-            this.logger.debug('logs started for ' + podName + ' ' + container);
-          })
-          .catch((err) => {
-            release();
-            this.logger.error(
-              'Failed to start logs for ' + podName + ' ' + container,
-            );
-            this.logger.error(err?.body?.message ?? err?.message);
-          });
-      } else {
-        this.logger.debug('logs already running ' + podName + ' ' + container);
-      }
-    }
-  }
+				this.kubectl.log
+					.log(namespace, podName, container, logStream, {
+						follow: true,
+						tailLines: 0,
+						pretty: false,
+						timestamps: false,
+					})
+					.then((_res) => {
+						this.logger.debug("logs started for " + podName + " " + container);
+					})
+					.catch((err) => {
+						release();
+						this.logger.error("Failed to start logs for " + podName + " " + container);
+						this.logger.error(err?.body?.message ?? err?.message);
+					});
+			} else {
+				this.logger.debug("logs already running " + podName + " " + container);
+			}
+		}
+	}
 
-  public async startLogging(
-    pipelineName: string,
-    phaseName: string,
-    appName: string,
-    userGroups: string[],
-  ) {
-    const contextName = await this.pipelinesService.getContext(
-      pipelineName,
-      phaseName,
-      userGroups,
-    );
-    const namespace = pipelineName + '-' + phaseName;
+	public async startLogging(
+		pipelineName: string,
+		phaseName: string,
+		appName: string,
+		userGroups: string[],
+	) {
+		const contextName = await this.pipelinesService.getContext(pipelineName, phaseName, userGroups);
+		const namespace = pipelineName + "-" + phaseName;
 
-    if (contextName) {
-      const pods = await this.kubectl.getPods(namespace, contextName);
-      for (const pod of pods) {
-        if (pod.metadata?.name?.startsWith(appName + '-kuberoapp')) {
-          for (const container of pod.spec?.containers || []) {
-            await this.emitLogs(
-              pipelineName,
-              phaseName,
-              appName,
-              pod.metadata.name,
-              container.name,
-              userGroups,
-            );
-          }
-          /* TODO needs some improvements since it wont load web anymore
+		if (contextName) {
+			const pods = await this.kubectl.getPods(namespace, contextName);
+			for (const pod of pods) {
+				if (pod.metadata?.name?.startsWith(appName + "-kuberoapp")) {
+					for (const container of pod.spec?.containers || []) {
+						await this.emitLogs(
+							pipelineName,
+							phaseName,
+							appName,
+							pod.metadata.name,
+							container.name,
+							userGroups,
+						);
+					}
+					/* TODO needs some improvements since it wont load web anymore
           for (const initcontainer of pod.spec.initContainers) {
               this.emitLogs(pipelineName, phaseName, appName, pod.metadata.name, initcontainer.name);
           }
           */
-        }
-      }
-    }
-  }
+				}
+			}
+		}
+	}
 
-  public async getLogsHistory(
-    pipelineName: string,
-    phaseName: string,
-    appName: string,
-    container: string,
-    userGroups: string[],
-  ) {
-    const contextName = await this.pipelinesService.getContext(
-      pipelineName,
-      phaseName,
-      userGroups,
-    );
-    const namespace = pipelineName + '-' + phaseName;
+	public async getLogsHistory(
+		pipelineName: string,
+		phaseName: string,
+		appName: string,
+		container: string,
+		userGroups: string[],
+	) {
+		const contextName = await this.pipelinesService.getContext(pipelineName, phaseName, userGroups);
+		const namespace = pipelineName + "-" + phaseName;
 
-    if (!['web', 'builder', 'fetcher', 'addons'].includes(container)) {
-      console.log('unknown container: ' + container);
-      return [];
-    }
+		if (!["web", "builder", "fetcher", "addons"].includes(container)) {
+			console.log("unknown container: " + container);
+			return [];
+		}
 
-    // Los pods de la app siempre son <app>-kuberoapp-*; todo lo demás que
-    // empiece con <app>- (ej. la base de datos) es de un addon.
-    const appPrefix = appName + '-kuberoapp';
+		// Los pods de la app siempre son <app>-kuberoapp-*; todo lo demás que
+		// empiece con <app>- (ej. la base de datos) es de un addon.
+		const appPrefix = appName + "-kuberoapp";
 
-    let loglines: ILoglines[] = [];
-    if (contextName) {
-      // Los pods de addon se identifican por el nombre exacto de cada addon de
-      // esta app. Un prefijo no alcanza: "server-api" empieza con "server-".
-      const addonNames =
-        container == 'addons'
-          ? this.addonInstanceNames(
-              await this.appsService.getApp(
-                pipelineName,
-                phaseName,
-                appName,
-                userGroups,
-              ),
-            )
-          : [];
-      const pods = await this.kubectl.getPods(namespace, contextName);
-      for (const pod of pods) {
-        const podName = pod.metadata?.name;
-        if (!podName) {
-          continue;
-        }
-        const isJob = !!pod.metadata?.labels?.['job-name'];
+		let loglines: ILoglines[] = [];
+		if (contextName) {
+			// Los pods de addon se identifican por el nombre exacto de cada addon de
+			// esta app. Un prefijo no alcanza: "server-api" empieza con "server-".
+			const addonNames =
+				container == "addons"
+					? this.addonInstanceNames(
+							await this.appsService.getApp(pipelineName, phaseName, appName, userGroups),
+						)
+					: [];
+			const pods = await this.kubectl.getPods(namespace, contextName);
+			for (const pod of pods) {
+				const podName = pod.metadata?.name;
+				if (!podName) {
+					continue;
+				}
+				const isJob = !!pod.metadata?.labels?.["job-name"];
 
-        if (container == 'web' && podName.startsWith(appPrefix) && !isJob) {
-          // only fetch logs for the web container, exclude job pods (builds)
-          for (const c of pod.spec?.containers || []) {
-            const ll = await this.fetchLogs(
-              namespace,
-              podName,
-              c.name,
-              pipelineName,
-              phaseName,
-              appName,
-            );
-            loglines = loglines.concat(ll);
-          }
-        } else if (
-          (container == 'builder' || container == 'fetcher') &&
-          podName.startsWith(appPrefix)
-        ) {
-          const ll = await this.fetchLogs(
-            namespace,
-            podName,
-            'kuberoapp-' + container,
-            pipelineName,
-            phaseName,
-            appName,
-          );
-          loglines = loglines.concat(ll);
-        } else if (
-          container == 'addons' &&
-          !podName.includes('-kuberoapp-') &&
-          !isJob &&
-          addonNames.some((name) => podName.startsWith(name + '-'))
-        ) {
-          for (const c of pod.spec?.containers || []) {
-            const ll = await this.fetchLogs(
-              namespace,
-              podName,
-              c.name,
-              pipelineName,
-              phaseName,
-              appName,
-            );
-            loglines = loglines.concat(ll);
-          }
-        }
-      }
-    }
-    // lo más nuevo primero, igual que las líneas en vivo (unshift en el cliente)
-    return loglines.sort((a, b) => b.time - a.time);
-  }
+				if (container == "web" && podName.startsWith(appPrefix) && !isJob) {
+					// only fetch logs for the web container, exclude job pods (builds)
+					for (const c of pod.spec?.containers || []) {
+						const ll = await this.fetchLogs(
+							namespace,
+							podName,
+							c.name,
+							pipelineName,
+							phaseName,
+							appName,
+						);
+						loglines = loglines.concat(ll);
+					}
+				} else if (
+					(container == "builder" || container == "fetcher") &&
+					podName.startsWith(appPrefix)
+				) {
+					const ll = await this.fetchLogs(
+						namespace,
+						podName,
+						"kuberoapp-" + container,
+						pipelineName,
+						phaseName,
+						appName,
+					);
+					loglines = loglines.concat(ll);
+				} else if (
+					container == "addons" &&
+					!podName.includes("-kuberoapp-") &&
+					!isJob &&
+					addonNames.some((name) => podName.startsWith(name + "-"))
+				) {
+					for (const c of pod.spec?.containers || []) {
+						const ll = await this.fetchLogs(
+							namespace,
+							podName,
+							c.name,
+							pipelineName,
+							phaseName,
+							appName,
+						);
+						loglines = loglines.concat(ll);
+					}
+				}
+			}
+		}
+		// lo más nuevo primero, igual que las líneas en vivo (unshift en el cliente)
+		return loglines.sort((a, b) => b.time - a.time);
+	}
 
-  public async fetchLogs(
-    namespace: string,
-    podName: string,
-    containerName: string,
-    pipelineName: string,
-    phaseName: string,
-    appName: string,
-  ): Promise<ILoglines[]> {
-    const loglines: ILoglines[] = [];
+	public async fetchLogs(
+		namespace: string,
+		podName: string,
+		containerName: string,
+		pipelineName: string,
+		phaseName: string,
+		appName: string,
+	): Promise<ILoglines[]> {
+		const loglines: ILoglines[] = [];
 
-    const logStream = new Stream.PassThrough();
-    let logs: string = '';
-    logStream.on('data', (chunk: any) => {
-      //console.log(chunk.toString());
-      logs += chunk.toString();
-    });
+		const logStream = new Stream.PassThrough();
+		let logs: string = "";
+		logStream.on("data", (chunk: any) => {
+			//console.log(chunk.toString());
+			logs += chunk.toString();
+		});
 
-    try {
-      await this.kubectl.log.log(namespace, podName, containerName, logStream, {
-        follow: false,
-        tailLines: 80,
-        pretty: false,
-        timestamps: true,
-      });
-    } catch {
-      console.log('error getting logs for ' + podName + ' ' + containerName);
-      return [];
-    }
+		try {
+			await this.kubectl.log.log(namespace, podName, containerName, logStream, {
+				follow: false,
+				tailLines: 80,
+				pretty: false,
+				timestamps: true,
+			});
+		} catch {
+			console.log("error getting logs for " + podName + " " + containerName);
+			return [];
+		}
 
-    // sleep for 1 second to wait for all logs to be collected
-    await new Promise((r) => setTimeout(r, 300));
+		// sleep for 1 second to wait for all logs to be collected
+		await new Promise((r) => setTimeout(r, 300));
 
-    // split loglines into array
-    const loglinesArray = logs.split('\n').reverse();
-    for (const logline of loglinesArray) {
-      if (logline.length > 0) {
-        // split after first whitespace
-        const loglineArray = logline.split(/(?<=^\S+)\s/);
-        const loglineDate = new Date(loglineArray[0]);
-        const loglineText = loglineArray[1];
+		// split loglines into array
+		const loglinesArray = logs.split("\n").reverse();
+		for (const logline of loglinesArray) {
+			if (logline.length > 0) {
+				// split after first whitespace
+				const loglineArray = logline.split(/(?<=^\S+)\s/);
+				const loglineDate = new Date(loglineArray[0]);
+				const loglineText = loglineArray[1];
 
-        loglines.push({
-          id: uuidv4(),
-          time: loglineDate.getTime(),
-          pipeline: pipelineName,
-          phase: phaseName,
-          app: appName,
-          pod: podName,
-          podID: podName.split('-')[3] + '-' + podName.split('-')[4],
-          container: containerName,
-          color: this.logcolor(podName),
-          log: loglineText,
-        });
-      }
-    }
+				loglines.push({
+					id: uuidv4(),
+					time: loglineDate.getTime(),
+					pipeline: pipelineName,
+					phase: phaseName,
+					app: appName,
+					pod: podName,
+					podID: podName.split("-")[3] + "-" + podName.split("-")[4],
+					container: containerName,
+					color: this.logcolor(podName),
+					log: loglineText,
+				});
+			}
+		}
 
-    return loglines;
-  }
+		return loglines;
+	}
 }

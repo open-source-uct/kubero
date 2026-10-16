@@ -1,11 +1,11 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsNotEmpty, IsString } from "class-validator";
 
 export class ValidateKubeconfigDto {
-  @IsString()
-  @IsNotEmpty()
-  kubeconfig: string;
+	@IsString()
+	@IsNotEmpty()
+	kubeconfig: string;
 
-  @IsString()
-  @IsNotEmpty()
-  context: string;
+	@IsString()
+	@IsNotEmpty()
+	context: string;
 }

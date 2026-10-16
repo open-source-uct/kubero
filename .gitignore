@@ -1,6 +1,6 @@
-dist
+**/dist
 .env
-node_modules
+**/node_modules
 
 .odo/odo-file-index.json
 
@@ -19,5 +19,22 @@ config.yaml
 db
 
 .claude/settings.local.json
-*.sqlite
-.DS_Store
+**/*.sqlite
+**/.DS_Store
+
+# Log files
+npm-debug.log*
+pnpm-debug.log*
+
+# Editor directories and files
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Playwright & E2E Test Artifacts
+**/test-results/
+**/playwright-report/
+**/e2e/.auth/

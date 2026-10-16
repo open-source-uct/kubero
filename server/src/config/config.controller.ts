@@ -1,514 +1,507 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Post,
-  Put,
-  Request,
-  UseGuards,
-} from '@nestjs/common';
-//import { ApiTags } from '@nestjs/swagger';
-import { ConfigService } from './config.service';
+	BadRequestException,
+	Body,
+	Controller,
+	Delete,
+	Get,
+	Param,
+	Post,
+	Put,
+	Request,
+	UseGuards,
+} from "@nestjs/common";
 import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiForbiddenResponse,
-  ApiOperation,
-  ApiParam,
-} from '@nestjs/swagger';
-import { OKDTO } from '../common/dto/ok.dto';
-import { JwtAuthGuard } from '../auth/strategies/jwt.guard';
-import { ReadonlyGuard } from '../common/guards/readonly.guard';
-import { PermissionsGuard } from '../auth/permissions.guard';
-import { Permissions } from '../auth/permissions.decorator';
-import { PodSize } from './podsize/podsize';
-import { CreatePodSizeDto, UpdatePodSizeDto } from './podsize/podsize.dto';
-import { CreateRunpackDto } from './dto/runpack.dto';
-import { ValidateKubeconfigDto } from './dto/validate-kubeconfig.dto';
-import { UpdateRunningConfigDto } from './dto/update-running-config.dto';
-import { SettingsValidationDto } from './dto/settings-validation.dto';
-import { validate } from 'class-validator';
-import { plainToInstance } from 'class-transformer';
-import { BadRequestException } from '@nestjs/common';
-import { flattenValidationErrors } from '../common/utils/validation.util';
+	ApiBearerAuth,
+	ApiBody,
+	ApiForbiddenResponse,
+	ApiOperation,
+	ApiParam,
+} from "@nestjs/swagger";
+import { plainToInstance } from "class-transformer";
+import { validate } from "class-validator";
+import { Permissions } from "../auth/permissions.decorator";
+import { PermissionsGuard } from "../auth/permissions.guard";
+import { JwtAuthGuard } from "../auth/strategies/jwt.guard";
+import { OKDTO } from "../common/dto/ok.dto";
+import { ReadonlyGuard } from "../common/guards/readonly.guard";
+import { flattenValidationErrors } from "../common/utils/validation.util";
+//import { ApiTags } from '@nestjs/swagger';
+import type { ConfigService } from "./config.service";
+import type { CreateRunpackDto } from "./dto/runpack.dto";
+import { SettingsValidationDto } from "./dto/settings-validation.dto";
+import type { UpdateRunningConfigDto } from "./dto/update-running-config.dto";
+import type { ValidateKubeconfigDto } from "./dto/validate-kubeconfig.dto";
+import { PodSize } from "./podsize/podsize";
+import type { CreatePodSizeDto, UpdatePodSizeDto } from "./podsize/podsize.dto";
 
-@Controller({ path: 'api/config', version: '1' })
+@Controller({ path: "api/config", version: "1" })
 export class ConfigController {
-  constructor(private readonly configService: ConfigService) {}
+	constructor(private readonly configService: ConfigService) {}
 
-  @Get('/')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:read', 'config:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiOperation({ summary: 'Get the Kubero settings' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  async getSettings(@Request() req: any) {
-    const settings: any = await this.configService.getSettings();
-    return this.redactSettings(settings, req);
-  }
+	@Get("/")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("config:read", "config:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiOperation({ summary: "Get the Kubero settings" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	async getSettings(@Request() req: any) {
+		const settings: any = await this.configService.getSettings();
+		return this.redactSettings(settings, req);
+	}
 
-  // GET /api/config devuelve los tokens de acceso de GitHub/Gitea/GitLab/Gogs,
-  // la contraseña de Bitbucket, el secreto del webhook y los secretos de
-  // cliente. Antes los recibía cualquiera con config:read, permiso que un rol de
-  // estudiante necesita para ver podsizes y runpacks al crear una app. Ahora
-  // solo los ve quien tiene config:write; el resto recibe los valores
-  // enmascarados (las URLs base y el usuario de Bitbucket no son secretos).
-  private redactSettings(settings: any, req: any) {
-    const permissions: string[] = req?.user?.permissions ?? [];
-    if (!settings || permissions.includes('config:write')) {
-      return settings;
-    }
-    const mask = (value: unknown) => (value ? '********' : value);
-    const clean = { ...settings };
-    if (settings.secrets) {
-      clean.secrets = Object.fromEntries(
-        Object.entries(settings.secrets).map(([key, value]) => [
-          key,
-          key.endsWith('_BASEURL') || key === 'BITBUCKET_USERNAME'
-            ? value
-            : mask(value),
-        ]),
-      );
-    }
-    const account = settings.settings?.registry?.account;
-    if (account) {
-      clean.settings = {
-        ...settings.settings,
-        registry: {
-          ...settings.settings.registry,
-          account: {
-            ...account,
-            password: mask(account.password),
-            hash: mask(account.hash),
-          },
-        },
-      };
-    }
-    return clean;
-  }
+	// GET /api/config devuelve los tokens de acceso de GitHub/Gitea/GitLab/Gogs,
+	// la contraseña de Bitbucket, el secreto del webhook y los secretos de
+	// cliente. Antes los recibía cualquiera con config:read, permiso que un rol de
+	// estudiante necesita para ver podsizes y runpacks al crear una app. Ahora
+	// solo los ve quien tiene config:write; el resto recibe los valores
+	// enmascarados (las URLs base y el usuario de Bitbucket no son secretos).
+	private redactSettings(settings: any, req: any) {
+		const permissions: string[] = req?.user?.permissions ?? [];
+		if (!settings || permissions.includes("config:write")) {
+			return settings;
+		}
+		const mask = (value: unknown) => (value ? "********" : value);
+		const clean = { ...settings };
+		if (settings.secrets) {
+			clean.secrets = Object.fromEntries(
+				Object.entries(settings.secrets).map(([key, value]) => [
+					key,
+					key.endsWith("_BASEURL") || key === "BITBUCKET_USERNAME" ? value : mask(value),
+				]),
+			);
+		}
+		const account = settings.settings?.registry?.account;
+		if (account) {
+			clean.settings = {
+				...settings.settings,
+				registry: {
+					...settings.settings.registry,
+					account: {
+						...account,
+						password: mask(account.password),
+						hash: mask(account.hash),
+					},
+				},
+			};
+		}
+		return clean;
+	}
 
-  @Post('/')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:write')
-  @UseGuards(ReadonlyGuard)
-  @ApiBearerAuth('bearerAuth')
-  @ApiOperation({ summary: 'Update the Kubero settings' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  //@ApiBody({ type: OKDTO })
-  async updateSettings(@Body() body: any) {
-    if (!body?.settings?.kubero) {
-      throw new BadRequestException(['settings.kubero is required']);
-    }
-    const validationErrors = await validate(
-      plainToInstance(SettingsValidationDto, body.settings.kubero),
-    );
-    if (validationErrors.length > 0) {
-      throw new BadRequestException(flattenValidationErrors(validationErrors));
-    }
-    return this.configService.updateSettings(body);
-  }
+	@Post("/")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("config:write")
+	@UseGuards(ReadonlyGuard)
+	@ApiBearerAuth("bearerAuth")
+	@ApiOperation({ summary: "Update the Kubero settings" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	//@ApiBody({ type: OKDTO })
+	async updateSettings(@Body() body: any) {
+		if (!body?.settings?.kubero) {
+			throw new BadRequestException(["settings.kubero is required"]);
+		}
+		const validationErrors = await validate(
+			plainToInstance(SettingsValidationDto, body.settings.kubero),
+		);
+		if (validationErrors.length > 0) {
+			throw new BadRequestException(flattenValidationErrors(validationErrors));
+		}
+		return this.configService.updateSettings(body);
+	}
 
-  @Get('/banner')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('bearerAuth')
-  @ApiOperation({ summary: 'Get the banner informations' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  async getBanner() {
-    return this.configService.getBanner();
-  }
+	@Get("/banner")
+	@UseGuards(JwtAuthGuard)
+	@ApiBearerAuth("bearerAuth")
+	@ApiOperation({ summary: "Get the banner informations" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	async getBanner() {
+		return this.configService.getBanner();
+	}
 
-  @Get('/templates')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:read', 'config:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiOperation({ summary: 'Get the templates settings' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  async getTemplates() {
-    return this.configService.getTemplateConfig();
-  }
+	@Get("/templates")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("config:read", "config:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiOperation({ summary: "Get the templates settings" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	async getTemplates() {
+		return this.configService.getTemplateConfig();
+	}
 
-  @Get('/registry')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  // trae las credenciales del registry y el client no la usa: solo config:write
-  @Permissions('config:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiOperation({ summary: 'Get the registry settings' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  async getRegistry() {
-    return this.configService.getRegistry();
-  }
+	@Get("/registry")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	// trae las credenciales del registry y el client no la usa: solo config:write
+	@Permissions("config:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiOperation({ summary: "Get the registry settings" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	async getRegistry() {
+		return this.configService.getRegistry();
+	}
 
-  @Get('/runpacks')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:read', 'config:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiOperation({ summary: 'List runpacks' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  async getRunpacks() {
-    return this.configService.getRunpacks();
-  }
+	@Get("/runpacks")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("config:read", "config:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiOperation({ summary: "List runpacks" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	async getRunpacks() {
+		return this.configService.getRunpacks();
+	}
 
-  @Delete('/runpacks/:id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiOperation({ summary: 'Delete a runpack' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiParam({ name: 'id', description: 'Runpack ID to delete' })
-  async deleteRunpack(@Param('id') id: string) {
-    return this.configService.deleteRunpack(id);
-  }
+	@Delete("/runpacks/:id")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("config:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiOperation({ summary: "Delete a runpack" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiParam({ name: "id", description: "Runpack ID to delete" })
+	async deleteRunpack(@Param("id") id: string) {
+		return this.configService.deleteRunpack(id);
+	}
 
-  @Post('/runpacks')
-  @UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
-  @Permissions('config:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiOperation({ summary: 'Add a new runpack' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiBody({
-    required: true,
-    schema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Runpack name',
-        },
-        language: {
-          type: 'string',
-          description: 'Programming language of the runpack',
-        },
-      },
-      // Additional properties for fetch, build, and run phases
-    },
-  })
-  async addRunpack(@Body() body: CreateRunpackDto) {
-    return this.configService.createRunpack(body);
-  }
+	@Post("/runpacks")
+	@UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
+	@Permissions("config:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiOperation({ summary: "Add a new runpack" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiBody({
+		required: true,
+		schema: {
+			type: "object",
+			properties: {
+				name: {
+					type: "string",
+					description: "Runpack name",
+				},
+				language: {
+					type: "string",
+					description: "Programming language of the runpack",
+				},
+			},
+			// Additional properties for fetch, build, and run phases
+		},
+	})
+	async addRunpack(@Body() body: CreateRunpackDto) {
+		return this.configService.createRunpack(body);
+	}
 
-  @Get('/clusterissuer')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:read', 'config:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiOperation({ summary: 'Get the configured cluster issuer' })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('bearerAuth')
-  async getClusterIssuer() {
-    return this.configService.getClusterIssuer();
-  }
+	@Get("/clusterissuer")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("config:read", "config:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiOperation({ summary: "Get the configured cluster issuer" })
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@UseGuards(JwtAuthGuard)
+	@ApiBearerAuth("bearerAuth")
+	async getClusterIssuer() {
+		return this.configService.getClusterIssuer();
+	}
 
-  @Get('/podsizes')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:read', 'config:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOperation({ summary: 'List available pod sizes' })
-  async getPodSizes() {
-    return this.configService.getPodSizes();
-  }
+	@Get("/podsizes")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("config:read", "config:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOperation({ summary: "List available pod sizes" })
+	async getPodSizes() {
+		return this.configService.getPodSizes();
+	}
 
-  @Post('/podsizes')
-  @UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
-  @Permissions('config:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOperation({ summary: 'Add a new pod size' })
-  @ApiBody({
-    required: true,
-    schema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Pod size name',
-        },
-        description: {
-          type: 'string',
-          description: 'Description of the pod size',
-        },
-        cpuLimit: {
-          type: 'string',
-          description: 'CPU limit for the pod size (e.g., "2")',
-        },
-        memoryLimit: {
-          type: 'string',
-          description: 'Memory limit for the pod size (e.g., "4Gi")',
-        },
-        cpuRequest: {
-          type: 'string',
-          description: 'CPU request for the pod size (e.g., "1")',
-        },
-        memoryRequest: {
-          type: 'string',
-          description: 'Memory request for the pod size (e.g., "2Gi")',
-        },
-      },
-    },
-  })
-  async addPodSize(@Body() body: CreatePodSizeDto) {
-    const podsize = new PodSize({
-      name: body.name,
-      description: body.description,
-      resources: {
-        requests: {
-          memory: body.resources.requests.memory,
-          cpu: body.resources.requests.cpu,
-        },
-        limits: {
-          memory: body.resources.limits.memory,
-          cpu: body.resources.limits.cpu,
-        },
-      },
-    });
-    return this.configService.addPodSize(podsize);
-  }
+	@Post("/podsizes")
+	@UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
+	@Permissions("config:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOperation({ summary: "Add a new pod size" })
+	@ApiBody({
+		required: true,
+		schema: {
+			type: "object",
+			properties: {
+				name: {
+					type: "string",
+					description: "Pod size name",
+				},
+				description: {
+					type: "string",
+					description: "Description of the pod size",
+				},
+				cpuLimit: {
+					type: "string",
+					description: 'CPU limit for the pod size (e.g., "2")',
+				},
+				memoryLimit: {
+					type: "string",
+					description: 'Memory limit for the pod size (e.g., "4Gi")',
+				},
+				cpuRequest: {
+					type: "string",
+					description: 'CPU request for the pod size (e.g., "1")',
+				},
+				memoryRequest: {
+					type: "string",
+					description: 'Memory request for the pod size (e.g., "2Gi")',
+				},
+			},
+		},
+	})
+	async addPodSize(@Body() body: CreatePodSizeDto) {
+		const podsize = new PodSize({
+			name: body.name,
+			description: body.description,
+			resources: {
+				requests: {
+					memory: body.resources.requests.memory,
+					cpu: body.resources.requests.cpu,
+				},
+				limits: {
+					memory: body.resources.limits.memory,
+					cpu: body.resources.limits.cpu,
+				},
+			},
+		});
+		return this.configService.addPodSize(podsize);
+	}
 
-  @Delete('/podsizes/:id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
-  @Permissions('config:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOperation({ summary: 'Delete a pod size' })
-  @ApiParam({ name: 'id', description: 'Pod size ID to delete' })
-  async deletePodSize(@Param('id') id: string) {
-    if (!id) {
-      throw new Error('Pod size ID is required');
-    }
-    return this.configService.deletePodSize(id);
-  }
+	@Delete("/podsizes/:id")
+	@UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
+	@Permissions("config:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOperation({ summary: "Delete a pod size" })
+	@ApiParam({ name: "id", description: "Pod size ID to delete" })
+	async deletePodSize(@Param("id") id: string) {
+		if (!id) {
+			throw new Error("Pod size ID is required");
+		}
+		return this.configService.deletePodSize(id);
+	}
 
-  @Put('/podsizes/:id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
-  @Permissions('config:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOperation({ summary: 'Update a pod size' })
-  @ApiParam({ name: 'id', description: 'Pod size ID to update' })
-  @ApiBody({
-    required: true,
-    schema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Pod size name',
-        },
-        description: {
-          type: 'string',
-          description: 'Description of the pod size',
-        },
-        cpuLimit: {
-          type: 'string',
-          description: 'CPU limit for the pod size (e.g., "2")',
-        },
-        memoryLimit: {
-          type: 'string',
-          description: 'Memory limit for the pod size (e.g., "4Gi")',
-        },
-        cpuRequest: {
-          type: 'string',
-          description: 'CPU request for the pod size (e.g., "1")',
-        },
-        memoryRequest: {
-          type: 'string',
-          description: 'Memory request for the pod size (e.g., "2Gi")',
-        },
-      },
-    },
-  })
-  async updatePodSize(@Param('id') id: string, @Body() body: UpdatePodSizeDto) {
-    const podsize = new PodSize({
-      name: body.name,
-      description: body.description,
-      resources: {
-        requests: {
-          memory: body.resources.requests.memory,
-          cpu: body.resources.requests.cpu,
-        },
-        limits: {
-          memory: body.resources.limits.memory,
-          cpu: body.resources.limits.cpu,
-        },
-      },
-    });
-    return this.configService.updatePodSize(id, podsize);
-  }
+	@Put("/podsizes/:id")
+	@UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
+	@Permissions("config:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOperation({ summary: "Update a pod size" })
+	@ApiParam({ name: "id", description: "Pod size ID to update" })
+	@ApiBody({
+		required: true,
+		schema: {
+			type: "object",
+			properties: {
+				name: {
+					type: "string",
+					description: "Pod size name",
+				},
+				description: {
+					type: "string",
+					description: "Description of the pod size",
+				},
+				cpuLimit: {
+					type: "string",
+					description: 'CPU limit for the pod size (e.g., "2")',
+				},
+				memoryLimit: {
+					type: "string",
+					description: 'Memory limit for the pod size (e.g., "4Gi")',
+				},
+				cpuRequest: {
+					type: "string",
+					description: 'CPU request for the pod size (e.g., "1")',
+				},
+				memoryRequest: {
+					type: "string",
+					description: 'Memory request for the pod size (e.g., "2Gi")',
+				},
+			},
+		},
+	})
+	async updatePodSize(@Param("id") id: string, @Body() body: UpdatePodSizeDto) {
+		const podsize = new PodSize({
+			name: body.name,
+			description: body.description,
+			resources: {
+				requests: {
+					memory: body.resources.requests.memory,
+					cpu: body.resources.requests.cpu,
+				},
+				limits: {
+					memory: body.resources.limits.memory,
+					cpu: body.resources.limits.cpu,
+				},
+			},
+		});
+		return this.configService.updatePodSize(id, podsize);
+	}
 
-  @Get('/setup/check/:component')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:read', 'config:write')
-  @ApiBearerAuth('bearerAuth')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOperation({ summary: 'Check the setup' })
-  @ApiParam({ name: 'component', description: 'Component to check' })
-  async checkComponent(@Param('component') component: string) {
-    return this.configService.checkComponent(component);
-  }
+	@Get("/setup/check/:component")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("config:read", "config:write")
+	@ApiBearerAuth("bearerAuth")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOperation({ summary: "Check the setup" })
+	@ApiParam({ name: "component", description: "Component to check" })
+	async checkComponent(@Param("component") component: string) {
+		return this.configService.checkComponent(component);
+	}
 
-  @Post('/setup/kubeconfig/validate')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:write')
-  @UseGuards(ReadonlyGuard)
-  @ApiBearerAuth('bearerAuth')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOperation({ summary: 'Validate the provided kubeconfig' })
-  @ApiBody({
-    required: true,
-    schema: {
-      type: 'object',
-      properties: {
-        kubeconfig: {
-          type: 'string',
-          description: 'Kubeconfig content as a string',
-        },
-        context: {
-          type: 'string',
-          description: 'Kubernetes context to validate',
-        },
-      },
-    },
-  })
-  async validateKubeconfig(@Body() body: ValidateKubeconfigDto) {
-    const result = await this.configService.validateKubeconfig(
-      body.kubeconfig,
-      body.context,
-    );
-    return result;
-  }
+	@Post("/setup/kubeconfig/validate")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("config:write")
+	@UseGuards(ReadonlyGuard)
+	@ApiBearerAuth("bearerAuth")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOperation({ summary: "Validate the provided kubeconfig" })
+	@ApiBody({
+		required: true,
+		schema: {
+			type: "object",
+			properties: {
+				kubeconfig: {
+					type: "string",
+					description: "Kubeconfig content as a string",
+				},
+				context: {
+					type: "string",
+					description: "Kubernetes context to validate",
+				},
+			},
+		},
+	})
+	async validateKubeconfig(@Body() body: ValidateKubeconfigDto) {
+		const result = await this.configService.validateKubeconfig(body.kubeconfig, body.context);
+		return result;
+	}
 
-  @Post('/setup/save')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:write')
-  @UseGuards(ReadonlyGuard)
-  @ApiBearerAuth('bearerAuth')
-  @ApiForbiddenResponse({
-    description: 'Error: Unauthorized',
-    type: OKDTO,
-    isArray: false,
-  })
-  @ApiOperation({ summary: 'Save the running configuration' })
-  @ApiBody({
-    required: true,
-    schema: {
-      type: 'object',
-      properties: {
-        KUBECONFIG_BASE64: {
-          type: 'string',
-          description: 'Base64 encoded kubeconfig',
-        },
-        KUBERO_CONTEXT: {
-          type: 'string',
-          description: 'Kubernetes context to use',
-        },
-        KUBERO_NAMESPACE: {
-          type: 'string',
-          description: 'Namespace for Kubero',
-        },
-        KUBERO_SESSION_KEY: {
-          type: 'string',
-          description: 'Session key for Kubero',
-        },
-        KUBERO_WEBHOOK_SECRET: {
-          type: 'string',
-          description: 'Webhook secret for Kubero',
-        },
-      },
-    },
-  })
-  async updateRunningConfig(@Body() body: UpdateRunningConfigDto) {
-    const kubeconfigBase64 = body.KUBECONFIG_BASE64;
-    const kubeContext = body.KUBERO_CONTEXT;
-    const kuberoNamespace = body.KUBERO_NAMESPACE;
-    const KuberoSessionKey = body.KUBERO_SESSION_KEY;
-    const kuberoWebhookSecret = body.KUBERO_WEBHOOK_SECRET;
+	@Post("/setup/save")
+	@UseGuards(JwtAuthGuard, PermissionsGuard)
+	@Permissions("config:write")
+	@UseGuards(ReadonlyGuard)
+	@ApiBearerAuth("bearerAuth")
+	@ApiForbiddenResponse({
+		description: "Error: Unauthorized",
+		type: OKDTO,
+		isArray: false,
+	})
+	@ApiOperation({ summary: "Save the running configuration" })
+	@ApiBody({
+		required: true,
+		schema: {
+			type: "object",
+			properties: {
+				KUBECONFIG_BASE64: {
+					type: "string",
+					description: "Base64 encoded kubeconfig",
+				},
+				KUBERO_CONTEXT: {
+					type: "string",
+					description: "Kubernetes context to use",
+				},
+				KUBERO_NAMESPACE: {
+					type: "string",
+					description: "Namespace for Kubero",
+				},
+				KUBERO_SESSION_KEY: {
+					type: "string",
+					description: "Session key for Kubero",
+				},
+				KUBERO_WEBHOOK_SECRET: {
+					type: "string",
+					description: "Webhook secret for Kubero",
+				},
+			},
+		},
+	})
+	async updateRunningConfig(@Body() body: UpdateRunningConfigDto) {
+		const kubeconfigBase64 = body.KUBECONFIG_BASE64;
+		const kubeContext = body.KUBERO_CONTEXT;
+		const kuberoNamespace = body.KUBERO_NAMESPACE;
+		const KuberoSessionKey = body.KUBERO_SESSION_KEY;
+		const kuberoWebhookSecret = body.KUBERO_WEBHOOK_SECRET;
 
-    const kubeconfigDecoded = Buffer.from(kubeconfigBase64, 'base64').toString(
-      'utf-8',
-    );
-    const resultValidation = await this.configService.validateKubeconfig(
-      kubeconfigDecoded,
-      kubeContext,
-    );
-    if (resultValidation.valid === false) {
-      return resultValidation;
-    }
+		const kubeconfigDecoded = Buffer.from(kubeconfigBase64, "base64").toString("utf-8");
+		const resultValidation = await this.configService.validateKubeconfig(
+			kubeconfigDecoded,
+			kubeContext,
+		);
+		if (resultValidation.valid === false) {
+			return resultValidation;
+		}
 
-    const resultUpdateConfig = await this.configService.updateRunningConfig(
-      kubeconfigBase64,
-      kubeContext,
-      kuberoNamespace,
-      KuberoSessionKey,
-      kuberoWebhookSecret,
-    );
+		const resultUpdateConfig = await this.configService.updateRunningConfig(
+			kubeconfigBase64,
+			kubeContext,
+			kuberoNamespace,
+			KuberoSessionKey,
+			kuberoWebhookSecret,
+		);
 
-    return resultUpdateConfig;
-  }
+		return resultUpdateConfig;
+	}
 }

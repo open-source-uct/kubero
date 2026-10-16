@@ -1,0 +1,56 @@
+{
+	"format_on_save": "on",
+	"tab_size": 2,
+	"file_types": {
+		"Plain Text": ["pnpm-lock.yaml", "*-lock.yaml"]
+	},
+	"file_scan_exclusions": [
+		"**/node_modules/**",
+		"**/.git/**",
+		"**/routeTree.gen.ts",
+		"**/dist/**",
+		"**/build/**",
+		"**/.pnpm-store"
+	],
+	"languages": {
+		"JavaScript": {
+			"formatter": { "language_server": { "name": "biome" } },
+			"code_actions_on_format": {
+				"source.fixAll.biome": true,
+				"source.organizeImports.biome": true
+			}
+		},
+		"TypeScript": {
+			"formatter": { "language_server": { "name": "biome" } },
+			"code_actions_on_format": {
+				"source.fixAll.biome": true,
+				"source.organizeImports.biome": true
+			}
+		},
+		"TSX": {
+			"formatter": { "language_server": { "name": "biome" } },
+			"code_actions_on_format": {
+				"source.fixAll.biome": true,
+				"source.organizeImports.biome": true
+			}
+		},
+		"Vue.js": {
+			"formatter": { "language_server": { "name": "biome" } },
+			"code_actions_on_format": {
+				"source.fixAll.biome": true,
+				"source.organizeImports.biome": true
+			}
+		},
+		"JSON": { "formatter": { "language_server": { "name": "biome" } } },
+		"JSONC": { "formatter": { "language_server": { "name": "biome" } } },
+		"CSS": { "formatter": { "language_server": { "name": "biome" } } },
+		"HTML": { "formatter": { "language_server": { "name": "biome" } } }
+	},
+	"lsp": {
+		"biome": {
+			"settings": {
+				"require_config_file": true
+			}
+		}
+	}
+}

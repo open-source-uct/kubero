@@ -1,159 +1,155 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { TokenService } from './token.service';
-import { AuthService } from '../auth/auth.service';
-import { UsersService } from '../users/users.service';
-import { RolesService } from '../roles/roles.service';
+import { Test, type TestingModule } from "@nestjs/testing";
+import { AuthService } from "../auth/auth.service";
+import { RolesService } from "../roles/roles.service";
+import { UsersService } from "../users/users.service";
+import { TokenService } from "./token.service";
 
-describe('TokenService', () => {
-  let service: TokenService;
+describe("TokenService", () => {
+	let service: TokenService;
 
-  // Mock Prisma client or any DB dependencies inside TokenService
-  const mockPrisma = {
-    token: {
-      findMany: jest.fn().mockResolvedValue([{ id: '1', name: 'token1' }]),
-      findUnique: jest.fn().mockResolvedValue({ userId: 'u1' }),
-      create: jest.fn().mockResolvedValue({ id: '1', name: 'token1' }),
-      delete: jest.fn().mockResolvedValue({ id: '1', deleted: true }),
-    },
-  };
+	// Mock Prisma client or any DB dependencies inside TokenService
+	const mockPrisma = {
+		token: {
+			findMany: jest.fn().mockResolvedValue([{ id: "1", name: "token1" }]),
+			findUnique: jest.fn().mockResolvedValue({ userId: "u1" }),
+			create: jest.fn().mockResolvedValue({ id: "1", name: "token1" }),
+			delete: jest.fn().mockResolvedValue({ id: "1", deleted: true }),
+		},
+	};
 
-  const mockAuthService = {
-    // Add any methods used by TokenService if needed
-    generateToken: jest.fn().mockResolvedValue('mocked-jwt-token'),
-  };
+	const mockAuthService = {
+		// Add any methods used by TokenService if needed
+		generateToken: jest.fn().mockResolvedValue("mocked-jwt-token"),
+	};
 
-  const mockUsersService = {
-    findById: jest.fn().mockResolvedValue({
-      id: 'u1',
-      username: 'test',
-      role: { id: 'r1', name: 'admin' },
-      userGroups: [{ id: 'g1', name: 'everyone' }],
-    }),
-  };
+	const mockUsersService = {
+		findById: jest.fn().mockResolvedValue({
+			id: "u1",
+			username: "test",
+			role: { id: "r1", name: "admin" },
+			userGroups: [{ id: "g1", name: "everyone" }],
+		}),
+	};
 
-  const mockRolesService = {
-    getPermissions: jest.fn().mockResolvedValue({
-      permissions: [{ resource: 'app', action: 'write' }],
-      scopeToOwnTeam: false,
-      priority: 0,
-    }),
-  };
+	const mockRolesService = {
+		getPermissions: jest.fn().mockResolvedValue({
+			permissions: [{ resource: "app", action: "write" }],
+			scopeToOwnTeam: false,
+			priority: 0,
+		}),
+	};
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        { provide: AuthService, useValue: mockAuthService },
-        { provide: UsersService, useValue: mockUsersService },
-        { provide: RolesService, useValue: mockRolesService },
-        { provide: 'PrismaClient', useValue: mockPrisma },
-        TokenService,
-      ],
-    }).compile();
+	beforeEach(async () => {
+		const module: TestingModule = await Test.createTestingModule({
+			providers: [
+				{ provide: AuthService, useValue: mockAuthService },
+				{ provide: UsersService, useValue: mockUsersService },
+				{ provide: RolesService, useValue: mockRolesService },
+				{ provide: "PrismaClient", useValue: mockPrisma },
+				TokenService,
+			],
+		}).compile();
 
-    service = module.get<TokenService>(TokenService);
-    // @ts-expect-error prisma es privado; se reemplaza por un mock
-    service['prisma'] = mockPrisma;
-    jest.clearAllMocks();
-    mockUsersService.findById.mockResolvedValue({
-      id: 'u1',
-      username: 'test',
-      role: { id: 'r1', name: 'admin' },
-      userGroups: [{ id: 'g1', name: 'everyone' }],
-    });
-    mockRolesService.getPermissions.mockResolvedValue({
-      permissions: [{ resource: 'app', action: 'write' }],
-      scopeToOwnTeam: false,
-      priority: 0,
-    });
-    mockAuthService.generateToken.mockResolvedValue('mocked-jwt-token');
-  });
+		service = module.get<TokenService>(TokenService);
+		// @ts-expect-error prisma es privado; se reemplaza por un mock
+		service["prisma"] = mockPrisma;
+		jest.clearAllMocks();
+		mockUsersService.findById.mockResolvedValue({
+			id: "u1",
+			username: "test",
+			role: { id: "r1", name: "admin" },
+			userGroups: [{ id: "g1", name: "everyone" }],
+		});
+		mockRolesService.getPermissions.mockResolvedValue({
+			permissions: [{ resource: "app", action: "write" }],
+			scopeToOwnTeam: false,
+			priority: 0,
+		});
+		mockAuthService.generateToken.mockResolvedValue("mocked-jwt-token");
+	});
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
+	it("should be defined", () => {
+		expect(service).toBeDefined();
+	});
 
-  describe('findAll', () => {
-    it('should return all tokens', async () => {
-      const result = await service.findAll();
-      expect(mockPrisma.token.findMany).toHaveBeenCalled();
-      expect(result).toEqual([{ id: '1', name: 'token1' }]);
-    });
-  });
+	describe("findAll", () => {
+		it("should return all tokens", async () => {
+			const result = await service.findAll();
+			expect(mockPrisma.token.findMany).toHaveBeenCalled();
+			expect(result).toEqual([{ id: "1", name: "token1" }]);
+		});
+	});
 
-  describe('create', () => {
-    it('should create a token', async () => {
-      const result = await service.create('token1', '2025-01-01', 'u1');
-      expect(mockUsersService.findById).toHaveBeenCalledWith('u1');
-      expect(mockPrisma.token.create).toHaveBeenCalled();
-      expect(result).toEqual({
-        expiresAt: '2025-01-01',
-        name: 'token1',
-        token: 'mocked-jwt-token',
-      });
-    });
+	describe("create", () => {
+		it("should create a token", async () => {
+			const result = await service.create("token1", "2025-01-01", "u1");
+			expect(mockUsersService.findById).toHaveBeenCalledWith("u1");
+			expect(mockPrisma.token.create).toHaveBeenCalled();
+			expect(result).toEqual({
+				expiresAt: "2025-01-01",
+				name: "token1",
+				token: "mocked-jwt-token",
+			});
+		});
 
-    it('should read the role, groups and permissions from the database, not from arguments', async () => {
-      await service.create('token1', '2025-01-01', 'u1');
-      expect(mockRolesService.getPermissions).toHaveBeenCalledWith('r1');
-      expect(mockAuthService.generateToken).toHaveBeenCalledWith(
-        'u1',
-        'test',
-        'admin',
-        ['everyone'],
-        ['app:write'],
-        '2025-01-01',
-        '1', // id de la fila: el JWT se firma con él (jti) para poder revocarlo
-        false,
-        0,
-      );
-      const createCall = mockPrisma.token.create.mock.calls[0][0];
-      expect(createCall.data.role).toBe('admin');
-      expect(createCall.data.groups).toBe('everyone');
-    });
+		it("should read the role, groups and permissions from the database, not from arguments", async () => {
+			await service.create("token1", "2025-01-01", "u1");
+			expect(mockRolesService.getPermissions).toHaveBeenCalledWith("r1");
+			expect(mockAuthService.generateToken).toHaveBeenCalledWith(
+				"u1",
+				"test",
+				"admin",
+				["everyone"],
+				["app:write"],
+				"2025-01-01",
+				"1", // id de la fila: el JWT se firma con él (jti) para poder revocarlo
+				false,
+				0,
+			);
+			const createCall = mockPrisma.token.create.mock.calls[0][0];
+			expect(createCall.data.role).toBe("admin");
+			expect(createCall.data.groups).toBe("everyone");
+		});
 
-    it('should remove the row if the JWT could not be signed', async () => {
-      mockAuthService.generateToken.mockRejectedValueOnce(new Error('boom'));
-      await expect(
-        service.create('token1', '2025-01-01', 'u1'),
-      ).rejects.toThrow('boom');
-      expect(mockPrisma.token.delete).toHaveBeenCalledWith({
-        where: { id: '1' },
-      });
-    });
+		it("should remove the row if the JWT could not be signed", async () => {
+			mockAuthService.generateToken.mockRejectedValueOnce(new Error("boom"));
+			await expect(service.create("token1", "2025-01-01", "u1")).rejects.toThrow("boom");
+			expect(mockPrisma.token.delete).toHaveBeenCalledWith({
+				where: { id: "1" },
+			});
+		});
 
-    it('should throw if the user does not exist', async () => {
-      mockUsersService.findById.mockResolvedValueOnce(null);
-      await expect(
-        service.create('token1', '2025-01-01', 'u1'),
-      ).rejects.toThrow('User not found');
-    });
-  });
+		it("should throw if the user does not exist", async () => {
+			mockUsersService.findById.mockResolvedValueOnce(null);
+			await expect(service.create("token1", "2025-01-01", "u1")).rejects.toThrow("User not found");
+		});
+	});
 
-  describe('delete', () => {
-    it('deletes a token when the caller owns it', async () => {
-      mockPrisma.token.findUnique.mockResolvedValueOnce({ userId: 'u1' });
-      const result = await service.delete('1', 'u1');
-      expect(mockPrisma.token.delete).toHaveBeenCalledWith({
-        where: { id: '1' },
-      });
-      expect(result).toEqual({ id: '1', deleted: true });
-    });
+	describe("delete", () => {
+		it("deletes a token when the caller owns it", async () => {
+			mockPrisma.token.findUnique.mockResolvedValueOnce({ userId: "u1" });
+			const result = await service.delete("1", "u1");
+			expect(mockPrisma.token.delete).toHaveBeenCalledWith({
+				where: { id: "1" },
+			});
+			expect(result).toEqual({ id: "1", deleted: true });
+		});
 
-    it('refuses to delete another user token without token:write', async () => {
-      mockPrisma.token.findUnique.mockResolvedValueOnce({ userId: 'other' });
-      await expect(service.delete('1', 'u1')).rejects.toThrow(
-        'No puedes borrar un token que no es tuyo',
-      );
-      expect(mockPrisma.token.delete).not.toHaveBeenCalled();
-    });
+		it("refuses to delete another user token without token:write", async () => {
+			mockPrisma.token.findUnique.mockResolvedValueOnce({ userId: "other" });
+			await expect(service.delete("1", "u1")).rejects.toThrow(
+				"No puedes borrar un token que no es tuyo",
+			);
+			expect(mockPrisma.token.delete).not.toHaveBeenCalled();
+		});
 
-    it('lets a caller with token:write (admin) delete any token', async () => {
-      const result = await service.delete('1', 'someone-else', true);
-      expect(mockPrisma.token.findUnique).not.toHaveBeenCalled();
-      expect(mockPrisma.token.delete).toHaveBeenCalledWith({
-        where: { id: '1' },
-      });
-      expect(result).toEqual({ id: '1', deleted: true });
-    });
-  });
+		it("lets a caller with token:write (admin) delete any token", async () => {
+			const result = await service.delete("1", "someone-else", true);
+			expect(mockPrisma.token.findUnique).not.toHaveBeenCalled();
+			expect(mockPrisma.token.delete).toHaveBeenCalledWith({
+				where: { id: "1" },
+			});
+			expect(result).toEqual({ id: "1", deleted: true });
+		});
+	});
 });

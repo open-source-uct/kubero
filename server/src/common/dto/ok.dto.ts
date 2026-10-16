@@ -1,9 +1,9 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class OKDTO {
-  @ApiProperty()
-  status: string;
+	@ApiProperty()
+	status: string;
 
-  @ApiPropertyOptional()
-  message?: string;
+	@ApiPropertyOptional()
+	message?: string;
 }

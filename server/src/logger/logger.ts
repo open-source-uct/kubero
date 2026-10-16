@@ -1,4 +1,4 @@
-import { ConsoleLogger } from '@nestjs/common';
+import { ConsoleLogger } from "@nestjs/common";
 
 /**
  * A custom logger that disables all logs emitted by calling `log` method if
@@ -9,19 +9,19 @@ import { ConsoleLogger } from '@nestjs/common';
  * - `NestFactory`
  */
 export class CustomConsoleLogger extends ConsoleLogger {
-  static contextsToIgnore = [
-    'InstanceLoader',
-    'RoutesResolver',
-    'RouterExplorer',
-    'NestFactory',
-    'NestApplication',
-    'WebSocketsController',
-  ];
+	static contextsToIgnore = [
+		"InstanceLoader",
+		"RoutesResolver",
+		"RouterExplorer",
+		"NestFactory",
+		"NestApplication",
+		"WebSocketsController",
+	];
 
-  log(message: any, ...optionalParams: any[]): void {
-    const context = optionalParams[0] || '';
-    if (!CustomConsoleLogger.contextsToIgnore.includes(context)) {
-      super.log(message, ...optionalParams);
-    }
-  }
+	log(message: any, ...optionalParams: any[]): void {
+		const context = optionalParams[0] || "";
+		if (!CustomConsoleLogger.contextsToIgnore.includes(context)) {
+			super.log(message, ...optionalParams);
+		}
+	}
 }
