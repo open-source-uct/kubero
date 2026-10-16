@@ -6,7 +6,7 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"includes": ["**", "!!**/dist", "!!**/*.spec.ts"]
+		"includes": ["**", "!!**/dist", "!!**/*.scss", "!!**/*lock.yaml"]
 	},
 	"formatter": {
 		"enabled": true,

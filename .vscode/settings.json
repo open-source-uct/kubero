@@ -16,6 +16,10 @@
 	"[jsonc]": { "editor.defaultFormatter": "biomejs.biome" },
 	"[css]": { "editor.defaultFormatter": "biomejs.biome" },
 	"[html]": { "editor.defaultFormatter": "biomejs.biome" },
+	"files.associations": {
+		"pnpm-lock.yaml": "plaintext",
+		"*-lock.yaml": "plaintext"
+	},
 	"files.exclude": {
 		"**/node_modules/**": true,
 		"**/.git/**": true,

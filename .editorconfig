@@ -11,5 +11,9 @@ max_line_length = 100
 indent_style = space
 indent_size = 2
 
+[*-lock.yaml]
+indent_style = unset
+indent_size = unset
+
 [*.md]
 trim_trailing_whitespace = false

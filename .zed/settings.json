@@ -1,6 +1,9 @@
 {
 	"format_on_save": "on",
 	"tab_size": 2,
+	"file_types": {
+		"Plain Text": ["pnpm-lock.yaml", "*-lock.yaml"]
+	},
 	"file_scan_exclusions": [
 		"**/node_modules/**",
 		"**/.git/**",
