@@ -30,6 +30,10 @@ const messages = {
   navigation: {
     aboutKubero: 'Acerca de Kubero',
     pipelines: 'Pipelines',
+    searchPipelines: 'Buscar pipelines',
+    loading: 'Cargando…',
+    noItems: 'No hay nada acá',
+    noApps: 'Sin apps',
     templates: 'Plantillas',
     activity: 'Actividad',
     addOns: 'Complementos',
