@@ -43,6 +43,7 @@
           :key="item.id"
           :item="item"
           @select="$emit('select')"
+          @retry="emit('expand', $event)"
         />
       </v-list>
     </nav>
@@ -62,6 +63,8 @@ export interface SecondaryNavItem {
   // true si los children se cargan recién al expandir el grupo
   lazy?: boolean
   loading?: boolean
+  // true si la última carga de children falló (ver SecondaryNavTreeNode)
+  error?: boolean
 }
 </script>
 

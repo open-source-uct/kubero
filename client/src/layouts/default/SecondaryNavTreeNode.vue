@@ -22,6 +22,21 @@
     </v-list-item>
 
     <v-list-item
+      v-else-if="item.error"
+      class="secondary-nav-item secondary-nav-item--error"
+      density="compact"
+      @click.stop="$emit('retry', item.id)"
+    >
+      <template #prepend>
+        <v-icon icon="mdi-alert-circle-outline" size="small" color="error"></v-icon>
+      </template>
+      <v-list-item-title class="text-caption">{{ $t('navigation.loadError') }}</v-list-item-title>
+      <template #append>
+        <v-icon icon="mdi-refresh" size="small"></v-icon>
+      </template>
+    </v-list-item>
+
+    <v-list-item
       v-else-if="item.children && item.children.length === 0"
       class="secondary-nav-item secondary-nav-item--empty"
       density="compact"
@@ -35,6 +50,7 @@
       :item="child"
       :depth="depth + 1"
       @select="$emit('select')"
+      @retry="$emit('retry', $event)"
     ></secondary-nav-tree-node>
   </v-list-group>
 
@@ -72,6 +88,7 @@ withDefaults(
 
 defineEmits<{
   select: []
+  retry: [id: string]
 }>()
 
 const route = useRoute()
@@ -88,5 +105,8 @@ const route = useRoute()
 .secondary-nav-item--empty {
   opacity: 0.65;
   pointer-events: none;
+}
+.secondary-nav-item--error {
+  cursor: pointer;
 }
 </style>

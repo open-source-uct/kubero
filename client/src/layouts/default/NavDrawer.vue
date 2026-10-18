@@ -373,6 +373,7 @@ type ApiPhase = { name: string; enabled: boolean; apps: ApiApp[] }
 const pipelines = ref<ApiPipeline[]>([])
 const pipelineChildren = ref<Record<string, SecondaryNavItem[]>>({})
 const pipelineLoading = ref<Record<string, boolean>>({})
+const pipelineError = ref<Record<string, boolean>>({})
 const openedPipelineGroups = ref<string[]>([])
 
 const pipelineSearchable = computed(() => pipelines.value.length > PIPELINE_SEARCH_THRESHOLD)
@@ -386,6 +387,7 @@ const pipelineTreeItems = computed<SecondaryNavItem[]>(() =>
       icon: 'mdi-source-branch',
       lazy: true,
       loading: pipelineLoading.value[pipeline.name] ?? false,
+      error: pipelineError.value[pipeline.name] ?? false,
       children: pipelineChildren.value[pipeline.name],
     })),
 )
@@ -402,6 +404,7 @@ async function loadPipelines() {
 
 async function loadPipelineApps(pipelineName: string) {
   pipelineLoading.value = { ...pipelineLoading.value, [pipelineName]: true }
+  pipelineError.value = { ...pipelineError.value, [pipelineName]: false }
   try {
     const response = await axios.get(`/api/pipelines/${encodeURIComponent(pipelineName)}/apps`)
     const phases: ApiPhase[] = Array.isArray(response.data?.phases) ? response.data.phases : []
@@ -420,7 +423,9 @@ async function loadPipelineApps(pipelineName: string) {
       }))
     pipelineChildren.value = { ...pipelineChildren.value, [pipelineName]: children }
   } catch {
-    pipelineChildren.value = { ...pipelineChildren.value, [pipelineName]: [] }
+    // no seteamos children=[] a propósito: así el grupo sigue "lazy" y un
+    // reintento (o volver a abrir el grupo) vuelve a pedirlo
+    pipelineError.value = { ...pipelineError.value, [pipelineName]: true }
   } finally {
     pipelineLoading.value = { ...pipelineLoading.value, [pipelineName]: false }
   }
@@ -433,18 +438,23 @@ function onPipelineTreeExpand(id: string) {
 }
 
 // si entrás directo a una app/pipeline (URL, refresh), la dejamos
-// pre-cargada y expandida para cuando se abra el panel
+// pre-cargada y expandida (pipeline + fase) para cuando se abra el panel
 const activePipelineName = computed(() => (typeof route.params.pipeline === 'string' ? route.params.pipeline : null))
+const activePhaseName = computed(() => (typeof route.params.phase === 'string' ? route.params.phase : null))
+
+function ensureOpened(id: string) {
+  if (!openedPipelineGroups.value.includes(id)) {
+    openedPipelineGroups.value = [...openedPipelineGroups.value, id]
+  }
+}
 
 watch(
-  activePipelineName,
-  (name) => {
-    if (!name) return
+  [activePipelineName, activePhaseName],
+  ([pipeline, phase]) => {
+    if (!pipeline) return
     if (pipelines.value.length === 0) loadPipelines()
-    const id = `pipeline:${name}`
-    if (!openedPipelineGroups.value.includes(id)) {
-      openedPipelineGroups.value = [...openedPipelineGroups.value, id]
-    }
+    ensureOpened(`pipeline:${pipeline}`)
+    if (phase) ensureOpened(`phase:${pipeline}:${phase}`)
   },
   { immediate: true },
 )
@@ -524,7 +534,17 @@ function openSecondary(group: SecondaryGroup, event: Event) {
 
   nextTick(() => {
     syncSecondaryGeometry()
-    document.querySelector<HTMLElement>(`#secondary-nav-${group} .v-list-item`)?.focus()
+    const panel = document.querySelector<HTMLElement>(`#secondary-nav-${group}`)
+    // si ya sabemos dónde estás parado (pipeline/fase/app activos, ver
+    // openedPipelineGroups más arriba), saltamos directo ahí en vez de al
+    // primer ítem de la lista
+    const activeItem = panel?.querySelector<HTMLElement>('.v-list-item--active')
+    if (activeItem) {
+      activeItem.scrollIntoView({ block: 'center' })
+      activeItem.focus()
+    } else {
+      panel?.querySelector<HTMLElement>('.v-list-item')?.focus()
+    }
   })
 }
 
