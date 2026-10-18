@@ -290,9 +290,13 @@
       :title="secondaryTitle"
       :close-label="$t('navigation.closeSubnavigation', { section: secondaryTitle })"
       :items="secondaryItems"
+      :searchable="activeSecondary === 'pipelines' && pipelineSearchable"
+      :search-placeholder="$t('navigation.searchPipelines')"
+      v-model:opened-groups="openedPipelineGroups"
       :style="secondaryStyle"
       @close="closeSecondary"
       @select="closeSecondary"
+      @expand="onPipelineTreeExpand"
     />
   </transition>
 </template>
@@ -356,7 +360,94 @@ const pipelineItems = computed<SecondaryNavItem[]>(() => [
     ? [{ id: 'overview', title: t('navigation.overview'), icon: 'mdi-view-dashboard-outline', to: '/overview' }]
     : []),
   { id: 'pipelines', title: t('navigation.pipelines'), icon: 'mdi-source-branch', to: '/' },
+  ...pipelineTreeItems.value,
 ])
+
+// cascada pipelines -> fases -> apps (issue #187): atajo rápido en el
+// sidebar, sin reemplazar la página completa de Pipelines
+const PIPELINE_SEARCH_THRESHOLD = 8
+type ApiPipeline = { name: string }
+type ApiApp = { name: string }
+type ApiPhase = { name: string; enabled: boolean; apps: ApiApp[] }
+
+const pipelines = ref<ApiPipeline[]>([])
+const pipelineChildren = ref<Record<string, SecondaryNavItem[]>>({})
+const pipelineLoading = ref<Record<string, boolean>>({})
+const openedPipelineGroups = ref<string[]>([])
+
+const pipelineSearchable = computed(() => pipelines.value.length > PIPELINE_SEARCH_THRESHOLD)
+
+const pipelineTreeItems = computed<SecondaryNavItem[]>(() =>
+  [...pipelines.value]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((pipeline) => ({
+      id: `pipeline:${pipeline.name}`,
+      title: pipeline.name,
+      icon: 'mdi-source-branch',
+      lazy: true,
+      loading: pipelineLoading.value[pipeline.name] ?? false,
+      children: pipelineChildren.value[pipeline.name],
+    })),
+)
+
+async function loadPipelines() {
+  if (!(authStore.hasPermission('pipeline:write') || authStore.hasPermission('pipeline:read'))) return
+  try {
+    const response = await axios.get('/api/pipelines')
+    pipelines.value = Array.isArray(response.data?.items) ? response.data.items : []
+  } catch {
+    pipelines.value = []
+  }
+}
+
+async function loadPipelineApps(pipelineName: string) {
+  pipelineLoading.value = { ...pipelineLoading.value, [pipelineName]: true }
+  try {
+    const response = await axios.get(`/api/pipelines/${encodeURIComponent(pipelineName)}/apps`)
+    const phases: ApiPhase[] = Array.isArray(response.data?.phases) ? response.data.phases : []
+    const children: SecondaryNavItem[] = phases
+      .filter((phase) => phase.enabled)
+      .map((phase) => ({
+        id: `phase:${pipelineName}:${phase.name}`,
+        title: t(`pipeline.phases.${phase.name}`),
+        icon: 'mdi-layers-outline',
+        children: (phase.apps ?? []).map((app) => ({
+          id: `app:${pipelineName}:${phase.name}:${app.name}`,
+          title: app.name,
+          icon: 'mdi-application-outline',
+          to: `/pipeline/${pipelineName}/${phase.name}/${app.name}/detail`,
+        })),
+      }))
+    pipelineChildren.value = { ...pipelineChildren.value, [pipelineName]: children }
+  } catch {
+    pipelineChildren.value = { ...pipelineChildren.value, [pipelineName]: [] }
+  } finally {
+    pipelineLoading.value = { ...pipelineLoading.value, [pipelineName]: false }
+  }
+}
+
+function onPipelineTreeExpand(id: string) {
+  if (id.startsWith('pipeline:')) {
+    loadPipelineApps(id.slice('pipeline:'.length))
+  }
+}
+
+// si entrás directo a una app/pipeline (URL, refresh), la dejamos
+// pre-cargada y expandida para cuando se abra el panel
+const activePipelineName = computed(() => (typeof route.params.pipeline === 'string' ? route.params.pipeline : null))
+
+watch(
+  activePipelineName,
+  (name) => {
+    if (!name) return
+    if (pipelines.value.length === 0) loadPipelines()
+    const id = `pipeline:${name}`
+    if (!openedPipelineGroups.value.includes(id)) {
+      openedPipelineGroups.value = [...openedPipelineGroups.value, id]
+    }
+  },
+  { immediate: true },
+)
 
 const settingsItems = computed<SecondaryNavItem[]>(() => [
   { id: 'general', title: t('navigation.general'), icon: 'mdi-tune', to: '/settings' },
@@ -426,6 +517,10 @@ function openSecondary(group: SecondaryGroup, event: Event) {
 
   activeTrigger.value = event.currentTarget as HTMLElement
   activeSecondary.value = group
+
+  if (group === 'pipelines' && pipelines.value.length === 0) {
+    loadPipelines()
+  }
 
   nextTick(() => {
     syncSecondaryGeometry()
