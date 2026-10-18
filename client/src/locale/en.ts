@@ -34,6 +34,7 @@ const messages = {
         loading: 'Loading…',
         noItems: 'Nothing here',
         noApps: 'No apps',
+        loadError: 'Couldn\'t load — retry',
         templates: 'Templates',
         activity: 'Activity',
         addOns: 'Add-Ons',

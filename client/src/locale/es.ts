@@ -34,6 +34,7 @@ const messages = {
     loading: 'Cargando…',
     noItems: 'No hay nada acá',
     noApps: 'Sin apps',
+    loadError: 'No se pudo cargar — reintentar',
     templates: 'Plantillas',
     activity: 'Actividad',
     addOns: 'Complementos',
