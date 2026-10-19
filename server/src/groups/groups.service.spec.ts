@@ -215,6 +215,33 @@ describe('GroupsService scopeToOwnTeam', () => {
     expect(prisma.userGroup.delete).toHaveBeenCalled();
   });
 
+  it('ignores nested relations in the body (a scoped role cannot change members through a team edit)', async () => {
+    prisma.userGroup.findUnique.mockResolvedValue({
+      id: 'g',
+      name: 'Taller1',
+    });
+    await service.update(
+      'g',
+      {
+        name: 'Taller1',
+        description: 'x',
+        users: {
+          update: {
+            where: { id: 'caller-id' },
+            data: { role: { connect: { name: 'admin' } } },
+          },
+          connect: { id: 'other-team-user' },
+        },
+      } as any,
+      ['Taller1'],
+      true,
+    );
+    expect(prisma.userGroup.update).toHaveBeenCalledWith({
+      where: { id: 'g' },
+      data: { name: 'Taller1', description: 'x' },
+    });
+  });
+
   it('create joins the caller to the new team when scoped (otherwise it would be invisible to them)', async () => {
     prisma.userGroup.create = jest.fn().mockResolvedValue({});
     await service.create('Taller3', 'desc', 'caller-id', true);

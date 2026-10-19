@@ -93,21 +93,29 @@ export class GroupsService {
 
   async update(
     id: string,
-    groupData: any,
+    groupData: { name?: string; description?: string },
     callerGroups: string[] = [],
     scopeToOwnTeam = false,
   ): Promise<any> {
     if (scopeToOwnTeam) {
       await this.assertOwnTeam(id, callerGroups);
     }
+    // Solo name y description: el ValidationPipe global no descarta campos
+    // extra, y pasar el body entero a Prisma permitía operaciones anidadas
+    // sobre `users` (cambiar roles o contraseñas, sumar miembros de otros
+    // equipos) sin pasar por los controles de UsersService.
+    const data: { name?: string; description?: string } = {};
     // renombrar 'admin' dejaría a todos sus miembros sin el acceso total
     if (groupData?.name !== undefined) {
       await this.assertNotProtected(id, 'renamed');
-      groupData = { ...groupData, name: this.cleanName(groupData.name) };
+      data.name = this.cleanName(groupData.name);
+    }
+    if (groupData?.description !== undefined) {
+      data.description = groupData.description;
     }
     return this.prisma.userGroup.update({
       where: { id },
-      data: groupData,
+      data,
     });
   }
 
