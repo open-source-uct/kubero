@@ -72,9 +72,20 @@ export class GroupsService {
   // pipelines y 'everyone' es el equipo por defecto de los usuarios nuevos.
   private static readonly PROTECTED = ['admin', 'everyone'];
 
-  private async assertNotProtected(id: string, action: string) {
+  // newName: si se pasa, solo se bloquea cuando el nombre realmente cambia. El
+  // formulario siempre reenvía el nombre, y sin esto no se podía editar ni la
+  // descripción de los equipos protegidos.
+  private async assertNotProtected(
+    id: string,
+    action: string,
+    newName?: string,
+  ) {
     const group = await this.prisma.userGroup.findUnique({ where: { id } });
-    if (group && GroupsService.PROTECTED.includes(group.name)) {
+    if (
+      group &&
+      GroupsService.PROTECTED.includes(group.name) &&
+      (newName === undefined || newName !== group.name)
+    ) {
       throw new ForbiddenException(
         `The "${group.name}" team cannot be ${action}`,
       );
@@ -107,8 +118,8 @@ export class GroupsService {
     const data: { name?: string; description?: string } = {};
     // renombrar 'admin' dejaría a todos sus miembros sin el acceso total
     if (groupData?.name !== undefined) {
-      await this.assertNotProtected(id, 'renamed');
       data.name = this.cleanName(groupData.name);
+      await this.assertNotProtected(id, 'renamed', data.name);
     }
     if (groupData?.description !== undefined) {
       data.description = groupData.description;

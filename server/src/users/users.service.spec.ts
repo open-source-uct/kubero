@@ -256,6 +256,29 @@ describe('UsersService', () => {
     expect(data.username).toBe('user4');
   });
 
+  it('should not pass unexpected fields to update (roleId, 2FA, provider)', async () => {
+    prismaMock.user.update.mockResolvedValueOnce({ id: '1' } as PrismaUser);
+    await service.update('1', {
+      firstName: 'Ana',
+      roleId: 'admin-role-id',
+      twoFaEnabled: false,
+      twoFaSecret: 'attacker-secret',
+      providerId: 'x',
+      id: 'other-id',
+      createdAt: '2026-01-01',
+    });
+    const data = prismaMock.user.update.mock.calls[0][0].data;
+    expect(data).toEqual({ firstName: 'Ana' });
+  });
+
+  it('update still applies a role change sent as a role id', async () => {
+    prismaMock.role.findUnique.mockResolvedValueOnce({ name: 'admin' });
+    prismaMock.user.update.mockResolvedValueOnce({ id: '1' } as PrismaUser);
+    await service.update('1', { role: 'role-id' });
+    const data = prismaMock.user.update.mock.calls[0][0].data;
+    expect(data).toEqual({ role: { connect: { id: 'role-id' } } });
+  });
+
   it('should return undefined if updatePassword fails', async () => {
     prismaMock.user.update.mockRejectedValueOnce(new Error('Not found'));
     const user = await service.updatePassword('1', 'fail');
