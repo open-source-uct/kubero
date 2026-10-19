@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { CustomConsoleLogger } from './logger/logger';
+import { createValidationPipe } from './validation';
 import { LogLevel } from '@nestjs/common/services/logger.service';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -31,7 +32,7 @@ async function bootstrap() {
     // los webhooks se firman sobre el cuerpo tal cual llegó
     rawBody: true,
   });
-  app.useGlobalPipes(new ValidationPipe({ transform: true }));
+  app.useGlobalPipes(createValidationPipe());
 
   await DatabaseService.DBinit();
 

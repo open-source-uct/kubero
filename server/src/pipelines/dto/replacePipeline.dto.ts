@@ -6,6 +6,7 @@ import {
   IsIn,
   IsOptional,
   IsArray,
+  IsObject,
   ValidateNested,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
@@ -38,6 +39,8 @@ class BuildpackDto {
 }
 
 class GitLinkDto {
+  @IsOptional()
+  @IsObject()
   keys: { priv?: string; pub?: string };
 
   @IsOptional()
@@ -47,6 +50,8 @@ class GitLinkDto {
   @IsOptional()
   repository?: any;
 
+  @IsOptional()
+  @IsObject()
   webhook: object;
 }
 

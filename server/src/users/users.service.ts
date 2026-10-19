@@ -448,16 +448,20 @@ export class UsersService {
     if (scopeToOwnTeam) {
       await this.assertSharesTeam(userId, callerGroups);
     }
-    const {
-      id,
-      createdAt,
-      updatedAt,
-      role,
-      userGroups,
-      tokens,
-      password,
-      ...data
-    } = user;
+    const { role, userGroups } = user;
+    // Lista explícita, igual que en create(): con un "...resto" del body,
+    // campos como roleId llegaban directo a Prisma y un rol acotado podía
+    // darse otro rol saltándose assertAssignableRole (o tocar twoFaSecret).
+    const UPDATABLE_FIELDS = [
+      'username',
+      'email',
+      'firstName',
+      'lastName',
+      'isActive',
+    ];
+    const data: any = Object.fromEntries(
+      Object.entries(user).filter(([key]) => UPDATABLE_FIELDS.includes(key)),
+    );
 
     // no dejar el sistema sin administrador: desactivar al último o cambiarle
     // el rol a uno que no sea admin
