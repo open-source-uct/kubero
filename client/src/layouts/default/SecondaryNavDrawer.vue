@@ -19,32 +19,30 @@
 
     <v-divider></v-divider>
 
-    <div v-if="searchable" class="secondary-nav-search">
-      <v-text-field
-        v-model="search"
-        density="compact"
-        variant="outlined"
-        hide-details
-        clearable
-        prepend-inner-icon="mdi-magnify"
-        :placeholder="searchPlaceholder"
-      ></v-text-field>
-    </div>
-
     <nav :aria-label="title" class="secondary-nav-content">
-      <v-list
-        v-model:opened="opened"
-        nav
-        active-color="primary"
-        bg-color="transparent"
-      >
-        <secondary-nav-tree-node
-          v-for="item in filteredItems"
+      <v-list nav active-color="primary" bg-color="transparent">
+        <v-list-item
+          v-for="item in items"
           :key="item.id"
-          :item="item"
-          @select="$emit('select')"
-          @retry="emit('expand', $event)"
-        />
+          :to="item.to"
+          :href="item.href"
+          :target="item.href ? '_blank' : undefined"
+          :rel="item.href ? 'noopener noreferrer' : undefined"
+          :prepend-icon="item.icon"
+          :title="item.title"
+          :active="item.to ? route.path === item.to : false"
+          rounded="md"
+          class="secondary-nav-item"
+          @click="$emit('select')"
+        >
+          <template v-if="item.href" #append>
+            <v-icon
+              icon="mdi-open-in-new"
+              size="small"
+              aria-hidden="true"
+            ></v-icon>
+          </template>
+        </v-list-item>
       </v-list>
     </nav>
   </aside>
@@ -57,79 +55,25 @@ export interface SecondaryNavItem {
   icon: string
   to?: string
   href?: string
-  // hijos ya resueltos (p. ej. fases de una pipeline, siempre vienen junto
-  // con sus apps); si es undefined y lazy=true, aún no se cargaron
-  children?: SecondaryNavItem[]
-  // true si los children se cargan recién al expandir el grupo
-  lazy?: boolean
-  loading?: boolean
-  // true si la última carga de children falló (ver SecondaryNavTreeNode)
-  error?: boolean
 }
 </script>
 
 <script lang="ts" setup>
-import { computed, ref, watch } from 'vue'
-import SecondaryNavTreeNode from './SecondaryNavTreeNode.vue'
+import { useRoute } from 'vue-router'
 
-const props = defineProps<{
+defineProps<{
   id: string
   title: string
   closeLabel: string
   items: SecondaryNavItem[]
-  // muestra un buscador que filtra los items de primer nivel por título
-  // (se activa recién cuando hay varios, no tiene sentido con pocos)
-  searchable?: boolean
-  searchPlaceholder?: string
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   close: []
   select: []
-  expand: [id: string]
 }>()
 
-const search = ref('')
-
-const filteredItems = computed(() => {
-  const query = search.value.trim().toLocaleLowerCase()
-  if (!query) return props.items
-  return props.items.filter((item) => item.title.toLocaleLowerCase().includes(query))
-})
-
-// ids de los v-list-group actualmente abiertos (API nativa de Vuetify).
-// Es un v-model para que quien nos use pueda abrir de entrada la pipeline
-// activa (ver NavDrawer.vue).
-const opened = defineModel<string[]>('openedGroups', { default: () => [] })
-
-function findItem(items: SecondaryNavItem[], id: string): SecondaryNavItem | undefined {
-  for (const item of items) {
-    if (item.id === id) return item
-    if (item.children) {
-      const found = findItem(item.children, id)
-      if (found) return found
-    }
-  }
-  return undefined
-}
-
-// al abrir un grupo "lazy" (children aún no cargados) se avisa al padre,
-// que es quien sabe cómo pedir los datos (ver NavDrawer.vue)
-// reacciona tanto a que se abra un grupo como a que lleguen nuevos items
-// (p. ej. las pipelines terminan de cargar después de que ya se marcó
-// cuál debía abrirse de entrada)
-watch(
-  [opened, () => props.items],
-  ([ids]) => {
-    for (const id of ids) {
-      const item = findItem(props.items, id)
-      if (item?.lazy && !item.children && !item.loading) {
-        emit('expand', id)
-      }
-    }
-  },
-  { immediate: true },
-)
+const route = useRoute()
 </script>
 
 <style scoped>
@@ -165,10 +109,6 @@ watch(
   font-size: 1.125rem;
   font-weight: 600;
   line-height: 1.3;
-}
-
-.secondary-nav-search {
-  padding: 8px 8px 0;
 }
 
 .secondary-nav-content {
