@@ -226,26 +226,120 @@ describe('UsersService', () => {
       'user1@example.com',
       'user1',
     );
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.role.findUnique).not.toHaveBeenCalled();
   });
 
   it('updatePassword rejects resetting a cross-team user password for a scoped caller', async () => {
     prismaMock.user.findUnique.mockResolvedValueOnce({
+      roleId: 'student-role',
       userGroups: [{ name: 'OtroEquipo' }],
     });
     await expect(
-      service.updatePassword('1', 'newpass', ['MiEquipo'], true),
+      service.updatePassword('1', 'newpass', ['MiEquipo'], true, 50),
     ).rejects.toThrow(ForbiddenException);
+    expect(mockedBcrypt.hash).not.toHaveBeenCalled();
     expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(mailServiceMock.sendPasswordChangedEmail).not.toHaveBeenCalled();
   });
 
-  it('updatePassword allows resetting a same-team user password for a scoped caller', async () => {
+  it.each([10, 50])(
+    'updatePassword allows a scoped same-team target with priority %i for a priority-50 caller',
+    async (priority) => {
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        roleId: 'target-role',
+        userGroups: [{ name: 'MiEquipo' }],
+      });
+      prismaMock.role.findUnique.mockResolvedValueOnce({
+        priority,
+        scopeToOwnTeam: true,
+      });
+      const updatedUser = {
+        id: '1',
+        username: 'user1',
+        email: 'user1@example.com',
+      };
+      prismaMock.user.update.mockResolvedValueOnce(updatedUser);
+
+      await expect(
+        service.updatePassword('1', 'newpass', ['MiEquipo'], true, 50),
+      ).resolves.toEqual(updatedUser);
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        omit: { password: true, twoFaSecret: true },
+        where: { id: '1' },
+        data: { password: 'hashedPassword' },
+      });
+      expect(mailServiceMock.sendPasswordChangedEmail).toHaveBeenCalledWith(
+        updatedUser.email,
+        updatedUser.username,
+      );
+    },
+  );
+
+  it.each([
+    ['higher-priority scoped role', { priority: 60, scopeToOwnTeam: true }],
+    ['administrator role', { priority: 100, scopeToOwnTeam: false }],
+    ['low-priority global role', { priority: 0, scopeToOwnTeam: false }],
+    ['missing role', null],
+  ])(
+    'updatePassword rejects a same-team target with a %s before hashing or writing',
+    async (_description, role) => {
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        roleId: 'target-role',
+        userGroups: [{ name: 'everyone' }],
+      });
+      prismaMock.role.findUnique.mockResolvedValueOnce(role);
+
+      await expect(
+        service.updatePassword('1', 'newpass', ['everyone'], true, 50),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockedBcrypt.hash).not.toHaveBeenCalled();
+      expect(prismaMock.user.update).not.toHaveBeenCalled();
+      expect(mailServiceMock.sendPasswordChangedEmail).not.toHaveBeenCalled();
+    },
+  );
+
+  it('updatePassword rejects a same-team target without a role', async () => {
     prismaMock.user.findUnique.mockResolvedValueOnce({
+      roleId: null,
       userGroups: [{ name: 'MiEquipo' }],
     });
-    prismaMock.user.update.mockResolvedValueOnce({ id: '1' } as PrismaUser);
+
+    await expect(
+      service.updatePassword('1', 'newpass', ['MiEquipo'], true, 50),
+    ).rejects.toThrow(ForbiddenException);
+    expect(mockedBcrypt.hash).not.toHaveBeenCalled();
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(mailServiceMock.sendPasswordChangedEmail).not.toHaveBeenCalled();
+  });
+
+  it('updatePassword defaults a missing caller priority to zero', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      roleId: 'student-role',
+      userGroups: [{ name: 'MiEquipo' }],
+    });
+    prismaMock.role.findUnique.mockResolvedValueOnce({
+      priority: 10,
+      scopeToOwnTeam: true,
+    });
+
     await expect(
       service.updatePassword('1', 'newpass', ['MiEquipo'], true),
-    ).resolves.toEqual({ id: '1' });
+    ).rejects.toThrow(ForbiddenException);
+    expect(mockedBcrypt.hash).not.toHaveBeenCalled();
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(mailServiceMock.sendPasswordChangedEmail).not.toHaveBeenCalled();
+  });
+
+  it('updatePassword does not hash, write or notify for a missing scoped target', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce(null);
+
+    await expect(
+      service.updatePassword('missing', 'newpass', ['MiEquipo'], true, 50),
+    ).resolves.toBeUndefined();
+    expect(mockedBcrypt.hash).not.toHaveBeenCalled();
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(mailServiceMock.sendPasswordChangedEmail).not.toHaveBeenCalled();
   });
 
   it('should not pass unexpected fields to create', async () => {

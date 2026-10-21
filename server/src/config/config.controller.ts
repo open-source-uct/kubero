@@ -175,7 +175,7 @@ export class ConfigController {
   }
 
   @Delete('/runpacks/:id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
   @Permissions('config:write')
   @ApiBearerAuth('bearerAuth')
   @ApiOperation({ summary: 'Delete a runpack' })

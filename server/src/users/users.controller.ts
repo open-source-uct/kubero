@@ -203,6 +203,7 @@ export class UsersController {
       body.password,
       req.user.userGroups,
       req.user.scopeToOwnTeam,
+      req.user.priority,
     );
   }
 
