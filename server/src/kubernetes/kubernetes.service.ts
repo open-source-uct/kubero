@@ -333,9 +333,9 @@ export class KubernetesService {
         pl.name,
         pipeline,
       )
-      .catch(() => {
-        this.logger.debug('❌ Error updating pipeline: ' + pl.name);
-        //this.logger.debug(error);
+      .catch((error) => {
+        this.logger.error('❌ Error updating pipeline: ' + pl.name);
+        throw error;
       })
       .finally(() => this.invalidatePipelinesCache());
   }

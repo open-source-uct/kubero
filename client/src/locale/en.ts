@@ -211,6 +211,8 @@ const messages = {
           loadNotificationPipelines: { title: 'Pipelines could not be loaded', message: 'The pipeline selection for this notification cannot be completed.' },
           loadBuildReferences: { title: 'Git references could not be loaded', message: 'The available branches and tags could not be retrieved.' },
           submitBuild: { title: 'The build could not be started', message: 'The build was not submitted and you can correct the form.' },
+          createPipeline: { title: 'The pipeline could not be created', message: 'The pipeline was not created.' },
+          updatePipeline: { title: 'The pipeline could not be updated', message: 'Your changes were not saved.' },
           deletePipeline: { title: 'The pipeline could not be deleted', message: 'The pipeline and its applications remain available.' },
         },
       },
