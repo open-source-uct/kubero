@@ -5,6 +5,8 @@ import { HttpException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import axios from 'axios';
 import { MailService } from '../mail/mail.service';
+import * as dns from 'dns';
+import { safeHttpAgent, safeHttpsAgent } from '../common/utils/ssrf.util';
 
 const mailServiceMock = {
   sendPasswordChangedEmail: jest.fn(),
@@ -516,6 +518,23 @@ describe('UsersService', () => {
       expect(prismaMock.user.create).toHaveBeenCalled();
     });
 
+    it('does not create an OAuth account when its avatar URL is blocked', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(null);
+      prismaMock.role.findFirst.mockResolvedValueOnce({ id: 'role1' });
+      prismaMock.userGroup.findFirst.mockResolvedValueOnce({ id: 'group1' });
+
+      await expect(
+        service.findOneOrCreate(
+          'newuser',
+          'new@example.invalid',
+          'oauth2',
+          'http://169.254.169.254/latest/meta-data/',
+        ),
+      ).rejects.toThrow('The URL points to a blocked address');
+      expect(mockedAxios.get).not.toHaveBeenCalled();
+      expect(prismaMock.user.create).not.toHaveBeenCalled();
+    });
+
     it('should throw error if default role not found', async () => {
       prismaMock.user.findUnique.mockResolvedValueOnce(null);
       prismaMock.role.findFirst.mockResolvedValueOnce(null);
@@ -738,6 +757,7 @@ describe('UsersService', () => {
 
       expect(result).toBe(updatedUser);
       expect(prismaMock.user.update).toHaveBeenCalledWith({
+        omit: { password: true, twoFaSecret: true },
         where: { id: '1' },
         data: { image: 'data:image/jpeg;base64,ZmFrZS1pbWFnZS1kYXRh' },
       });
@@ -749,6 +769,7 @@ describe('UsersService', () => {
 
       expect(result1).toBeUndefined();
       expect(result2).toBeUndefined();
+      expect(prismaMock.user.update).not.toHaveBeenCalled();
     });
 
     it('should return undefined when update fails', async () => {
@@ -788,6 +809,8 @@ describe('UsersService', () => {
   });
 
   describe('generateUserDataFromImageUrl', () => {
+    afterEach(() => jest.restoreAllMocks());
+
     it('should generate base64 image data from URL', async () => {
       const imageBuffer = Buffer.from('fake-image-data');
       mockedAxios.get.mockResolvedValueOnce({
@@ -805,11 +828,87 @@ describe('UsersService', () => {
       );
       expect(mockedAxios.get).toHaveBeenCalledWith(
         'https://example.com/image.jpg',
-        {
+        expect.objectContaining({
           responseType: 'arraybuffer',
-        },
+          proxy: false,
+          httpAgent: safeHttpAgent,
+          httpsAgent: safeHttpsAgent,
+          maxRedirects: 3,
+          timeout: 10000,
+          maxContentLength: 1024 * 1024,
+          maxBodyLength: 1024 * 1024,
+        }),
       );
     });
+
+    it.each([
+      'not a url',
+      'file:///etc/passwd',
+      'ftp://example.com/image.jpg',
+      'http://user:password@example.com/image.jpg',
+      'http://localhost:2000/api/auth/methods',
+      'http://127.0.0.1/image.jpg',
+      'http://127.1/image.jpg',
+      'http://2130706433/image.jpg',
+      'http://0x7f000001/image.jpg',
+      'http://10.0.0.1/image.jpg',
+      'http://172.16.0.1/image.jpg',
+      'http://192.168.1.1/image.jpg',
+      'http://169.254.169.254/latest/meta-data/',
+      'http://[::1]/image.jpg',
+      'http://[fd00::1]/image.jpg',
+      'http://[::ffff:127.0.0.1]/image.jpg',
+    ])('rejects an unsafe avatar URL before downloading: %s', async (url) => {
+      await expect(
+        (service as any).generateUserDataFromImageUrl(url),
+      ).rejects.toThrow();
+      expect(mockedAxios.get).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [{ address: '10.0.0.1', family: 4 }],
+      [
+        { address: '8.8.8.8', family: 4 },
+        { address: '127.0.0.1', family: 4 },
+      ],
+    ])(
+      'rejects private DNS answers with the real HTTP adapter (%j)',
+      async (...addresses) => {
+        jest
+          .spyOn(dns, 'lookup')
+          .mockImplementation(((_host, _options, callback) =>
+            callback(null, addresses)) as any);
+        const realAxios = jest.requireActual<typeof axios>('axios');
+        mockedAxios.get.mockImplementationOnce((url, options) =>
+          realAxios.get(url, options),
+        );
+
+        await expect(
+          (service as any).generateUserDataFromImageUrl(
+            'http://blocked-avatar.example.invalid/image.jpg',
+          ),
+        ).rejects.toThrow('resolves to a blocked address');
+      },
+    );
+
+    it.each(['127.0.0.1', '169.254.169.254', 'localhost'])(
+      'rejects an avatar redirect to %s',
+      async (hostname) => {
+        mockedAxios.get.mockImplementationOnce(async (_url, options) => {
+          options!.beforeRedirect!(
+            { protocol: 'http:', hostname, path: '/image.jpg' },
+            { headers: {}, statusCode: 302 },
+          );
+          throw new Error('An unsafe redirect was accepted');
+        });
+
+        await expect(
+          (service as any).generateUserDataFromImageUrl(
+            'https://example.com/image.jpg',
+          ),
+        ).rejects.toThrow('The URL points to a blocked address');
+      },
+    );
 
     it('should throw error when image fetch fails', async () => {
       mockedAxios.get.mockResolvedValueOnce({
