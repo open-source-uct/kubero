@@ -1196,11 +1196,14 @@ describe('UsersService safeguards', () => {
     prisma = {
       user: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        create: jest.fn(),
         count: jest.fn().mockResolvedValue(1), // queda otro admin
         delete: jest.fn().mockResolvedValue({}),
         update: jest.fn().mockResolvedValue({}),
       },
-      role: { findUnique: jest.fn() },
+      role: { findUnique: jest.fn(), findFirst: jest.fn() },
+      userGroup: { findFirst: jest.fn() },
     };
     service = new UsersService(mailServiceMock);
     // @ts-expect-error prisma es privado; se reemplaza por un mock
@@ -1291,6 +1294,105 @@ describe('UsersService safeguards', () => {
       } as any);
       const user = await service.findOneOrCreate('ana', 'a@b.c', 'github', '');
       expect(user).toMatchObject({ username: 'ana' });
+    });
+
+    it('finds the account by providerId, without even looking at the username', async () => {
+      prisma.user.findFirst.mockResolvedValueOnce({
+        id: 'u3',
+        username: 'ana-renamed',
+        provider: 'github',
+        providerId: '12345',
+      });
+      const findOneFullSpy = jest.spyOn(service, 'findOneFull');
+      const user = await service.findOneOrCreate(
+        'ana-renamed',
+        'a@b.c',
+        'github',
+        '',
+        '12345',
+      );
+      expect(prisma.user.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { provider: 'github', providerId: '12345' },
+        }),
+      );
+      expect(user).toMatchObject({ id: 'u3' });
+      expect(findOneFullSpy).not.toHaveBeenCalled();
+    });
+
+    it('backfills the providerId on an account created before this fix', async () => {
+      prisma.user.findFirst.mockResolvedValueOnce(null);
+      jest.spyOn(service, 'findOneFull').mockResolvedValue({
+        id: 'u4',
+        username: 'ana',
+        provider: 'github',
+        providerId: null,
+      } as any);
+      prisma.user.update.mockResolvedValueOnce({
+        id: 'u4',
+        username: 'ana',
+        provider: 'github',
+        providerId: '999',
+      });
+
+      const user = await service.findOneOrCreate(
+        'ana',
+        'a@b.c',
+        'github',
+        '',
+        '999',
+      );
+
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'u4' },
+          data: { providerId: '999' },
+        }),
+      );
+      expect(user).toMatchObject({ providerId: '999' });
+    });
+
+    it('refuses a username already linked to a different providerId (reused/renamed GitHub account)', async () => {
+      prisma.user.findFirst.mockResolvedValueOnce(null);
+      jest.spyOn(service, 'findOneFull').mockResolvedValue({
+        id: 'u5',
+        username: 'ana',
+        provider: 'github',
+        providerId: '111',
+      } as any);
+
+      await expect(
+        service.findOneOrCreate('ana', 'a@b.c', 'github', '', '222'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('persists the providerId when creating a brand new OAuth account', async () => {
+      jest.spyOn(service, 'findOneFull').mockResolvedValue(null);
+      prisma.user.findFirst.mockResolvedValueOnce(null);
+      prisma.role.findFirst.mockResolvedValueOnce({
+        id: 'role1',
+        name: 'guest',
+      });
+      prisma.userGroup.findFirst.mockResolvedValueOnce({
+        id: 'group1',
+        name: 'everyone',
+      });
+      prisma.user.create.mockResolvedValueOnce({ id: 'u6' });
+
+      await service.findOneOrCreate(
+        'newghuser',
+        'new@b.c',
+        'github',
+        '',
+        '333',
+      );
+
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ providerId: '333' }),
+        }),
+      );
     });
   });
 });

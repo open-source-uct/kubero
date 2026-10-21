@@ -103,6 +103,10 @@ export class AuthService {
     const email =
       reqUser.emails[0]?.value || reqUser.email || 'undefined@kubero.dev';
     const provider = reqUser.provider || 'oauth2';
+    // id inmutable del perfil (ej. el id numérico de GitHub), a diferencia
+    // del username, que se puede renombrar o reciclar.
+    const providerId =
+      reqUser.id !== undefined ? String(reqUser.id) : undefined;
 
     // extract image data from url
     const image = reqUser.photos ? reqUser.photos[0]?.value : null;
@@ -119,6 +123,7 @@ export class AuthService {
       email,
       provider,
       image,
+      providerId,
     )) as any;
     if (!user) {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
