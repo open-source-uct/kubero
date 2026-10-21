@@ -12,6 +12,7 @@ dotenv.config();
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import axios from 'axios';
+import { MailService } from '../mail/mail.service';
 
 // This should be a real class/interface representing a user entity
 export type User = any;
@@ -22,7 +23,7 @@ export class UsersService {
   private readonly prisma = new PrismaClient();
   private logger = new Logger(UsersService.name);
 
-  constructor() { }
+  constructor(private readonly mailService: MailService) {}
 
   async findOne(username: string): Promise<PrismaUser | null> {
     return this.prisma.user.findUnique({ where: { username } });
@@ -562,6 +563,7 @@ export class UsersService {
         data: { password: hashedPassword },
       });
       this.logger.debug(`Password updated for user with ID ${userId}.`);
+      void this.mailService.sendPasswordChangedEmail(user.email, user.username);
       return user;
     } catch (error) {
       this.logger.debug(
@@ -630,6 +632,10 @@ export class UsersService {
       });
 
       this.logger.debug(`Password updated for user with ID ${userId}.`);
+      void this.mailService.sendPasswordChangedEmail(
+        updatedUser.email,
+        updatedUser.username,
+      );
       return updatedUser;
     } catch (error) {
       this.logger.debug(

@@ -4,6 +4,11 @@ import { User as PrismaUser } from '@prisma/client';
 import { HttpException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import axios from 'axios';
+import { MailService } from '../mail/mail.service';
+
+const mailServiceMock = {
+  sendPasswordChangedEmail: jest.fn(),
+} as unknown as MailService;
 
 // Mock bcrypt
 jest.mock('bcrypt');
@@ -69,7 +74,7 @@ describe('UsersService', () => {
       () => 'hashedPassword',
     );
 
-    service = new UsersService();
+    service = new UsersService(mailServiceMock);
     // @ts-expect-error prisma es privado; se reemplaza por un mock
     service['prisma'] = prismaMock;
   });
@@ -206,6 +211,7 @@ describe('UsersService', () => {
     const updatedUser = {
       id: '1',
       username: 'user1',
+      email: 'user1@example.com',
       password: 'newpass',
     } as PrismaUser;
     prismaMock.user.update.mockResolvedValueOnce(updatedUser);
@@ -216,6 +222,10 @@ describe('UsersService', () => {
       where: { id: '1' },
       data: { password: expect.any(String) }, // password will be hashed
     });
+    expect(mailServiceMock.sendPasswordChangedEmail).toHaveBeenCalledWith(
+      'user1@example.com',
+      'user1',
+    );
   });
 
   it('updatePassword rejects resetting a cross-team user password for a scoped caller', async () => {
@@ -283,6 +293,7 @@ describe('UsersService', () => {
     prismaMock.user.update.mockRejectedValueOnce(new Error('Not found'));
     const user = await service.updatePassword('1', 'fail');
     expect(user).toBeUndefined();
+    expect(mailServiceMock.sendPasswordChangedEmail).not.toHaveBeenCalled();
   });
 
   it('should delete a user', async () => {
@@ -486,7 +497,12 @@ describe('UsersService', () => {
   describe('updateMyPassword', () => {
     it('should update password when current password is correct', async () => {
       const mockUser = { id: '1', password: 'hashedCurrentPassword' };
-      const updatedUser = { id: '1', password: 'hashedNewPassword' };
+      const updatedUser = {
+        id: '1',
+        username: 'user1',
+        email: 'user1@example.com',
+        password: 'hashedNewPassword',
+      };
 
       prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
       (mockedBcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
@@ -507,6 +523,10 @@ describe('UsersService', () => {
         'hashedCurrentPassword',
       );
       expect(mockedBcrypt.hash).toHaveBeenCalledWith('newPassword123', 10);
+      expect(mailServiceMock.sendPasswordChangedEmail).toHaveBeenCalledWith(
+        'user1@example.com',
+        'user1',
+      );
     });
 
     it('should return undefined for invalid input parameters', async () => {
@@ -543,6 +563,7 @@ describe('UsersService', () => {
       await expect(
         service.updateMyPassword('1', 'wrongPassword', 'newPassword123'),
       ).rejects.toThrow(HttpException);
+      expect(mailServiceMock.sendPasswordChangedEmail).not.toHaveBeenCalled();
     });
 
     it('should propagate database errors', async () => {
@@ -1087,7 +1108,7 @@ describe('UsersService safeguards', () => {
       },
       role: { findUnique: jest.fn() },
     };
-    service = new UsersService();
+    service = new UsersService(mailServiceMock);
     // @ts-expect-error prisma es privado; se reemplaza por un mock
     service['prisma'] = prisma;
   });
