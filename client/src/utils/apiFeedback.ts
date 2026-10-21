@@ -31,6 +31,8 @@ export type ApiFeedbackAction =
   | 'loadNotificationPipelines'
   | 'loadBuildReferences'
   | 'submitBuild'
+  | 'createPipeline'
+  | 'updatePipeline'
   | 'deletePipeline'
 
 export interface ApiErrorFeedback {

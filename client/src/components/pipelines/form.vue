@@ -225,6 +225,7 @@ import { defineComponent } from 'vue'
 import Breadcrumbs from "../breadcrumbs.vue";
 import { EnvVar } from '../apps/form.vue'
 import { useAuthStore } from '../../stores/auth';
+import { handledApiErrorConfig, notifyApiError } from '../../utils/apiFeedback'
 
 const authStore = useAuthStore();
 
@@ -413,14 +414,13 @@ export default defineComponent({
           dockerimage: '',
           deploymentstrategy: this.deploymentstrategy,
           buildstrategy: this.buildstrategy,
-        })
-        .then(response => {
+        }, handledApiErrorConfig)
+        .then(() => {
           this.pipelineName = '';
-          //console.log(response);
           this.$router.push({path: '/'});
         })
         .catch(error => {
-          console.log(error);
+          notifyApiError(error, 'createPipeline');
         });
       },
       updatePipeline() {
@@ -437,14 +437,13 @@ export default defineComponent({
           deploymentstrategy: this.deploymentstrategy,
           buildstrategy: this.buildstrategy,
           buildpack: this.buildpack,
-        })
-        .then(response => {
+        }, handledApiErrorConfig)
+        .then(() => {
           this.pipelineName = '';
-          //console.log(response);
           this.$router.push({path: '/'});
         })
         .catch(error => {
-          console.log(error);
+          notifyApiError(error, 'updatePipeline');
         });
       },
       addEnvLine(phase: any) {

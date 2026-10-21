@@ -93,7 +93,8 @@ export class MetricsService {
     // capacidad total del cluster (todos los nodos) — para mostrar qué
     // porcentaje de eso están usando las apps de Kubero, en vez de un "total"
     // inventado
-    const cpuCapacityQuery = 'sum(kube_node_status_allocatable{resource="cpu"})';
+    const cpuCapacityQuery =
+      'sum(kube_node_status_allocatable{resource="cpu"})';
     const memoryCapacityQuery =
       'sum(kube_node_status_allocatable{resource="memory"})';
     let cpuCores = 0;
