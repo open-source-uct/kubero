@@ -13,6 +13,7 @@ import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import axios from 'axios';
 import { MailService } from '../mail/mail.service';
+import { assertSafeUrl, safeAxiosOptions } from '../common/utils/ssrf.util';
 
 // This should be a real class/interface representing a user entity
 export type User = any;
@@ -730,7 +731,7 @@ export class UsersService {
   async updateAvatar(
     userId: string,
     avatarFile: any,
-  ): Promise<PrismaUser | undefined> {
+  ): Promise<Omit<PrismaUser, 'password' | 'twoFaSecret'> | undefined> {
     if (!avatarFile || !avatarFile.buffer) {
       this.logger.warn('No avatar file buffer provided.');
       return undefined;
@@ -739,6 +740,7 @@ export class UsersService {
     const base64Image = `data:${avatarFile.mimetype};base64,${avatarFile.buffer.toString('base64')}`;
     try {
       return await this.prisma.user.update({
+        omit: { password: true, twoFaSecret: true },
         where: { id: userId },
         data: { image: base64Image },
       });
@@ -760,7 +762,13 @@ export class UsersService {
   private async generateUserDataFromImageUrl(
     imageUrl: string,
   ): Promise<string> {
-    const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+    assertSafeUrl(imageUrl);
+    const response = await axios.get(imageUrl, {
+      ...safeAxiosOptions(),
+      responseType: 'arraybuffer',
+      // El agente seguro debe resolver el destino, no un proxy del entorno.
+      proxy: false,
+    });
     if (response.status !== 200) {
       throw new Error(`Failed to fetch image from URL: ${imageUrl}`);
     }
