@@ -1,5 +1,12 @@
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ExecutionContext,
+  INestApplication,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import * as request from 'supertest';
+import { JwtAuthGuard } from '../auth/strategies/jwt.guard';
 import { ConfigController } from './config.controller';
 import { ConfigService } from './config.service';
 
@@ -204,5 +211,93 @@ describe('ConfigController', () => {
       valid: false,
     });
     expect(service.validateKubeconfig).toHaveBeenCalled();
+  });
+});
+
+describe('ConfigController runpack authorization (HTTP)', () => {
+  let app: INestApplication;
+  let user: { permissions: string[] } | undefined;
+  const deleteRunpack = jest.fn();
+  const originalReadonly = process.env.KUBERO_READONLY;
+
+  beforeAll(async () => {
+    const module = await Test.createTestingModule({
+      controllers: [ConfigController],
+      providers: [{ provide: ConfigService, useValue: { deleteRunpack } }],
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({
+        canActivate(context: ExecutionContext) {
+          if (!user) throw new UnauthorizedException();
+          context.switchToHttp().getRequest().user = user;
+          return true;
+        },
+      })
+      .compile();
+    app = module.createNestApplication({ logger: false });
+    await app.init();
+  });
+
+  beforeEach(() => {
+    deleteRunpack.mockReset();
+    user = { permissions: ['config:write'] };
+    delete process.env.KUBERO_READONLY;
+  });
+
+  afterEach(() => {
+    if (originalReadonly === undefined) {
+      delete process.env.KUBERO_READONLY;
+    } else {
+      process.env.KUBERO_READONLY = originalReadonly;
+    }
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('blocks deletion before reaching the service in read-only mode', async () => {
+    process.env.KUBERO_READONLY = 'true';
+
+    const response = await request(app.getHttpServer())
+      .delete('/api/config/runpacks/runpack-id')
+      .expect(202);
+
+    expect(response.body.message).toBe('Kubero is in read-only mode');
+    expect(deleteRunpack).not.toHaveBeenCalled();
+  });
+
+  it.each(['false', undefined])(
+    'allows an authorized deletion with KUBERO_READONLY=%s',
+    async (readonly) => {
+      if (readonly !== undefined) process.env.KUBERO_READONLY = readonly;
+
+      await request(app.getHttpServer())
+        .delete('/api/config/runpacks/runpack-id')
+        .expect(200);
+
+      expect(deleteRunpack).toHaveBeenCalledWith('runpack-id');
+      expect(deleteRunpack).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('continues to require config:write', async () => {
+    user = { permissions: ['config:read'] };
+
+    await request(app.getHttpServer())
+      .delete('/api/config/runpacks/runpack-id')
+      .expect(403);
+
+    expect(deleteRunpack).not.toHaveBeenCalled();
+  });
+
+  it('continues to require an authenticated caller', async () => {
+    user = undefined;
+
+    await request(app.getHttpServer())
+      .delete('/api/config/runpacks/runpack-id')
+      .expect(401);
+
+    expect(deleteRunpack).not.toHaveBeenCalled();
   });
 });

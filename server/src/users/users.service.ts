@@ -348,10 +348,10 @@ export class UsersService {
   private async assertSharesTeam(
     userId: string,
     callerGroups: string[],
-  ): Promise<void> {
+  ): Promise<{ roleId: string | null } | undefined> {
     const target = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { userGroups: { select: { name: true } } },
+      select: { roleId: true, userGroups: { select: { name: true } } },
     });
     if (!target) {
       return;
@@ -360,6 +360,7 @@ export class UsersService {
     if (!shares) {
       throw new ForbiddenException('No tienes acceso a este usuario');
     }
+    return target;
   }
 
   async create(
@@ -543,6 +544,7 @@ export class UsersService {
     newPassword: string,
     callerGroups: string[] = [],
     scopeToOwnTeam = false,
+    callerPriority = 0,
   ): Promise<PartialPrismaUser | undefined> {
     if (
       !newPassword ||
@@ -553,7 +555,15 @@ export class UsersService {
       return undefined;
     }
     if (scopeToOwnTeam) {
-      await this.assertSharesTeam(userId, callerGroups);
+      const target = await this.assertSharesTeam(userId, callerGroups);
+      if (!target) {
+        return undefined;
+      }
+      if (!target.roleId) {
+        throw new ForbiddenException('El usuario no tiene un rol asignado');
+      }
+      // Compartir equipo no autoriza a restablecer roles globales o superiores.
+      await this.assertAssignableRole(target.roleId, callerPriority);
     }
     try {
       const hashedPassword = await bcrypt.hash(newPassword, 10);
