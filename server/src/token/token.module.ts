@@ -5,8 +5,10 @@ import { AuthService } from '../auth/auth.service';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { RolesService } from '../roles/roles.service';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
+  imports: [MailModule],
   providers: [
     TokenService,
     AuthService,

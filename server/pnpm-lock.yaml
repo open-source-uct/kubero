@@ -101,6 +101,9 @@ importers:
       node-fetch:
         specifier: ^2.7.0
         version: 2.7.0(encoding@0.1.13)
+      nodemailer:
+        specifier: ^10.1.7
+        version: 10.1.7
       passport:
         specifier: ^0.7.0
         version: 0.7.0
@@ -3505,6 +3508,10 @@ packages:
 
   node-releases@2.0.21:
     resolution: {integrity: sha512-5b0pgg78U3hwXkCM8Z9b2FJdPZlr9Psr9V2gQPESdGHqbntyFJKFW4r5TeWGFzafGY3hzs1JC62VEQMbl1JFkw==}
+
+  nodemailer@10.1.7:
+    resolution: {integrity: sha512-OQa6FDln5fLttmqSbjDiRYvFDOFNrBqfiOwHPlEbURil3b+vPB1v8xpi+Sp46drzNDlsTnNsS502vthmz56r4w==}
+    engines: {node: '>=20.0.0'}
 
   nopt@5.0.0:
     resolution: {integrity: sha512-Tbj67rffqceeLpcRXrT7vKAN8CwfPeIBgM7E6iBkmKLV7bEMwpGgYLGv0jACUsECaa/vuxP0IjEont6umdMgtQ==}
@@ -8412,6 +8419,8 @@ snapshots:
   node-int64@0.4.0: {}
 
   node-releases@2.0.21: {}
+
+  nodemailer@10.1.7: {}
 
   nopt@5.0.0:
     dependencies:
