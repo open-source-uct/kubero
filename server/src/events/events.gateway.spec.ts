@@ -36,6 +36,7 @@ describe('EventsGateway', () => {
 
   beforeEach(() => {
     mockServer = {
+      sockets: { sockets: new Map() },
       emit: jest.fn(),
       to: jest.fn().mockReturnThis(),
     };
@@ -245,37 +246,89 @@ describe('EventsGateway', () => {
     });
   });
 
-  describe('sendEvent', () => {
-    it('emits to every authenticated socket when no teams are given', () => {
-      gateway.sendEvent('testEvent', { foo: 'bar' });
-      expect(mockServer.emit).toHaveBeenCalledWith('testEvent', { foo: 'bar' });
-      expect(mockServer.to).not.toHaveBeenCalled();
+  describe('outbound authorization', () => {
+    async function connected(over: any = {}) {
+      const client = socketOf(undefined, {
+        id: 's1',
+        rooms: new Set([
+          'mine-production-web',
+          'mine-production-web-pod1-c1-terminal',
+        ]),
+        emit: jest.fn(),
+        handshake: { headers: {}, auth: { token: 't' } },
+      });
+      identity.resolve.mockResolvedValue(user(over));
+      await gateway.handleConnection(client);
+      mockServer.sockets.sockets.set(client.id, client);
+      return client;
+    }
+
+    it('delivers events to an authenticated recipient', async () => {
+      const client = await connected();
+      await gateway.sendEvent('testEvent', { a: 1 });
+      expect(client.emit).toHaveBeenCalledWith('testEvent', { a: 1 });
     });
 
-    it('emits only to the given teams and to the admin team', () => {
-      gateway.sendEvent('deleteApp', { a: 1 }, ['Taller1']);
-      expect(mockServer.to).toHaveBeenCalledWith([
-        'team:admin',
-        'team:Taller1',
+    it('isolates events by current team membership, including admin', async () => {
+      const client = await connected();
+      await gateway.sendEvent('event', {}, ['Other']);
+      expect(client.emit).not.toHaveBeenCalled();
+      await gateway.sendEvent('event', {}, ['Taller1']);
+      expect(client.emit).toHaveBeenCalledWith('event', {});
+      client.emit.mockClear();
+      await gateway.sendEvent('event', {}, []);
+      expect(client.emit).not.toHaveBeenCalled();
+      await connected({ userGroups: ['admin'] });
+      const admin = mockServer.sockets.sockets.get('s1');
+      await gateway.sendEvent('event', {}, []);
+      expect(admin.emit).toHaveBeenCalled();
+    });
+
+    it.each(['permissions', 'userGroups', 'role'])(
+      'disconnects before delivering events after a %s change',
+      async (field) => {
+        const client = await connected();
+        identity.resolve.mockResolvedValue(
+          user({ [field]: field === 'role' ? 'guest' : [] }),
+        );
+        await gateway.sendEvent('event', {});
+        expect(client.disconnect).toHaveBeenCalledWith(true);
+        expect(client.emit).not.toHaveBeenCalled();
+      },
+    );
+
+    it('rechecks revocation for passive log and terminal subscribers', async () => {
+      const client = await connected();
+      identity.resolve.mockRejectedValue(new Error('Session revoked'));
+      await gateway.sendLogline('mine-production-web', 'secret');
+      await gateway.sendTerminalLine(
+        'mine-production-web-pod1-c1-terminal',
+        'secret',
+      );
+      expect(client.emit).not.toHaveBeenCalled();
+      expect(client.disconnect).toHaveBeenCalledWith(true);
+    });
+
+    it('delivers logs and terminal output only to authorized subscribed rooms', async () => {
+      const client = await connected();
+      await gateway.sendLogline('mine-production-web', 'line');
+      await gateway.sendTerminalLine(
+        'mine-production-web-pod1-c1-terminal',
+        'line',
+      );
+      await gateway.sendLogline('theirs-production-web', 'secret');
+      expect(client.emit.mock.calls).toEqual([
+        ['log', 'line'],
+        ['consoleresponse', 'line'],
       ]);
-      expect(mockServer.emit).toHaveBeenCalledWith('deleteApp', { a: 1 });
     });
 
-    it('with an empty team list only the admin team receives it', () => {
-      gateway.sendEvent('updateSettings', {}, []);
-      expect(mockServer.to).toHaveBeenCalledWith(['team:admin']);
+    it('checks revocation again on every incoming message', async () => {
+      const client = await connected();
+      expect(await client.data.revalidate()).toBe(true);
+      identity.resolve.mockRejectedValue(new Error('Revoked'));
+      expect(await client.data.revalidate()).toBe(false);
+      expect(client.disconnect).toHaveBeenCalledWith(true);
     });
-  });
-
-  it('should emit logline to room on sendLogline', () => {
-    gateway.sendLogline('room1', 'logline');
-    expect(mockServer.to).toHaveBeenCalledWith('room1');
-    expect(mockServer.emit).toHaveBeenCalledWith('log', 'logline');
-  });
-
-  it('should emit terminal line to room on sendTerminalLine', () => {
-    gateway.sendTerminalLine('room1', 'line');
-    expect(mockServer.to).toHaveBeenCalledWith('room1');
-    expect(mockServer.emit).toHaveBeenCalledWith('consoleresponse', 'line');
   });
 });

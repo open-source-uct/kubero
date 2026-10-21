@@ -26,6 +26,7 @@ import {
 import { OKDTO } from '../common/dto/ok.dto';
 import { JwtAuthGuard } from './strategies/jwt.guard';
 import { AuthGuard } from '@nestjs/passport';
+import { SESSION_COOKIE, sessionCookieOptions } from './session-cookie';
 
 @Controller({ path: 'api/auth', version: '1' })
 export class AuthController {
@@ -44,12 +45,22 @@ export class AuthController {
     type: LoginOKResponseDTO,
     isArray: false,
   })
-  async login(@Body() auth: LoginDTO, @Request() req: any) {
+  async login(
+    @Body() auth: LoginDTO,
+    @Request() req: any,
+    @Response({ passthrough: true }) res: any,
+  ) {
     const ip: string = req?.ip ?? 'unknown';
     // 429 si ya hubo demasiados intentos fallidos con este usuario
     this.loginThrottle.assertAllowed(ip, auth.username);
     try {
       const result = await this.authService.login(auth.username, auth.password);
+      res.cookie(
+        SESSION_COOKIE,
+        result.access_token,
+        sessionCookieOptions(req),
+      );
+      res.setHeader('Cache-Control', 'no-store');
       this.loginThrottle.reset(ip, auth.username);
       return result;
     } catch (error) {
@@ -59,18 +70,27 @@ export class AuthController {
   }
 
   @Get('logout')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: 'Logout the current session',
-    description: 'Clears the current JWT Token',
+    description:
+      'Revokes all interactive sessions for the current user (Bearer only on GET)',
   })
   @ApiOkResponse({
     description: 'Logout OK',
     type: OKDTO,
     isArray: false,
   })
-  async logout(@Response() res: any): Promise<void> {
-    res.clearCookie('kubero.JWT_TOKEN');
+  async logout(@Response() res: any, @Request() req: any): Promise<void> {
+    await this.authService.logout(req.user);
+    res.clearCookie(SESSION_COOKIE, sessionCookieOptions(req));
     res.send({ message: 'Logged out', status: '200' } as OKDTO);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  async logoutPost(@Response() res: any, @Request() req: any): Promise<void> {
+    return this.logout(res, req);
   }
 
   @Get('session')
@@ -91,15 +111,10 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('bearerAuth')
   async session(@Request() req, @Response() res) {
-    let isAuthenticated = false;
-    if (req.headers.authorization) {
-      isAuthenticated = await this.authService.validateToken(
-        req.headers.authorization.split(' ')[1],
-      );
-    }
     // status siempre es 200 (ver getSession), no hace falta aplicarlo
-    const { message } = await this.authService.getSession(isAuthenticated);
-    res.send(message);
+    const { message } = await this.authService.getSession(true);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send({ ...message, user: req.user });
   }
 
   @Get('methods')
@@ -129,7 +144,8 @@ export class AuthController {
   async githubCallback(@Request() req: any, @Response() res: any) {
     //console.log(req.user); // debug github user data
     const token = await this.authService.loginOAuth2(req.user);
-    res.cookie('kubero.JWT_TOKEN', token);
+    res.cookie(SESSION_COOKIE, token, sessionCookieOptions(req));
+    res.setHeader('Cache-Control', 'no-store');
     res.redirect('/');
   }
 
@@ -146,7 +162,8 @@ export class AuthController {
   async oauth2Callback(@Request() req: any, @Response() res: any) {
     //console.log(req.user);
     const token = await this.authService.loginOAuth2(req.user);
-    res.cookie('kubero.JWT_TOKEN', token);
+    res.cookie(SESSION_COOKIE, token, sessionCookieOptions(req));
+    res.setHeader('Cache-Control', 'no-store');
     res.redirect('/');
   }
 }

@@ -22,7 +22,6 @@ const PERMISSIONS_ALL_KEY = 'permissions_all';
 // Endpoints que deben ser públicos (sin sesión).
 const PUBLIC: string[] = [
   'AuthController.login', // aún no hay sesión
-  'AuthController.logout', // solo borra la cookie
   'AuthController.getMethods', // el login lo necesita para dibujarse
   'AuthController.github', // flujo OAuth (no se usa, pero lo maneja passport)
   'AuthController.githubCallback',
@@ -35,6 +34,8 @@ const PUBLIC: string[] = [
 // Endpoints que solo exigen sesión, porque operan sobre el propio usuario o
 // son datos que todo usuario logueado necesita para que la UI funcione.
 const SESSION_ONLY: string[] = [
+  'AuthController.logout', // revoca las sesiones del propio usuario
+  'AuthController.logoutPost',
   'AuthController.session',
   'UsersController.getProfile',
   'UsersController.updateProfile',

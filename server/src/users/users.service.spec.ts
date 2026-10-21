@@ -109,6 +109,7 @@ describe('UsersService', () => {
         providerId: true,
         providerData: true,
         isActive: true,
+        sessionVersion: true,
         lastLogin: true,
         lastIp: true,
         createdAt: true,
@@ -222,7 +223,11 @@ describe('UsersService', () => {
     expect(prismaMock.user.update).toHaveBeenCalledWith({
       omit: { password: true, twoFaSecret: true },
       where: { id: '1' },
-      data: { password: expect.any(String) }, // password will be hashed
+      data: {
+        password: expect.any(String),
+        sessionVersion: { increment: 1 },
+        tokens: { updateMany: { where: {}, data: { isActive: false } } },
+      },
     });
     expect(mailServiceMock.sendPasswordChangedEmail).toHaveBeenCalledWith(
       'user1@example.com',
@@ -269,7 +274,11 @@ describe('UsersService', () => {
       expect(prismaMock.user.update).toHaveBeenCalledWith({
         omit: { password: true, twoFaSecret: true },
         where: { id: '1' },
-        data: { password: 'hashedPassword' },
+        data: {
+          password: 'hashedPassword',
+          sessionVersion: { increment: 1 },
+          tokens: { updateMany: { where: {}, data: { isActive: false } } },
+        },
       });
       expect(mailServiceMock.sendPasswordChangedEmail).toHaveBeenCalledWith(
         updatedUser.email,

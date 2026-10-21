@@ -206,6 +206,8 @@ export class DatabaseService {
           where: { id: '2' },
           data: {
             password: passwordHash,
+            sessionVersion: { increment: 1 },
+            tokens: { updateMany: { where: {}, data: { isActive: false } } },
             updatedAt: new Date(),
           },
         });

@@ -4,6 +4,7 @@ describe('WsJwtGuard', () => {
   const guard = new WsJwtGuard();
 
   const ctxOf = (data: any) => {
+    data.revalidate ??= jest.fn().mockResolvedValue(true);
     const client = { data, disconnect: jest.fn() };
     return {
       client,

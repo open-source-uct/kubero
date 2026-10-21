@@ -16,13 +16,9 @@
 <script lang="ts">
 
 import { useKuberoStore } from '../../stores/kubero'
-import { useCookies } from "vue3-cookies";
 import { useSocketIO } from '../../socket.io';
 
-const { cookies } = useCookies();
-const token = cookies.get("kubero.JWT_TOKEN");
-//console.log("COOKIE token", token);
-const { socket } = useSocketIO(token);
+const { socket } = useSocketIO();
 
 // Write socket to pinia
 const kuberoStore = useKuberoStore();

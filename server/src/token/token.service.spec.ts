@@ -6,6 +6,11 @@ import { RolesService } from '../roles/roles.service';
 
 describe('TokenService', () => {
   let service: TokenService;
+  const caller = {
+    userId: 'u1',
+    strategy: 'local',
+    permissions: ['token:ok'],
+  } as any;
 
   // Mock Prisma client or any DB dependencies inside TokenService
   const mockPrisma = {
@@ -82,7 +87,7 @@ describe('TokenService', () => {
 
   describe('create', () => {
     it('should create a token', async () => {
-      const result = await service.create('token1', '2025-01-01', 'u1');
+      const result = await service.create('token1', '2025-01-01', 'u1', caller);
       expect(mockUsersService.findById).toHaveBeenCalledWith('u1');
       expect(mockPrisma.token.create).toHaveBeenCalled();
       expect(result).toEqual({
@@ -93,7 +98,7 @@ describe('TokenService', () => {
     });
 
     it('should read the role, groups and permissions from the database, not from arguments', async () => {
-      await service.create('token1', '2025-01-01', 'u1');
+      await service.create('token1', '2025-01-01', 'u1', caller);
       expect(mockRolesService.getPermissions).toHaveBeenCalledWith('r1');
       expect(mockAuthService.generateToken).toHaveBeenCalledWith(
         'u1',
@@ -114,7 +119,7 @@ describe('TokenService', () => {
     it('should remove the row if the JWT could not be signed', async () => {
       mockAuthService.generateToken.mockRejectedValueOnce(new Error('boom'));
       await expect(
-        service.create('token1', '2025-01-01', 'u1'),
+        service.create('token1', '2025-01-01', 'u1', caller),
       ).rejects.toThrow('boom');
       expect(mockPrisma.token.delete).toHaveBeenCalledWith({
         where: { id: '1' },
@@ -124,7 +129,7 @@ describe('TokenService', () => {
     it('should throw if the user does not exist', async () => {
       mockUsersService.findById.mockResolvedValueOnce(null);
       await expect(
-        service.create('token1', '2025-01-01', 'u1'),
+        service.create('token1', '2025-01-01', 'u1', caller),
       ).rejects.toThrow('User not found');
     });
   });

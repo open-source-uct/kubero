@@ -54,20 +54,20 @@ export class AuthService {
       const passwordMatch = await bcrypt.compare(pass, user.password);
       //if (passwordMatch) {
       if (user.password === password || passwordMatch) {
+        if (user.password === password) {
+          if (!user.id) return null;
+          const migrated = await this.usersService.migrateLegacyPassword(
+            user.id,
+            user.password,
+            pass,
+          );
+          if (!migrated) return null;
+        }
         const { password: _password, ...result } = user;
         return result;
       }
     }
     return null;
-  }
-
-  async validateToken(token: string): Promise<boolean> {
-    try {
-      this.jwtService.verify(token);
-      return true;
-    } catch {
-      return false;
-    }
   }
 
   async login(username: string, password: string) {
@@ -91,6 +91,7 @@ export class AuthService {
       scopeToOwnTeam,
       priority,
       strategy: 'local',
+      sessionVersion: user.sessionVersion,
     };
 
     return {
@@ -123,6 +124,9 @@ export class AuthService {
     if (!user) {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
+    if (user.isActive === false) {
+      throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
+    }
 
     const { permissions, scopeToOwnTeam, priority } =
       await this.rolesService.getPermissions(user.roleId);
@@ -137,6 +141,7 @@ export class AuthService {
       scopeToOwnTeam,
       priority,
       strategy: 'oauth2',
+      sessionVersion: user.sessionVersion,
     };
     return this.jwtService.sign(u);
   }
@@ -216,6 +221,16 @@ export class AuthService {
     };
 
     return { message: message, status: status };
+  }
+
+  async logout(user: { userId: string; strategy?: string }) {
+    if (user.strategy === 'token') {
+      throw new HttpException(
+        'Interactive session required',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    await this.usersService.revokeSessions(user.userId);
   }
 
   getMethods(): { local: boolean; github: boolean; oauth2: boolean } {
