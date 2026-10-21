@@ -125,6 +125,15 @@ export class PipelinesController {
     @Request() req: any,
     @Param('pipeline') pipelineName: string,
   ) {
+    // La autorización de abajo valida contra el nombre de la URL; si el body
+    // trajera otro nombre, toPipeline() lo usaría para armar el pipeline a
+    // actualizar y se terminaría escribiendo sobre uno distinto al
+    // autorizado.
+    if (pl.pipelineName !== pipelineName) {
+      const msg = 'Pipeline name does not match the URL';
+      Logger.error(msg);
+      throw new HttpException(msg, HttpStatus.BAD_REQUEST);
+    }
     await this.assertPipelineAccess(pipelineName, req.user);
     const current = await this.pipelinesService.getPipeline(pipelineName);
     this.assertTeamAccess(pl, req.user, current?.access?.teams ?? []);

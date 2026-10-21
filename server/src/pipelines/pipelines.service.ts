@@ -31,7 +31,7 @@ export class PipelinesService {
       items: [],
     };
     for (const pipeline of pipelines.items) {
-      ret.items.push(pipeline.spec);
+      ret.items.push(this.redactPipeline(pipeline.spec));
     }
     return ret;
   }
@@ -48,9 +48,6 @@ export class PipelinesService {
     if (!kpipeline.spec || !kpipeline.spec.git || !kpipeline.spec.git.keys) {
       return;
     }
-
-    delete kpipeline.spec.git.keys.priv;
-    delete kpipeline.spec.git.keys.pub;
 
     const pipeline = kpipeline.spec;
 
@@ -76,7 +73,24 @@ export class PipelinesService {
         }
       }
     }
-    return pipeline;
+    return this.redactPipeline(pipeline);
+  }
+
+  // Clona el pipeline y le saca la clave privada/pública de git y el
+  // password del registry, antes de devolverlo en una respuesta o
+  // notificación. No muta el objeto recibido: updatePipeline, por ejemplo,
+  // sigue necesitando los valores reales después de llamar a esto para
+  // escribirlos en el CRD.
+  private redactPipeline(pipeline: IPipeline): IPipeline {
+    const redacted: IPipeline = JSON.parse(JSON.stringify(pipeline));
+    if (redacted.git?.keys) {
+      delete redacted.git.keys.priv;
+      delete redacted.git.keys.pub;
+    }
+    if (redacted.registry) {
+      redacted.registry.password = '';
+    }
+    return redacted;
   }
 
   // Devuelve el contexto de kubernetes de la fase, o lanza si el usuario no
@@ -136,14 +150,7 @@ export class PipelinesService {
         pipeline.spec.resourceVersion = pipeline.metadata.resourceVersion;
       }
 
-      if (pipeline.spec.git?.keys) {
-        delete pipeline.spec.git.keys.priv;
-        delete pipeline.spec.git.keys.pub;
-      }
-      if (pipeline.spec.registry) {
-        pipeline.spec.registry.password = '';
-      }
-      return pipeline.spec;
+      return this.redactPipeline(pipeline.spec);
     }
   }
 
@@ -193,7 +200,9 @@ export class PipelinesService {
       phaseName: '',
       appName: '',
       data: {
-        pipeline: pipeline,
+        pipeline: pipeline.spec
+          ? { ...pipeline, spec: this.redactPipeline(pipeline.spec) }
+          : pipeline,
       },
     } as INotification;
     void this.notificationsService.send(m);
@@ -239,7 +248,7 @@ export class PipelinesService {
       phaseName: '',
       appName: '',
       data: {
-        pipeline: pipeline,
+        pipeline: this.redactPipeline(pipeline),
       },
     } as INotification;
     void this.notificationsService.send(m);
@@ -270,7 +279,7 @@ export class PipelinesService {
       phaseName: '',
       appName: '',
       data: {
-        pipeline: pipeline,
+        pipeline: this.redactPipeline(pipeline),
       },
     } as INotification;
     void this.notificationsService.send(m);

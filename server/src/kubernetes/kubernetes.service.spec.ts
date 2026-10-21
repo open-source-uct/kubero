@@ -131,6 +131,20 @@ describe('KubernetesService', () => {
     ).resolves.toBeUndefined();
   });
 
+  it('should propagate errors when updating a pipeline fails', async () => {
+    // antes se silenciaba el error acá, y el caller (PipelinesService) seguía
+    // como si la escritura hubiese tenido éxito y mandaba la notificación de
+    // "actualizado" igual.
+    (
+      service as any
+    ).customObjectsApi.replaceNamespacedCustomObject.mockRejectedValueOnce(
+      new Error('boom'),
+    );
+    await expect(
+      service.updatePipeline({ name: 'test' } as any, '1'),
+    ).rejects.toThrow('boom');
+  });
+
   it('should deletePipeline', async () => {
     await expect(service.deletePipeline('test')).resolves.toBeUndefined();
   });
