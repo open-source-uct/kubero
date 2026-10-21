@@ -169,6 +169,23 @@ describe('AuthService', () => {
         scopeToOwnTeam: false,
       });
     });
+
+    it('passes the profile id as providerId (immutable, unlike the username)', async () => {
+      const reqUser = {
+        id: 987654,
+        username: 'oauthuser',
+        emails: [{ value: 'undefined@kubero.dev' }],
+        provider: 'github',
+      };
+      await service.loginOAuth2(reqUser);
+      expect(usersService.findOneOrCreate).toHaveBeenCalledWith(
+        'oauthuser',
+        'undefined@kubero.dev',
+        'github',
+        null,
+        '987654',
+      );
+    });
   });
 
   describe('generateToken', () => {
