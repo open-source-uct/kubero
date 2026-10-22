@@ -33,6 +33,7 @@ describe('LogsService', () => {
         log: jest.fn().mockResolvedValue(undefined),
       },
     };
+    kubectl.getLog = jest.fn(() => kubectl.log);
     pipelinesService = {
       getContext: jest.fn(),
     };
@@ -63,6 +64,21 @@ describe('LogsService', () => {
   });
 
   describe('emitLogs', () => {
+    it('keeps same-named pod log streams separate across contexts and namespaces', async () => {
+      pipelinesService.getContext
+        .mockResolvedValueOnce('cluster-a')
+        .mockResolvedValueOnce('cluster-b');
+      await service.emitLogs('pipe', 'dev', 'app', 'same-pod', 'web', [
+        'group1',
+      ]);
+      await service.emitLogs('pipe', 'prod', 'app', 'same-pod', 'web', [
+        'group1',
+      ]);
+      expect(kubectl.getLog).toHaveBeenNthCalledWith(1, 'cluster-a');
+      expect(kubectl.getLog).toHaveBeenNthCalledWith(2, 'cluster-b');
+      expect(kubectl.log.log).toHaveBeenCalledTimes(2);
+    });
+
     it('should emit logs and call sendLogline', async () => {
       pipelinesService.getContext.mockResolvedValue('ctx');
       kubectl.setCurrentContext.mockReturnValue(undefined);
@@ -88,7 +104,9 @@ describe('LogsService', () => {
 
     it('should not start logs if already running', async () => {
       pipelinesService.getContext.mockResolvedValue('ctx');
-      (service as any).podLogStreams = ['pod-foo-bar-123-456/web'];
+      (service as any).podLogStreams = [
+        'ctx/pipe-phase/pod-foo-bar-123-456/web',
+      ];
       const spy = jest.spyOn(kubectl.log, 'log');
       await service.emitLogs(
         'pipe',

@@ -43,9 +43,12 @@ export class DeploymentsService {
       phaseName,
       userGroups,
     );
-    this.kubectl.setCurrentContext(contextName);
+
     const namespace = pipelineName + '-' + phaseName;
-    const jobs = (await this.kubectl.getJobs(namespace)) as V1JobList;
+    const jobs = (await this.kubectl.getJobs(
+      namespace,
+      contextName,
+    )) as V1JobList;
 
     if (!jobs) {
       this.logger.log('No deployments found');
@@ -147,7 +150,7 @@ export class DeploymentsService {
       phase,
       userGroups,
     );
-    this.kubectl.setCurrentContext(contextName);
+
     const namespace = pipeline + '-' + phase;
 
     if (process.env.KUBERO_READONLY == 'true') {
@@ -171,6 +174,7 @@ export class DeploymentsService {
           image: process.env.KUBERO_BUILD_REGISTRY + '/' + pipeline + '-' + app,
           tag: reference,
         },
+        contextName,
       );
     } catch (error) {
       this.logger.error(
@@ -223,9 +227,9 @@ export class DeploymentsService {
       phase,
       userGroups,
     );
-    this.kubectl.setCurrentContext(contextName);
+
     const namespace = pipeline + '-' + phase;
-    await this.kubectl.deleteKuberoBuildJob(namespace, buildName);
+    await this.kubectl.deleteKuberoBuildJob(namespace, buildName, contextName);
 
     const m = {
       name: 'newBuild',
@@ -281,6 +285,7 @@ export class DeploymentsService {
             pipelineName,
             phaseName,
             appName,
+            contextName,
           );
           loglines = loglines.concat(ll);
         }
@@ -308,8 +313,7 @@ export class DeploymentsService {
     const namespace = pipelineName + '-' + phaseName;
 
     if (contextName) {
-      this.kubectl.setCurrentContext(contextName);
-      this.kubectl.deployApp(namespace, appName, tag);
+      this.kubectl.deployApp(namespace, appName, tag, contextName);
 
       const m = {
         name: 'deployApp',
