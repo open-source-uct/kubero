@@ -40,7 +40,6 @@ const messages = {
     podSizes: 'Tamaños de Pod',
     notifications: 'Notificaciones',
     theme: 'Modo Oscuro/Claro',
-    kuberoAPI: 'API de Kubero',
     documentation: 'Documentación',
     mainNavigation: 'Navegación principal',
     openMainNavigation: 'Abrir navegación principal',

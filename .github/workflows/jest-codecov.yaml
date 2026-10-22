@@ -11,8 +11,8 @@ jobs:
   codecov:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4         # checkout the repo
-      - uses: pnpm/action-setup@v4        # install pnpm (versión leída de package.json)
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4         # checkout the repo
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4        # install pnpm (versión leída de package.json)
         with:
           package_json_file: server/package.json
       - name: Install dependencies        # install dependencies
@@ -20,12 +20,12 @@ jobs:
       - run: pnpm run build                # install packages
       - run: pnpm run test                 # run tests (configured to use jest-junit reporter)
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
         with:
           directory: server/coverage
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
+        uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

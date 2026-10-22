@@ -135,12 +135,6 @@
                 prepend-icon="mdi-theme-light-dark"
                 :title="$t('navigation.theme')">
             </v-list-item>
-            <v-list-item 
-                link href="/api/docs" 
-                target="_blank"
-                prepend-icon="mdi-api"
-                :title="$t('navigation.kuberoAPI')">
-            </v-list-item>
             <v-list-item
                 class="secondary-nav-trigger"
                 role="button"

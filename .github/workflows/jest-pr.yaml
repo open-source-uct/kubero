@@ -11,8 +11,8 @@ jobs:
   build-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4         # checkout the repo
-      - uses: pnpm/action-setup@v4        # install pnpm (versión leída de package.json)
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4         # checkout the repo
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4        # install pnpm (versión leída de package.json)
         with:
           package_json_file: server/package.json
       - name: Install dependencies        # install dependencies
@@ -20,11 +20,11 @@ jobs:
       - run: pnpm run build                # install packages
       - run: pnpm run test:ci              # run tests (configured to use jest-junit reporter)
       - name: Jest Coverage Comment
-        uses: MishaKav/jest-coverage-comment@main
+        uses: MishaKav/jest-coverage-comment@1b5d15445c8afba0c13bd00167bd31130b812d0a # main
         with:
           coverage-summary-path: server/coverage/coverage-summary.json
           junitxml-path: server/reports/jest-junit.xml
-      - uses: actions/upload-artifact@v4  # upload test results
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4  # upload test results
         if: ${{ !cancelled() }}           # run this step even if previous step failed
         with:
           name: test-results              # Name of the check run which will be created

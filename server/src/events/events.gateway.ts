@@ -19,7 +19,10 @@ const teamRoom = (team: string) => `team:${team}`;
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    // mismo criterio que la API REST (main.ts): el cliente se sirve desde
+    // este mismo servidor en producción, así que no hace falta un origen
+    // abierto; en desarrollo el cliente corre en otro puerto (Vite).
+    origin: process.env.NODE_ENV !== 'production',
   },
 })
 @UseGuards(WsJwtGuard)
