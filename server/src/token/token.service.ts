@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { AuthService } from '../auth/auth.service';
 import { UsersService } from '../users/users.service';
 import { RolesService } from '../roles/roles.service';
+import { AuthenticatedUser } from '../auth/identity.service';
 
 @Injectable()
 export class TokenService {
@@ -38,11 +39,19 @@ export class TokenService {
     name: string,
     expiresAt: string,
     userId: string,
+    caller: AuthenticatedUser,
   ): Promise<{
     name: string;
     token: string;
     expiresAt: string;
   }> {
+    if (
+      !caller ||
+      caller.userId !== userId ||
+      !['local', 'oauth2'].includes(caller.strategy ?? '')
+    ) {
+      throw new ForbiddenException('Interactive session required');
+    }
     if (!name || !expiresAt || !userId) {
       throw new Error('Invalid token data');
     }
@@ -54,7 +63,7 @@ export class TokenService {
     // se castea a any porque findById() incluye relaciones (role, userGroups)
     // que el tipo Partial<PrismaUser> no declara
     const user = (await this.usersService.findById(userId)) as any;
-    if (!user) {
+    if (!user || user.isActive === false) {
       throw new Error('User not found');
     }
 

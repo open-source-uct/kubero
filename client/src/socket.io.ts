@@ -1,21 +1,16 @@
-import io from 'socket.io-client';
+import { io, type Socket } from 'socket.io-client'
 
-export const useSocketIO = (token: string) => {
-    const socketOptions = {
-        autoConnect: true,
-        auth: {}
-    };
+let socket: Socket | undefined
 
-    // Do not use authentication when token is empty
-    if (token !== '') {
-        socketOptions.auth = {
-            token: token,
-        };
-        //console.log('socket.io auth :::: ', token);
-    }
+export const useSocketIO = () => {
+  socket ??= io({ withCredentials: true })
+  return { socket }
+}
 
-    const socket = io(socketOptions);
-    return {
-        socket,
-    }
+export function disconnectSocketIO() {
+  if (!socket) return
+  socket.auth = {}
+  socket.disconnect()
+  socket.removeAllListeners()
+  socket = undefined
 }

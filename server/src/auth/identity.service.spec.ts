@@ -10,6 +10,7 @@ describe('IdentityService.resolve', () => {
     id: 'u1',
     username: 'ana',
     isActive: true,
+    sessionVersion: 0,
     role: { id: 'r-member', name: 'member' },
     userGroups: [{ name: 'Taller1' }],
   };
@@ -40,6 +41,7 @@ describe('IdentityService.resolve', () => {
       userGroups: ['admin'],
       permissions: ['user:write', 'config:write'],
       strategy: 'local',
+      sessionVersion: 0,
     });
     expect(user).toEqual({
       userId: 'u1',
@@ -57,27 +59,35 @@ describe('IdentityService.resolve', () => {
       permissions: [{ resource: 'app', action: 'read' }],
       scopeToOwnTeam: false,
     });
-    const user = await strategy.resolve({ userId: 'u1', strategy: 'local' });
+    const user = await strategy.resolve({
+      userId: 'u1',
+      strategy: 'local',
+      sessionVersion: 0,
+    });
     expect(user.permissions).toEqual(['app:read']);
   });
 
   it('reflects a removal from a team immediately', async () => {
     usersService.findById.mockResolvedValue({ ...dbUser, userGroups: [] });
-    const user = await strategy.resolve({ userId: 'u1', strategy: 'local' });
+    const user = await strategy.resolve({
+      userId: 'u1',
+      strategy: 'local',
+      sessionVersion: 0,
+    });
     expect(user.userGroups).toEqual([]);
   });
 
   it('rejects a token whose user was deleted', async () => {
     usersService.findById.mockResolvedValue(null);
     await expect(
-      strategy.resolve({ userId: 'u1', strategy: 'local' }),
+      strategy.resolve({ userId: 'u1', strategy: 'local', sessionVersion: 0 }),
     ).rejects.toThrow(UnauthorizedException);
   });
 
   it('rejects a token whose user was disabled', async () => {
     usersService.findById.mockResolvedValue({ ...dbUser, isActive: false });
     await expect(
-      strategy.resolve({ userId: 'u1', strategy: 'local' }),
+      strategy.resolve({ userId: 'u1', strategy: 'local', sessionVersion: 0 }),
     ).rejects.toThrow(UnauthorizedException);
   });
 
@@ -89,7 +99,7 @@ describe('IdentityService.resolve', () => {
   });
 
   it('accepts a numeric userId (tokens from v3.0.0)', async () => {
-    await strategy.resolve({ userId: 7, strategy: 'local' });
+    await strategy.resolve({ userId: 7, strategy: 'local', sessionVersion: 0 });
     expect(usersService.findById).toHaveBeenCalledWith('7');
   });
 
@@ -154,11 +164,11 @@ describe('IdentityService.resolve', () => {
       );
     });
 
-    it('still accepts tokens issued before the jti existed', async () => {
+    it('rejects legacy personal tokens without a revocable id', async () => {
       const { jti: _jti, ...legacy } = payload;
-      const user = await strategy.resolve(legacy);
-      expect(usersService.findToken).not.toHaveBeenCalled();
-      expect(user.permissions).toEqual(['app:write']);
+      await expect(strategy.resolve(legacy)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('rejects a legacy token of a disabled user', async () => {

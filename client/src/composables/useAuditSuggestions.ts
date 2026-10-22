@@ -15,7 +15,7 @@ export function useAuditSuggestions(kind: 'pipeline' | 'username', search: () =>
     request?.abort()
   }
 
-  watch(() => [search(), pipeline(), auth.token, auth.userGroups.join(','), auth.permissions.join(',')], (values, previous) => {
+  watch(() => [search(), pipeline(), auth.userId, auth.userGroups.join(','), auth.permissions.join(',')], (values, previous) => {
     cancel()
     // Vuetify reopens a focused combobox when items go from empty to populated.
     // Keep options while searching, but never retain names from a previous access scope.

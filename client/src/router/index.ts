@@ -1,7 +1,7 @@
 // Composables
 import { createRouter, createWebHistory, RouteLocationNormalized } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useCookies } from 'vue3-cookies'
+import axios from 'axios'
 
 const routes = [
   {
@@ -221,13 +221,13 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const authStore = useAuthStore()
 
-  const { cookies } = useCookies()
-  const token = cookies.get('kubero.JWT_TOKEN')
-  if (token && token !== authStore.token) authStore.loadToken(token)
-  if (!token && authStore.token) authStore.reset()
+  if (to.name === 'Login' || to.name === 'Setup') return
+  delete axios.defaults.headers.common['Authorization']
+  await authStore.initialize()
+  if (!authStore.userId) return { name: 'Login' }
 
   if (to.path === '/accounts') {
     if (authStore.hasPermission('user:read') || authStore.hasPermission('user:write')) return { name: 'Account Users' }

@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint . --fix --ignore-path .gitignore",
     "test:e2e": "playwright test",
+    "test:unit": "node --test tests/auth-session.test.cjs",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report"
   },

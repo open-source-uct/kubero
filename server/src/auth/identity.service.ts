@@ -52,6 +52,14 @@ export class IdentityService {
       throw new UnauthorizedException();
     }
 
+    if (
+      payload.strategy !== 'token' &&
+      (!Number.isInteger(payload.sessionVersion) ||
+        payload.sessionVersion !== user.sessionVersion)
+    ) {
+      throw new UnauthorizedException();
+    }
+
     const {
       permissions: rolePermissions,
       scopeToOwnTeam: freshScopeToOwnTeam,
@@ -64,16 +72,15 @@ export class IdentityService {
     let priority = freshPriority;
 
     if (payload.strategy === 'token') {
-      // Token personal: si trae el id de su fila (jti) tiene que seguir
-      // existiendo y activa (así se revoca borrándolo). Los emitidos antes de
-      // que existiera el jti siguen valiendo hasta caducar.
+      if (!payload.jti) throw new UnauthorizedException();
+      // Solo se aceptan tokens personales con una fila revocable activa.
       if (payload.jti) {
         const token = await this.usersService.findToken(payload.jti);
         if (
           !token ||
           token.userId !== userId ||
           token.isActive === false ||
-          token.expiresAt.getTime() < Date.now()
+          token.expiresAt.getTime() <= Date.now()
         ) {
           this.logger.warn(`Rejected revoked or expired token ${payload.jti}`);
           throw new UnauthorizedException();

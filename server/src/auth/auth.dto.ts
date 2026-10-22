@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty } from 'class-validator';
+import { AuthenticatedUser } from './identity.service';
 
 export class GetMethodsDTO {
   @ApiProperty({ default: false })
@@ -30,6 +31,12 @@ export class LoginDTO {
 }
 
 export class GetSessionDTO {
+  @ApiProperty({
+    description:
+      'Current identity and effective permissions, without credentials',
+    type: Object,
+  })
+  user: AuthenticatedUser;
   @ApiProperty()
   isAuthenticated: boolean;
   @ApiProperty()

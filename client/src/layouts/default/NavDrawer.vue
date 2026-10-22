@@ -532,7 +532,6 @@ theme.global.name.value = localStorage.getItem("theme") || 'light';
 </script>
 
 <script lang="ts">
-import { useCookies } from "vue3-cookies";
 import router from "../../router"
 import { defineComponent } from 'vue'
 import { useKuberoStore } from '../../stores/kubero'
@@ -541,7 +540,6 @@ import { mapState } from 'pinia'
 
 const authStore = useAuthStore();
 
-const { cookies } = useCookies();
 
 export default defineComponent({
   name: "NavDrawer",
@@ -557,12 +555,16 @@ export default defineComponent({
       ...mapState(useKuberoStore, ['kubero']),
     },
     methods: {
-        logout: () => {
-            //localStorage.removeItem("kubero.JWT_TOKEN");
-            // Remove cookie
-            cookies.remove("kubero.JWT_TOKEN");
-            authStore.reset()
-            router.push("/login")
+        logout: async () => {
+            try {
+                await axios.post('/api/auth/logout', {}, { feedback: { success: false } })
+            } catch {
+                // The HTTP interceptor reports the failure; still clear memory.
+                return
+            } finally {
+                authStore.reset()
+                await router.push('/login')
+            }
         },
     },
     mounted() {

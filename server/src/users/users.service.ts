@@ -35,6 +35,27 @@ export class UsersService {
     return this.prisma.token.findUnique({ where: { id } });
   }
 
+  async revokeSessions(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { sessionVersion: { increment: 1 } },
+      select: { id: true },
+    });
+  }
+
+  async migrateLegacyPassword(
+    userId: string,
+    oldHash: string,
+    password: string,
+  ) {
+    // Compare-and-swap: a concurrent password reset must win over this login.
+    const result = await this.prisma.user.updateMany({
+      where: { id: userId, password: oldHash },
+      data: { password: await bcrypt.hash(password, 10) },
+    });
+    return result.count === 1;
+  }
+
   async findOneFull(username: string): Promise<PartialPrismaUser | null> {
     return this.prisma.user.findUnique({
       where: {
@@ -207,6 +228,7 @@ export class UsersService {
         createdAt: true,
         updatedAt: true,
         isActive: true,
+        sessionVersion: true,
         lastLogin: true,
         lastIp: true,
         provider: true,
@@ -619,7 +641,11 @@ export class UsersService {
       const user = await this.prisma.user.update({
         omit: { password: true, twoFaSecret: true },
         where: { id: userId },
-        data: { password: hashedPassword },
+        data: {
+          password: hashedPassword,
+          sessionVersion: { increment: 1 },
+          tokens: { updateMany: { where: {}, data: { isActive: false } } },
+        },
       });
       this.logger.debug(`Password updated for user with ID ${userId}.`);
       void this.mailService.sendPasswordChangedEmail(user.email, user.username);
@@ -687,7 +713,11 @@ export class UsersService {
       const updatedUser = await this.prisma.user.update({
         omit: { password: true, twoFaSecret: true },
         where: { id: userId },
-        data: { password: hashedNewPassword },
+        data: {
+          password: hashedNewPassword,
+          sessionVersion: { increment: 1 },
+          tokens: { updateMany: { where: {}, data: { isActive: false } } },
+        },
       });
 
       this.logger.debug(`Password updated for user with ID ${userId}.`);
