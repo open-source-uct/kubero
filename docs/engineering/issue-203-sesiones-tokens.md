@@ -36,3 +36,9 @@ La suite completa de servidor pasa con 957 pruebas en 70 suites (pnpm --dir serv
 Cada entrega WebSocket revalida al destinatario en la base de datos. Los logs y terminales consultan además la autorización actual del pipeline. Los streams con muchos suscriptores pueden añadir latencia; validar capacidad antes de ampliar la carga de producción.
 
 Desplegar backend y cliente juntos, evitando versiones antiguas que sigan aceptando JWT sin comprobación de revocación. Para revertir, restaurar el código anterior conservando la columna aditiva y su historial de migración. El código anterior no respeta la versión de sesión: rotar la clave de firma durante esa reversión para no reactivar JWT revocados y volver a emitir los tokens personales afectados. No borrar ni reconstruir tablas para deshacer esta columna.
+
+## Integración con develop
+
+El 21-10-2026 se incorporó `origin/develop` (`56c3c83b`), que incluye el PR #214 de OAuth, mediante un merge sin conflictos. Se conserva la vinculación por `providerId` junto con el rechazo de usuarios desactivados y la emisión de `sessionVersion` para las sesiones OAuth.
+
+La combinación pasa **971 pruebas en 72 suites** con `pnpm --dir server exec jest --runInBand --coverage=false --silent`. También completan correctamente `pnpm --dir server run build`, `pnpm --dir client run build` y `git diff --cached --check`. Las pruebas de OAuth usan proveedores simulados; el flujo con un proveedor externo real continúa pendiente.

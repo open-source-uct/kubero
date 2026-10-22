@@ -93,7 +93,26 @@ export class UsersService {
     email: string,
     provider: string,
     image: string,
+    providerId?: string | null,
   ): Promise<PartialPrismaUser> {
+    // El id del proveedor es inmutable (a diferencia del username, que se
+    // puede renombrar o reciclar): si ya conocemos esta cuenta por su
+    // providerId, es la fuente de verdad y evita buscar por username.
+    if (providerId) {
+      const byProviderId = await this.prisma.user.findFirst({
+        where: { provider, providerId },
+        include: {
+          tokens: { select: { id: true, createdAt: true, expiresAt: true } },
+          role: { select: { id: true, name: true, description: true } },
+          userGroups: { select: { id: true, name: true, description: true } },
+        },
+      });
+      if (byProviderId) {
+        this.logger.debug(`User ${byProviderId.username} found by providerId.`);
+        return byProviderId;
+      }
+    }
+
     let user = await this.findOneFull(username);
     if (!user) {
       this.logger.debug(
@@ -142,7 +161,7 @@ export class UsersService {
         image: imageData,
         role: role.id,
         userGroups: [userGroupsData.id],
-        providerId: null, // Set providerId if needed
+        providerId: providerId ?? null,
         providerData: null, // Set providerData if needed
       });
       this.logger.debug(`User ${username} created successfully.`);
@@ -156,6 +175,35 @@ export class UsersService {
         throw new ForbiddenException(
           'This username is already used by another account',
         );
+      }
+      if (providerId) {
+        if (user.providerId && user.providerId !== providerId) {
+          // el username coincide pero el providerId no: alguien más es hoy
+          // dueño de ese username en el proveedor (reciclado o renombrado).
+          this.logger.warn(
+            `Refused ${provider} login: username ${username} is already linked to a different ${provider} account.`,
+          );
+          throw new ForbiddenException(
+            'This username is already linked to a different account',
+          );
+        }
+        if (!user.providerId) {
+          // cuenta creada antes de este fix: recién ahora le grabamos el
+          // providerId, para que de aquí en adelante quede como ancla fija.
+          user = await this.prisma.user.update({
+            where: { id: user.id },
+            data: { providerId },
+            include: {
+              tokens: {
+                select: { id: true, createdAt: true, expiresAt: true },
+              },
+              role: { select: { id: true, name: true, description: true } },
+              userGroups: {
+                select: { id: true, name: true, description: true },
+              },
+            },
+          });
+        }
       }
       this.logger.debug(`User ${username} found.`);
     }

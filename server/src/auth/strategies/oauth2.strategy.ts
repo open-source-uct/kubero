@@ -4,6 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthenticateOptions } from 'passport';
 import { ConfigService } from '../../config/config.service';
+import { StatelessOauthStateStore } from '../oauth-state.store';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -53,6 +54,10 @@ export class Oauth2Strategy extends PassportStrategy(Strategy) {
       scope: ConfigService.getAuthenticationScope(
         process.env.OAUTH2_CLIENT_SCOPE,
       ),
+      // sin esto, passport-oauth2 no agrega ni valida el parámetro "state"
+      // del flujo OAuth (login CSRF). Un store propio porque Kubero no usa
+      // sesiones de servidor (el store por defecto necesita req.session).
+      store: new StatelessOauthStateStore(),
     } as StrategyOptions);
   }
   async validate(accessToken: string, _refreshToken: string, profile: any) {
