@@ -189,8 +189,6 @@ export class AppsService {
 
     const timestamp = new Date().getTime();
     if (contextName) {
-      this.kubectl.setCurrentContext(contextName);
-
       await this.kubectl.createBuildJob(
         namespace,
         appName,
@@ -205,6 +203,7 @@ export class AppsService {
           image: `${process.env.KUBERO_BUILD_REGISTRY}/${pipeline}-${appName}`,
           tag: app.spec.branch + '-' + timestamp,
         },
+        contextName,
       );
     }
 
@@ -422,7 +421,7 @@ export class AppsService {
 
   public async getAllAppsList(contextName: string) {
     this.logger.debug('getAppsList');
-    this.kubectl.setCurrentContext(contextName);
+
     const apps = await this.kubectl.getAllAppsList(contextName);
     const appslist = [] as IApp[];
     for (const app of apps.items) {
@@ -729,7 +728,6 @@ export class AppsService {
     const workloads: Workload[] = [];
 
     if (contextName) {
-      this.kubectl.setCurrentContext(contextName);
       const workload = await this.kubectl.getPods(namespace, contextName);
       //return workload
       for (const pod of workload) {
@@ -825,16 +823,38 @@ export class AppsService {
       }
 
       const execStream = new Stream.PassThrough();
+      const stdout = new Stream.PassThrough();
+      const stderr = new Stream.PassThrough();
+      const output = (chunk: Buffer) => {
+        void this.eventsGateway.sendTerminalLine(streamname, chunk.toString());
+      };
+      stdout.on('data', output);
+      stderr.on('data', output);
+      const closeStreams = () => {
+        execStream.destroy();
+        stdout.destroy();
+        stderr.destroy();
+      };
 
       const namespace = pipelineName + '-' + phaseName;
       const ws = await this.kubectl
-        .execInContainer(namespace, podName, containerName, command, execStream)
-        .catch((error) => {
-          console.log(error);
+        .execInContainer(
+          namespace,
+          podName,
+          containerName,
+          command,
+          execStream,
+          stdout,
+          stderr,
+          contextName,
+        )
+        .catch(() => {
+          this.logger.error('Unable to open container terminal');
           return;
         });
 
       if (!ws || ws.readyState != ws.OPEN) {
+        closeStreams();
         console.log('execInContainer: ws is undefined or not open');
         return;
       }
@@ -845,10 +865,16 @@ export class AppsService {
       };
       this.eventsGateway.execStreams[streamname] = stream;
 
-      // sending the terminal output to the client
-      ws.on('message', (data: Buffer) => {
-        this.eventsGateway.sendTerminalLine(streamname, data.toString());
-      });
+      // Exec demultiplexes stdout/stderr. Never forward raw protocol frames
+      // (which also contain channel/status bytes) or write output to server logs.
+      const release = () => {
+        closeStreams();
+        if (this.eventsGateway.execStreams[streamname] === stream) {
+          delete this.eventsGateway.execStreams[streamname];
+        }
+      };
+      ws.on('close', release);
+      ws.on('error', release);
     }
   }
 

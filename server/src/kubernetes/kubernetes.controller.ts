@@ -55,9 +55,9 @@ export class KubernetesController {
     // cluster. Solo el equipo admin puede pedir uno arbitrario; el resto, solo
     // los namespaces (<pipeline>-<fase>) de los pipelines a los que tiene acceso.
     const userGroups: string[] = req.user.userGroups ?? [];
+    let context: string | undefined;
     if (!userGroups.includes('admin')) {
       const pipelines = await this.pipelinesService.listPipelines(userGroups);
-      let context: string | undefined;
       let allowed = false;
       for (const pipeline of pipelines.items) {
         for (const phase of pipeline.phases) {
@@ -70,11 +70,8 @@ export class KubernetesController {
       if (!allowed) {
         throw new ForbiddenException('No access to this namespace');
       }
-      if (context) {
-        this.kubernetesService.setCurrentContext(context);
-      }
     }
-    return this.kubernetesService.getEvents(namespace);
+    return this.kubernetesService.getEvents(namespace, context);
   }
 
   @Get('storageclasses')

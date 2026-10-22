@@ -1,62 +1,19 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { PrometheusController } from '@willsoto/nestjs-prometheus';
 import { StatusController } from './status.controller';
 
 describe('StatusController', () => {
-  let controller: StatusController;
-
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [StatusController],
-    }).compile();
-
-    controller = module.get<StatusController>(StatusController);
-  });
-
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
-  });
-
-  it('should return the metrics when request is not forwarded', async () => {
-    // Mock response and request objects
-    const mockResponse = {
-      req: {
-        headers: {},
-      },
-      status: jest.fn().mockReturnThis(),
-    } as any;
-
-    // Mock super.index
-    const superIndexSpy = jest
-      .spyOn(Object.getPrototypeOf(controller), 'index')
+  it('delegates an authorized request to Prometheus, including proxied requests', async () => {
+    const spy = jest
+      .spyOn(PrometheusController.prototype, 'index')
       .mockResolvedValue('metrics data');
-
-    const result = await controller.index(mockResponse);
-
-    expect(superIndexSpy).toHaveBeenCalledWith(mockResponse);
-    expect(result).toBe('metrics data');
-    expect(mockResponse.status).not.toHaveBeenCalled();
+    try {
+      const response = {
+        req: { headers: { 'x-forwarded-for': '203.0.113.1' } },
+      } as any;
+      expect(await new StatusController().index(response)).toBe('metrics data');
+      expect(spy).toHaveBeenCalledWith(response);
+    } finally {
+      spy.mockRestore();
+    }
   });
-  /*
-  it('should block request with 403 when x-forwarded-for header is present', async () => {
-    // Mock response and request objects
-    const mockResponse = {
-      req: {
-        headers: {
-          'x-forwarded-for': '192.168.1.1'
-        }
-      },
-      status: jest.fn().mockReturnThis()
-    } as any;
-    
-    const loggerWarnSpy = jest.spyOn(controller['logger'], 'warn');
-    const superIndexSpy = jest.spyOn(Object.getPrototypeOf(controller), 'index');
-    
-    const result = await controller.index(mockResponse);
-    
-    expect(mockResponse.status).toHaveBeenCalledWith(403);
-    expect(loggerWarnSpy).toHaveBeenCalledWith('Blocked request from ingress controller');
-    expect(superIndexSpy).not.toHaveBeenCalled();
-    expect(result).toBe('');
-  });
-*/
 });

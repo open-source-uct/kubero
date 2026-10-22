@@ -7,15 +7,17 @@ import {
 import { StatusService } from './status.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppsService } from '../apps/apps.service';
-import { StatusController } from './status.controller';
+import { StatusController, StatusAliasController } from './status.controller';
 
 @Module({
   imports: [
     PrometheusModule.register({
+      path: '/metrics',
       controller: StatusController,
     }),
     ScheduleModule.forRoot(),
   ],
+  controllers: [StatusAliasController],
   providers: [
     StatusService,
     AppsService,

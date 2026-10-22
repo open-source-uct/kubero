@@ -1,5 +1,4 @@
-export const buildpacksTemplate = `---
-# Source: kuberobuild/templates/job-buikdpacks.yaml
+export const buildpacksTemplate = `
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -12,7 +11,7 @@ metadata:
   name: example-test-20240631-2237
 spec:
   ttlSecondsAfterFinished: 31536000
-  backoffLimit: 0 # 0 means do not retry
+  backoffLimit: 0
   completionMode: NonIndexed
   completions: 1
   manualSelector: false
@@ -28,92 +27,169 @@ spec:
         kuberopipeline: test
         job-name: example-test-20240631-2237
     spec:
-      automountServiceAccountToken: true
+      automountServiceAccountToken: false
       securityContext:
         fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: deploy
           env:
-          - name: REPOSITORY
-            value: registry-kubero.yourdomain.com/optionalrepositoryowner/pipeline/app
-          - name: TAG
-            value: "123456"
-          - name: APP
-            value: example
+            - name: REPOSITORY
+              value: registry-kubero.yourdomain.com/optionalrepositoryowner/pipeline/app
+            - name: TAG
+              value: "123456"
+            - name: APP
+              value: example
+            - name: HOME
+              value: /tmp
           command:
-          - sh
-          - -c
-          - 'kubectl patch kuberoapps $APP --type=merge -p "{"spec":{"image":{"repository":
-            "$REPOSITORY","tag": "$TAG"}}}"'
+            - sh
+            - -c
+            - |-
+              set -eu
+              case "$APP" in ''|-*|*[!a-z0-9-]*) exit 1 ;; esac
+              case "$REPOSITORY" in ''|*[!a-zA-Z0-9._:/-]*) exit 1 ;; esac
+              case "$TAG" in ''|*[!a-zA-Z0-9_.-]*) exit 1 ;; esac
+              patch=$(printf '{"spec":{"image":{"repository":"%s","tag":"%s"}}}' "$REPOSITORY" "$TAG")
+              kubectl patch kuberoapps "$APP" --type=merge -p "$patch"
           image: bitnami/kubectl:latest
           imagePullPolicy: Always
-          resources: {}
-          terminationMessagePath: /dev/termination-log
-          terminationMessagePolicy: File
-      initContainers:
-        - name: fetch
-          env:
-          - name: GIT_REPOSITORY
-            value: git@github.com:kubero-dev/template-nodeapp.git
-          - name: GIT_REF
-            value: main
-          - name: KUBERO_BUILDPACK_DEFAULT_RUN_CMD
-            value: "exit 0"
-          - name: KUBERO_BUILDPACK_DEFAULT_BUILD_CMD
-            value: "exit 0"
-          image: "ghcr.io/kubero-dev/fetch:latest"
-          imagePullPolicy: Always
-          resources: {}
-          securityContext:
-            readOnlyRootFilesystem: false
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+              ephemeral-storage: 256Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+              ephemeral-storage: 4Gi
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
-          - mountPath: /home/kubero/.ssh-mounted
-            name: deployment-keys
-            readOnly: true
-          - mountPath: /app
-            name: app-storage
+            - name: deploy-api-access
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+            - name: deploy-tmp
+              mountPath: /tmp
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1001
+            capabilities:
+              drop:
+                - ALL
+      initContainers:
+        - name: fetch
+          env:
+            - name: GIT_REPOSITORY
+              value: git@github.com:kubero-dev/template-nodeapp.git
+            - name: GIT_REF
+              value: main
+            - name: KUBERO_BUILDPACK_DEFAULT_RUN_CMD
+              value: exit 0
+            - name: KUBERO_BUILDPACK_DEFAULT_BUILD_CMD
+              value: exit 0
+          image: ghcr.io/kubero-dev/fetch:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+              ephemeral-storage: 256Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+              ephemeral-storage: 4Gi
+          securityContext:
+            readOnlyRootFilesystem: false
+            privileged: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /home/kubero/.ssh-mounted
+              name: deployment-keys
+              readOnly: true
+            - mountPath: /app
+              name: app-storage
           workingDir: /app
         - command:
-          - sh
-          - -c
-          - chmod -R g+w /app
+            - sh
+            - -c
+            - chmod -R g+w /app
           image: busybox:latest
           imagePullPolicy: IfNotPresent
           name: permissions
           securityContext:
             readOnlyRootFilesystem: true
+            privileged: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
           volumeMounts:
-          - mountPath: /app
-            name: app-storage
+            - mountPath: /app
+              name: app-storage
           workingDir: /app
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+              ephemeral-storage: 256Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+              ephemeral-storage: 4Gi
         - name: build
           args:
-          - '-app=.'
-          - registry-kubero.yourdomain.com/optionalrepositoryowner/pipeline/app:mytag-id
-          command: ['/cnb/lifecycle/creator']
-          # https://github.com/buildpacks/pack/issues/564#issuecomment-943345649
-          # https://github.com/buildpacks/spec/blob/platform/v0.13/platform.md#creator
-          #command: ['/cnb/lifecycle/creator', '-app=.', '-buildpacks=/cnb/buildpacks', '-platform=/platform', '-run-image=ghcr.io/kubero-dev/run:v1.4.0', '-uid=1000', '-gid=1000', 'kubero-local-dev-0037732.loca.lt/example/exampled:latest']
-          #command: ['tail', '-f', '/dev/null']
-          image: "paketobuildpacks/builder-jammy-full:latest" #List of Builders : https://paketo.io/docs/reference/builders-reference/
+            - -app=.
+            - registry-kubero.yourdomain.com/optionalrepositoryowner/pipeline/app:mytag-id
+          command:
+            - /cnb/lifecycle/creator
+          image: paketobuildpacks/builder-jammy-full:latest
           imagePullPolicy: Always
-          resources: {}
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+              ephemeral-storage: 256Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+              ephemeral-storage: 4Gi
           env:
-          - name: CNB_PLATFORM_API
-            value: "0.13"
+            - name: CNB_PLATFORM_API
+              value: "0.13"
           securityContext:
-            privileged: true
+            privileged: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
-          - mountPath: /app
-            name: app-storage
-            readOnly: false
-          - mountPath: /home/cnb/.docker
-            name: docker-config
-            readOnly: true
+            - mountPath: /app
+              name: app-storage
+              readOnly: false
+            - mountPath: /home/cnb/.docker
+              name: docker-config
+              readOnly: true
           workingDir: /app
       restartPolicy: Never
       schedulerName: default-scheduler
@@ -121,20 +197,39 @@ spec:
       serviceAccountName: example-kuberoapp
       terminationGracePeriodSeconds: 30
       volumes:
-      - name: deployment-keys
-        secret:
-#          defaultMode: 420
-          secretName: deployment-keys
-      - emptyDir: {}
-        name: app-storage
-      - name: docker-config
-        secret:
-          secretName: kubero-pull-secret
-          items:
-            - key: .dockerconfigjson
-              path: config.json
-#      - name: pull-secret
-#        secret:
-#          defaultMode: 0384
-#          secretName: kubero-pull-secret
+        - name: deployment-keys
+          secret:
+            secretName: deployment-keys
+        - emptyDir:
+            sizeLimit: 4Gi
+          name: app-storage
+        - name: docker-config
+          secret:
+            secretName: kubero-pull-secret
+            items:
+              - key: .dockerconfigjson
+                path: config.json
+        - name: deploy-tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: deploy-api-access
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3600
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+              - downwardAPI:
+                  items:
+                    - path: namespace
+                      fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+      hostUsers: false
+  activeDeadlineSeconds: 1800
 `;

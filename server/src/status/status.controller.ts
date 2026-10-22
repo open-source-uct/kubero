@@ -1,19 +1,18 @@
-import { Controller, Logger, Get, Res } from '@nestjs/common';
+import { Controller, Get, Res, UseGuards } from '@nestjs/common';
 import { PrometheusController } from '@willsoto/nestjs-prometheus';
 import { Response } from 'express';
+import { MetricsAuthGuard } from './metrics-auth.guard';
 
-@Controller('status')
+@Controller('metrics')
 export class StatusController extends PrometheusController {
-  private readonly logger = new Logger(StatusController.name);
   @Get()
+  @UseGuards(MetricsAuthGuard)
   async index(@Res({ passthrough: true }) response: Response) {
-    // check if the request is been forwarded by the ingress controller
-    // block the request if it is forwarded
-    if (response.req.headers['x-forwarded-for']) {
-      response.status(403);
-      this.logger.warn('Blocked request from ingress controller');
-      return '';
-    }
     return super.index(response);
   }
 }
+
+// The Prometheus module historically mounted the custom controller at /metrics.
+// Keep that scrape URL and expose /status with exactly the same guarded method.
+@Controller('status')
+export class StatusAliasController extends StatusController {}

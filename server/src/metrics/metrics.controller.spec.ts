@@ -63,14 +63,19 @@ describe('MetricsController', () => {
   it('should get metrics for a specific app', async () => {
     service.getPodMetrics.mockResolvedValue({ cpu: 1, mem: 2 });
     const result = await controller.getMetrics('pipe', 'dev', 'app1', mockReq);
-    expect(service.getPodMetrics).toHaveBeenCalledWith('pipe', 'dev', 'app1');
+    expect(service.getPodMetrics).toHaveBeenCalledWith(
+      'pipe',
+      'dev',
+      'app1',
+      'ctx',
+    );
     expect(result).toEqual({ cpu: 1, mem: 2 });
   });
 
   it('should get uptimes', async () => {
     service.getUptimes.mockResolvedValue([{ pod: 'a', uptime: 123 }]);
     const result = await controller.getUptimes('pipe', 'dev', mockReq);
-    expect(service.getUptimes).toHaveBeenCalledWith('pipe', 'dev');
+    expect(service.getUptimes).toHaveBeenCalledWith('pipe', 'dev', 'ctx');
     expect(result).toEqual([{ pod: 'a', uptime: 123 }]);
   });
 

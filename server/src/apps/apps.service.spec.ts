@@ -488,7 +488,13 @@ describe('AppsService', () => {
         }
       });
       const wsMock = { readyState: 1, OPEN: 1, on: wsOnMock };
-      mockKubernetesService.execInContainer.mockResolvedValue(wsMock);
+      mockKubernetesService.execInContainer.mockImplementation(
+        async (...args) => {
+          args[5].write('test');
+          args[6].write('stderr');
+          return wsMock;
+        },
+      );
 
       await service.execInContainer(
         'pipe',
@@ -503,7 +509,11 @@ describe('AppsService', () => {
 
       const streamname = 'pipe-dev-app-pod-cont-terminal';
       expect(mockEventsGateway.execStreams[streamname]).toBeDefined();
-      expect(wsOnMock).toHaveBeenCalledWith('message', expect.any(Function));
+      expect(wsOnMock).toHaveBeenCalledWith('close', expect.any(Function));
+      expect(wsOnMock).not.toHaveBeenCalledWith(
+        'message',
+        expect.any(Function),
+      );
       expect(mockEventsGateway.sendTerminalLine).toHaveBeenCalledWith(
         streamname,
         'test',
@@ -1198,9 +1208,6 @@ describe('AppsService', () => {
         'pipe',
         'dev',
         ['group1', 'group2'],
-      );
-      expect(mockKubectl.setCurrentContext).toHaveBeenCalledWith(
-        'test-context',
       );
       expect(mockKubectl.getPods).toHaveBeenCalledWith(
         'pipe-dev',
