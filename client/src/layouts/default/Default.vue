@@ -17,14 +17,10 @@
 
 import { useKuberoStore } from '../../stores/kubero'
 import { useAuthStore } from '../../stores/auth'
-import { useCookies } from "vue3-cookies";
 import { useSocketIO } from '../../socket.io';
 import { useNotificationStore } from '../../stores/notifications';
 
-const { cookies } = useCookies();
-const token = cookies.get("kubero.JWT_TOKEN");
-//console.log("COOKIE token", token);
-const { socket } = useSocketIO(token);
+const { socket } = useSocketIO();
 
 // Write socket to pinia
 const kuberoStore = useKuberoStore();

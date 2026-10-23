@@ -9,13 +9,14 @@ import { AuthService } from './auth.service';
 
 describe('AuthController', () => {
   let controller: AuthController;
-  const req = { ip: '203.0.113.7' };
+  const req = { ip: '203.0.113.7', user: { userId: 'u1', strategy: 'local' } };
+  const res = { cookie: jest.fn(), setHeader: jest.fn() };
   let service: jest.Mocked<AuthService>;
 
   beforeEach(async () => {
     service = {
       login: jest.fn(),
-      validateToken: jest.fn(),
+      logout: jest.fn(),
       getSession: jest.fn(),
       getMethods: jest.fn(),
       loginOAuth2: jest.fn(),
@@ -52,6 +53,7 @@ describe('AuthController', () => {
       const result = await controller.login(
         { username: 'user', password: 'pw' },
         req,
+        res,
       );
       expect(service.login).toHaveBeenCalledWith('user', 'pw');
       expect(result).toEqual({ access_token: 'token' });
@@ -61,12 +63,12 @@ describe('AuthController', () => {
       service.login.mockRejectedValue(new HttpException('Forbidden', 403));
       for (let i = 0; i < LoginThrottleService.MAX_PER_IP_AND_USER; i++) {
         await expect(
-          controller.login({ username: 'ana', password: 'x' }, req),
+          controller.login({ username: 'ana', password: 'x' }, req, res),
         ).rejects.toMatchObject({ status: 403 });
       }
       service.login.mockClear();
       await expect(
-        controller.login({ username: 'ana', password: 'x' }, req),
+        controller.login({ username: 'ana', password: 'x' }, req, res),
       ).rejects.toMatchObject({ status: 429 });
       expect(service.login).not.toHaveBeenCalled();
     });
@@ -74,15 +76,15 @@ describe('AuthController', () => {
     it('should not count a successful login as a failure and clear previous ones', async () => {
       service.login.mockRejectedValueOnce(new HttpException('Forbidden', 403));
       await expect(
-        controller.login({ username: 'ana', password: 'bad' }, req),
+        controller.login({ username: 'ana', password: 'bad' }, req, res),
       ).rejects.toBeDefined();
       service.login.mockResolvedValue({ access_token: 't' });
-      await controller.login({ username: 'ana', password: 'ok' }, req);
+      await controller.login({ username: 'ana', password: 'ok' }, req, res);
       // tras el acierto el contador quedó en cero: caben otros intentos fallidos
       service.login.mockRejectedValue(new HttpException('Forbidden', 403));
       for (let i = 0; i < LoginThrottleService.MAX_PER_IP_AND_USER; i++) {
         await expect(
-          controller.login({ username: 'ana', password: 'x' }, req),
+          controller.login({ username: 'ana', password: 'x' }, req, res),
         ).rejects.toMatchObject({ status: 403 });
       }
     });
@@ -94,8 +96,11 @@ describe('AuthController', () => {
         clearCookie: jest.fn(),
         send: jest.fn(),
       };
-      await controller.logout(mockRes as any);
-      expect(mockRes.clearCookie).toHaveBeenCalledWith('kubero.JWT_TOKEN');
+      await controller.logout(mockRes as any, req);
+      expect(mockRes.clearCookie).toHaveBeenCalledWith(
+        'kubero.JWT_TOKEN',
+        expect.objectContaining({ httpOnly: true, sameSite: 'lax', path: '/' }),
+      );
       expect(mockRes.send).toHaveBeenCalledWith({
         message: 'Logged out',
         status: '200',
@@ -105,28 +110,26 @@ describe('AuthController', () => {
 
   describe('session', () => {
     it('should call getSession with isAuthenticated', async () => {
-      service.validateToken.mockResolvedValueOnce(true);
       service.getSession.mockResolvedValueOnce({
         message: { foo: 'bar' },
         status: 200,
       });
       const mockReq = { headers: { authorization: 'Bearer token' } };
-      const mockRes = { send: jest.fn() };
+      const mockRes = { send: jest.fn(), setHeader: jest.fn() };
       await controller.session(mockReq as any, mockRes as any);
-      expect(service.validateToken).toHaveBeenCalledWith('token');
       expect(service.getSession).toHaveBeenCalledWith(true);
       expect(mockRes.send).toHaveBeenCalledWith({ foo: 'bar' });
     });
 
-    it('should call getSession with false if no auth header', async () => {
+    it('accepts a guarded cookie session without an auth header', async () => {
       service.getSession.mockResolvedValueOnce({
         message: { foo: 'bar' },
         status: 200,
       });
       const mockReq = { headers: {} };
-      const mockRes = { send: jest.fn() };
+      const mockRes = { send: jest.fn(), setHeader: jest.fn() };
       await controller.session(mockReq as any, mockRes as any);
-      expect(service.getSession).toHaveBeenCalledWith(false);
+      expect(service.getSession).toHaveBeenCalledWith(true);
       expect(mockRes.send).toHaveBeenCalledWith({ foo: 'bar' });
     });
   });
@@ -147,10 +150,18 @@ describe('AuthController', () => {
     it('should set cookie and redirect', async () => {
       service.loginOAuth2.mockResolvedValueOnce('token');
       const mockReq = { user: { username: 'user' } };
-      const mockRes = { cookie: jest.fn(), redirect: jest.fn() };
+      const mockRes = {
+        cookie: jest.fn(),
+        redirect: jest.fn(),
+        setHeader: jest.fn(),
+      };
       await controller.githubCallback(mockReq as any, mockRes as any);
       expect(service.loginOAuth2).toHaveBeenCalledWith({ username: 'user' });
-      expect(mockRes.cookie).toHaveBeenCalledWith('kubero.JWT_TOKEN', 'token');
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        'kubero.JWT_TOKEN',
+        'token',
+        expect.objectContaining({ httpOnly: true, sameSite: 'lax', path: '/' }),
+      );
       expect(mockRes.redirect).toHaveBeenCalledWith('/');
     });
   });
@@ -159,10 +170,18 @@ describe('AuthController', () => {
     it('should set cookie and redirect', async () => {
       service.loginOAuth2.mockResolvedValueOnce('token');
       const mockReq = { user: { username: 'user' } };
-      const mockRes = { cookie: jest.fn(), redirect: jest.fn() };
+      const mockRes = {
+        cookie: jest.fn(),
+        redirect: jest.fn(),
+        setHeader: jest.fn(),
+      };
       await controller.oauth2Callback(mockReq as any, mockRes as any);
       expect(service.loginOAuth2).toHaveBeenCalledWith({ username: 'user' });
-      expect(mockRes.cookie).toHaveBeenCalledWith('kubero.JWT_TOKEN', 'token');
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        'kubero.JWT_TOKEN',
+        'token',
+        expect.objectContaining({ httpOnly: true, sameSite: 'lax', path: '/' }),
+      );
       expect(mockRes.redirect).toHaveBeenCalledWith('/');
     });
   });

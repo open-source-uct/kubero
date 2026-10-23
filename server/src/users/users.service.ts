@@ -12,6 +12,8 @@ dotenv.config();
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import axios from 'axios';
+import { MailService } from '../mail/mail.service';
+import { assertSafeUrl, safeAxiosOptions } from '../common/utils/ssrf.util';
 
 // This should be a real class/interface representing a user entity
 export type User = any;
@@ -22,7 +24,7 @@ export class UsersService {
   private readonly prisma = new PrismaClient();
   private logger = new Logger(UsersService.name);
 
-  constructor() { }
+  constructor(private readonly mailService: MailService) {}
 
   async findOne(username: string): Promise<PrismaUser | null> {
     return this.prisma.user.findUnique({ where: { username } });
@@ -31,6 +33,27 @@ export class UsersService {
   // Fila del token personal (para comprobar que no fue revocado)
   async findToken(id: string) {
     return this.prisma.token.findUnique({ where: { id } });
+  }
+
+  async revokeSessions(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { sessionVersion: { increment: 1 } },
+      select: { id: true },
+    });
+  }
+
+  async migrateLegacyPassword(
+    userId: string,
+    oldHash: string,
+    password: string,
+  ) {
+    // Compare-and-swap: a concurrent password reset must win over this login.
+    const result = await this.prisma.user.updateMany({
+      where: { id: userId, password: oldHash },
+      data: { password: await bcrypt.hash(password, 10) },
+    });
+    return result.count === 1;
   }
 
   async findOneFull(username: string): Promise<PartialPrismaUser | null> {
@@ -70,7 +93,26 @@ export class UsersService {
     email: string,
     provider: string,
     image: string,
+    providerId?: string | null,
   ): Promise<PartialPrismaUser> {
+    // El id del proveedor es inmutable (a diferencia del username, que se
+    // puede renombrar o reciclar): si ya conocemos esta cuenta por su
+    // providerId, es la fuente de verdad y evita buscar por username.
+    if (providerId) {
+      const byProviderId = await this.prisma.user.findFirst({
+        where: { provider, providerId },
+        include: {
+          tokens: { select: { id: true, createdAt: true, expiresAt: true } },
+          role: { select: { id: true, name: true, description: true } },
+          userGroups: { select: { id: true, name: true, description: true } },
+        },
+      });
+      if (byProviderId) {
+        this.logger.debug(`User ${byProviderId.username} found by providerId.`);
+        return byProviderId;
+      }
+    }
+
     let user = await this.findOneFull(username);
     if (!user) {
       this.logger.debug(
@@ -119,7 +161,7 @@ export class UsersService {
         image: imageData,
         role: role.id,
         userGroups: [userGroupsData.id],
-        providerId: null, // Set providerId if needed
+        providerId: providerId ?? null,
         providerData: null, // Set providerData if needed
       });
       this.logger.debug(`User ${username} created successfully.`);
@@ -133,6 +175,35 @@ export class UsersService {
         throw new ForbiddenException(
           'This username is already used by another account',
         );
+      }
+      if (providerId) {
+        if (user.providerId && user.providerId !== providerId) {
+          // el username coincide pero el providerId no: alguien más es hoy
+          // dueño de ese username en el proveedor (reciclado o renombrado).
+          this.logger.warn(
+            `Refused ${provider} login: username ${username} is already linked to a different ${provider} account.`,
+          );
+          throw new ForbiddenException(
+            'This username is already linked to a different account',
+          );
+        }
+        if (!user.providerId) {
+          // cuenta creada antes de este fix: recién ahora le grabamos el
+          // providerId, para que de aquí en adelante quede como ancla fija.
+          user = await this.prisma.user.update({
+            where: { id: user.id },
+            data: { providerId },
+            include: {
+              tokens: {
+                select: { id: true, createdAt: true, expiresAt: true },
+              },
+              role: { select: { id: true, name: true, description: true } },
+              userGroups: {
+                select: { id: true, name: true, description: true },
+              },
+            },
+          });
+        }
       }
       this.logger.debug(`User ${username} found.`);
     }
@@ -157,6 +228,7 @@ export class UsersService {
         createdAt: true,
         updatedAt: true,
         isActive: true,
+        sessionVersion: true,
         lastLogin: true,
         lastIp: true,
         provider: true,
@@ -347,10 +419,10 @@ export class UsersService {
   private async assertSharesTeam(
     userId: string,
     callerGroups: string[],
-  ): Promise<void> {
+  ): Promise<{ roleId: string | null } | undefined> {
     const target = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { userGroups: { select: { name: true } } },
+      select: { roleId: true, userGroups: { select: { name: true } } },
     });
     if (!target) {
       return;
@@ -359,6 +431,7 @@ export class UsersService {
     if (!shares) {
       throw new ForbiddenException('No tienes acceso a este usuario');
     }
+    return target;
   }
 
   async create(
@@ -448,16 +521,20 @@ export class UsersService {
     if (scopeToOwnTeam) {
       await this.assertSharesTeam(userId, callerGroups);
     }
-    const {
-      id,
-      createdAt,
-      updatedAt,
-      role,
-      userGroups,
-      tokens,
-      password,
-      ...data
-    } = user;
+    const { role, userGroups } = user;
+    // Lista explícita, igual que en create(): con un "...resto" del body,
+    // campos como roleId llegaban directo a Prisma y un rol acotado podía
+    // darse otro rol saltándose assertAssignableRole (o tocar twoFaSecret).
+    const UPDATABLE_FIELDS = [
+      'username',
+      'email',
+      'firstName',
+      'lastName',
+      'isActive',
+    ];
+    const data: any = Object.fromEntries(
+      Object.entries(user).filter(([key]) => UPDATABLE_FIELDS.includes(key)),
+    );
 
     // no dejar el sistema sin administrador: desactivar al último o cambiarle
     // el rol a uno que no sea admin
@@ -538,6 +615,7 @@ export class UsersService {
     newPassword: string,
     callerGroups: string[] = [],
     scopeToOwnTeam = false,
+    callerPriority = 0,
   ): Promise<PartialPrismaUser | undefined> {
     if (
       !newPassword ||
@@ -548,16 +626,29 @@ export class UsersService {
       return undefined;
     }
     if (scopeToOwnTeam) {
-      await this.assertSharesTeam(userId, callerGroups);
+      const target = await this.assertSharesTeam(userId, callerGroups);
+      if (!target) {
+        return undefined;
+      }
+      if (!target.roleId) {
+        throw new ForbiddenException('El usuario no tiene un rol asignado');
+      }
+      // Compartir equipo no autoriza a restablecer roles globales o superiores.
+      await this.assertAssignableRole(target.roleId, callerPriority);
     }
     try {
       const hashedPassword = await bcrypt.hash(newPassword, 10);
       const user = await this.prisma.user.update({
         omit: { password: true, twoFaSecret: true },
         where: { id: userId },
-        data: { password: hashedPassword },
+        data: {
+          password: hashedPassword,
+          sessionVersion: { increment: 1 },
+          tokens: { updateMany: { where: {}, data: { isActive: false } } },
+        },
       });
       this.logger.debug(`Password updated for user with ID ${userId}.`);
+      void this.mailService.sendPasswordChangedEmail(user.email, user.username);
       return user;
     } catch (error) {
       this.logger.debug(
@@ -622,10 +713,18 @@ export class UsersService {
       const updatedUser = await this.prisma.user.update({
         omit: { password: true, twoFaSecret: true },
         where: { id: userId },
-        data: { password: hashedNewPassword },
+        data: {
+          password: hashedNewPassword,
+          sessionVersion: { increment: 1 },
+          tokens: { updateMany: { where: {}, data: { isActive: false } } },
+        },
       });
 
       this.logger.debug(`Password updated for user with ID ${userId}.`);
+      void this.mailService.sendPasswordChangedEmail(
+        updatedUser.email,
+        updatedUser.username,
+      );
       return updatedUser;
     } catch (error) {
       this.logger.debug(
@@ -710,7 +809,7 @@ export class UsersService {
   async updateAvatar(
     userId: string,
     avatarFile: any,
-  ): Promise<PrismaUser | undefined> {
+  ): Promise<Omit<PrismaUser, 'password' | 'twoFaSecret'> | undefined> {
     if (!avatarFile || !avatarFile.buffer) {
       this.logger.warn('No avatar file buffer provided.');
       return undefined;
@@ -719,6 +818,7 @@ export class UsersService {
     const base64Image = `data:${avatarFile.mimetype};base64,${avatarFile.buffer.toString('base64')}`;
     try {
       return await this.prisma.user.update({
+        omit: { password: true, twoFaSecret: true },
         where: { id: userId },
         data: { image: base64Image },
       });
@@ -740,7 +840,13 @@ export class UsersService {
   private async generateUserDataFromImageUrl(
     imageUrl: string,
   ): Promise<string> {
-    const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+    assertSafeUrl(imageUrl);
+    const response = await axios.get(imageUrl, {
+      ...safeAxiosOptions(),
+      responseType: 'arraybuffer',
+      // El agente seguro debe resolver el destino, no un proxy del entorno.
+      proxy: false,
+    });
     if (response.status !== 200) {
       throw new Error(`Failed to fetch image from URL: ${imageUrl}`);
     }

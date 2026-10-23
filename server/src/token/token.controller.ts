@@ -92,6 +92,7 @@ export class TokenController {
       tokenData.name,
       tokenData.expiresAt,
       req.user.userId,
+      req.user,
     );
     return token;
   }

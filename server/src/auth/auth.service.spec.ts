@@ -18,6 +18,8 @@ describe('AuthService', () => {
   beforeEach(() => {
     usersService = {
       findOneFull: jest.fn(),
+      migrateLegacyPassword: jest.fn().mockResolvedValue(true),
+      revokeSessions: jest.fn(),
       findOneOrCreate: jest.fn().mockResolvedValue({
         userId: 3,
         username: 'oauthuser',
@@ -82,12 +84,17 @@ describe('AuthService', () => {
         .update('pass')
         .digest('hex');
       usersService.findOneFull.mockResolvedValueOnce({
-        userId: 1,
+        id: 'u1',
         username: 'test',
         password: hash,
       });
       const result = await service.validateUser('test', 'pass');
-      expect(result).toEqual({ userId: 1, username: 'test' });
+      expect(result).toEqual({ id: 'u1', username: 'test' });
+      expect(usersService.migrateLegacyPassword).toHaveBeenCalledWith(
+        'u1',
+        hash,
+        'pass',
+      );
     });
 
     it('should return user if bcrypt matches', async () => {
@@ -168,6 +175,23 @@ describe('AuthService', () => {
         permissions: ['app:read', 'app:write'],
         scopeToOwnTeam: false,
       });
+    });
+
+    it('passes the profile id as providerId (immutable, unlike the username)', async () => {
+      const reqUser = {
+        id: 987654,
+        username: 'oauthuser',
+        emails: [{ value: 'undefined@kubero.dev' }],
+        provider: 'github',
+      };
+      await service.loginOAuth2(reqUser);
+      expect(usersService.findOneOrCreate).toHaveBeenCalledWith(
+        'oauthuser',
+        'undefined@kubero.dev',
+        'github',
+        null,
+        '987654',
+      );
     });
   });
 
@@ -251,22 +275,6 @@ describe('AuthService', () => {
         github: false,
         oauth2: true,
       });
-    });
-  });
-
-  describe('validateToken', () => {
-    it('should return true for valid token', async () => {
-      jwtService.verify.mockReturnValueOnce({ userId: 1 });
-      const result = await service.validateToken('token');
-      expect(result).toBe(true);
-    });
-
-    it('should return false for invalid token', async () => {
-      jwtService.verify.mockImplementationOnce(() => {
-        throw new Error('invalid');
-      });
-      const result = await service.validateToken('badtoken');
-      expect(result).toBe(false);
     });
   });
 });

@@ -12,13 +12,17 @@ import { JwtService } from '@nestjs/jwt';
 import { ModuleRef } from '@nestjs/core';
 import { WsJwtGuard } from '../auth/strategies/ws-jwt.guard';
 import { AuthenticatedUser, IdentityService } from '../auth/identity.service';
+import { cookieToken } from '../auth/session-cookie';
 
 // Sala del equipo: los eventos de un pipeline solo llegan a sus equipos
 const teamRoom = (team: string) => `team:${team}`;
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    // mismo criterio que la API REST (main.ts): el cliente se sirve desde
+    // este mismo servidor en producción, así que no hace falta un origen
+    // abierto; en desarrollo el cliente corre en otro puerto (Vite).
+    origin: process.env.NODE_ENV !== 'production',
   },
 })
 @UseGuards(WsJwtGuard)
@@ -57,6 +61,8 @@ export class EventsGateway implements OnGatewayConnection {
       const payload = this.jwtService.verify(token);
       const user = await this.identity.resolve(payload);
       client.data.user = user;
+      client.data.token = token;
+      client.data.revalidate = () => this.revalidate(client);
       // el JWT caduca: pasado ese momento el socket deja de ser válido
       client.data.expiresAt = payload.exp ? payload.exp * 1000 : undefined;
       // el equipo admin ve todo; el resto, solo los de sus equipos
@@ -74,7 +80,54 @@ export class EventsGateway implements OnGatewayConnection {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       return authHeader.split(' ')[1];
     }
-    return client.handshake.auth?.token || null;
+    return (
+      client.handshake.auth?.token || cookieToken(client.handshake) || null
+    );
+  }
+
+  private async revalidate(client: Socket): Promise<boolean> {
+    try {
+      const payload = this.jwtService.verify(client.data.token);
+      const fresh = await this.identity.resolve(payload);
+      // A change removes all previous log, terminal and team subscriptions.
+      if (JSON.stringify(fresh) !== JSON.stringify(client.data.user)) {
+        throw new Error('Socket authorization changed');
+      }
+      return true;
+    } catch {
+      delete client.data.user;
+      delete client.data.token;
+      client.disconnect(true);
+      return false;
+    }
+  }
+
+  private async sendAuthorized(
+    event: string,
+    data: any,
+    allowed: (client: Socket) => boolean | Promise<boolean>,
+    room?: string,
+  ): Promise<void> {
+    await Promise.all(
+      Array.from(this.server.sockets.sockets.values()).map(async (client) => {
+        if (room && !client.rooms.has(room)) return;
+        // Preserve stream order while checking authorization at delivery time.
+        const previous: Promise<void> =
+          client.data.delivery ?? Promise.resolve();
+        client.data.delivery = previous.then(async () => {
+          try {
+            await client.data.authentication;
+            if (client.connected === false) return;
+            if ((await this.revalidate(client)) && (await allowed(client))) {
+              client.emit(event, data);
+            }
+          } catch {
+            client.disconnect(true);
+          }
+        });
+        await client.data.delivery;
+      }),
+    );
   }
 
   // El pipeline y la fase salen del nombre de la sala (<pipeline>-<fase>-<app>
@@ -142,18 +195,26 @@ export class EventsGateway implements OnGatewayConnection {
 
   // `teams` limita quién recibe el evento: solo esos equipos y el equipo admin.
   // Sin `teams` llega a todos los usuarios autenticados.
-  sendEvent(event: string, data: any, teams?: string[]) {
-    if (!teams) {
-      this.server.emit(event, data);
-      return;
-    }
-    const rooms = ['admin', ...teams].map(teamRoom);
-    this.server.to(rooms).emit(event, data);
+  async sendEvent(event: string, data: any, teams?: string[]) {
+    await this.sendAuthorized(
+      event,
+      data,
+      (client) =>
+        !teams ||
+        client.data.user.userGroups.some(
+          (team: string) => team === 'admin' || teams.includes(team),
+        ),
+    );
   }
 
-  sendLogline(room: string, logline: any) {
-    //TODO define logline type
-    this.server.to(room).emit('log', logline);
+  async sendLogline(room: string, logline: any) {
+    await this.sendAuthorized(
+      'log',
+      logline,
+      (client) =>
+        client.rooms.has(room) && this.canAccessRoom(client.data.user, room),
+      room,
+    );
   }
 
   // sending the terminal input to the server
@@ -177,7 +238,13 @@ export class EventsGateway implements OnGatewayConnection {
   }
 
   // sending the terminal output to the client
-  sendTerminalLine(room: string, line: string) {
-    this.server.to(room).emit('consoleresponse', line);
+  async sendTerminalLine(room: string, line: string) {
+    await this.sendAuthorized(
+      'consoleresponse',
+      line,
+      (client) =>
+        client.rooms.has(room) && this.canAccessRoom(client.data.user, room),
+      room,
+    );
   }
 }

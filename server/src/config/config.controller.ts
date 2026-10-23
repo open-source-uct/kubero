@@ -133,7 +133,11 @@ export class ConfigController {
 
   @Get('/templates')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:read', 'config:write')
+  // el catalogo de templates no es parte de Settings: cualquiera que pueda
+  // ver/crear apps lo necesita para elegir que servicio desplegar, aunque no
+  // tenga permiso de config (antes, sacarle Settings a un rol le sacaba
+  // Templates de rebote, sin ningun aviso).
+  @Permissions('app:read', 'app:write')
   @ApiBearerAuth('bearerAuth')
   @ApiOperation({ summary: 'Get the templates settings' })
   @ApiForbiddenResponse({
@@ -175,7 +179,7 @@ export class ConfigController {
   }
 
   @Delete('/runpacks/:id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard, ReadonlyGuard)
   @Permissions('config:write')
   @ApiBearerAuth('bearerAuth')
   @ApiOperation({ summary: 'Delete a runpack' })
@@ -222,7 +226,8 @@ export class ConfigController {
 
   @Get('/clusterissuer')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:read', 'config:write')
+  // lo usa el formulario de crear/editar app (TLS del dominio), no Settings.
+  @Permissions('app:read', 'app:write')
   @ApiBearerAuth('bearerAuth')
   @ApiOperation({ summary: 'Get the configured cluster issuer' })
   @ApiForbiddenResponse({
@@ -243,7 +248,8 @@ export class ConfigController {
 
   @Get('/podsizes')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('config:read', 'config:write')
+  // lo usa el formulario de crear/editar app (tamaño del pod), no Settings.
+  @Permissions('app:read', 'app:write')
   @ApiBearerAuth('bearerAuth')
   @ApiForbiddenResponse({
     description: 'Error: Unauthorized',

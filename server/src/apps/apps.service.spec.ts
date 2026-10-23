@@ -1199,9 +1199,6 @@ describe('AppsService', () => {
         'dev',
         ['group1', 'group2'],
       );
-      expect(mockKubectl.setCurrentContext).toHaveBeenCalledWith(
-        'test-context',
-      );
       expect(mockKubectl.getPods).toHaveBeenCalledWith(
         'pipe-dev',
         'test-context',

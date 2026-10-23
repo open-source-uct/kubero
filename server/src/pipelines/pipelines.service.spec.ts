@@ -86,6 +86,25 @@ describe('PipelinesService', () => {
       expect(result.items.length).toBe(2);
       expect(result.items[0].name).toBe('pipe1');
     });
+
+    it('should redact git keys and registry password', async () => {
+      kubectl.getPipelinesList.mockResolvedValue({
+        items: [
+          {
+            spec: {
+              name: 'pipe1',
+              phases: [],
+              git: { keys: { priv: 'priv', pub: 'pub' } },
+              registry: { host: 'docker.io', username: 'user', password: 'x' },
+            },
+          },
+        ],
+      });
+      const result = await service.listPipelines();
+      expect(result.items[0].git.keys.priv).toBeUndefined();
+      expect(result.items[0].git.keys.pub).toBeUndefined();
+      expect(result.items[0].registry.password).toBe('');
+    });
   });
 
   describe('getPipelineWithApps', () => {
@@ -95,6 +114,7 @@ describe('PipelinesService', () => {
         spec: {
           name: 'pipe1',
           git: { keys: { priv: 'priv', pub: 'pub' } },
+          registry: { host: 'docker.io', username: 'user', password: 'x' },
           phases: [
             { name: 'dev', enabled: true },
             { name: 'prod', enabled: false },
@@ -110,6 +130,7 @@ describe('PipelinesService', () => {
       expect(result?.phases.length).toBe(2);
       expect(result?.git.keys.priv).toBeUndefined();
       expect(result?.git.keys.pub).toBeUndefined();
+      expect(result?.registry?.password).toBe('');
     });
 
     it('should return undefined if pipeline spec or keys missing', async () => {
@@ -245,6 +266,26 @@ describe('PipelinesService', () => {
       expect(notificationsService.send).toHaveBeenCalled();
     });
 
+    it('sends the notification with the secrets redacted', async () => {
+      kubectl.getPipeline.mockResolvedValue({
+        metadata: { resourceVersion: '1' },
+        spec: {
+          name: 'pipe1',
+          git: { keys: { priv: 'priv', pub: 'pub' } },
+          registry: { host: 'docker.io', username: 'user', password: 'x' },
+        },
+      });
+      kubectl.deletePipeline.mockResolvedValue(undefined);
+      const user = { username: 'test' } as IUser;
+      await service.deletePipeline('pipe1', user);
+      const notified = notificationsService.send.mock.calls[0][0];
+      expect(notified.data.pipeline.spec.git.keys.priv).toBeUndefined();
+      expect(notified.data.pipeline.spec.git.keys.pub).toBeUndefined();
+      expect(notified.data.pipeline.spec.registry.password).toBe('');
+      // la metadata (p.ej. resourceVersion) no se pierde al redactar
+      expect(notified.data.pipeline.metadata.resourceVersion).toBe('1');
+    });
+
     it('should propagate errors when deleting fails', async () => {
       kubectl.getPipeline.mockResolvedValue({ name: 'pipe1' });
       kubectl.deletePipeline.mockRejectedValue(new Error('boom'));
@@ -277,6 +318,38 @@ describe('PipelinesService', () => {
       await service.updatePipeline(mockPipeline, '1', user);
       expect(kubectl.updatePipeline).toHaveBeenCalled();
       //expect(notificationsService.send).toHaveBeenCalled();
+    });
+
+    it('sends the notification with the secrets redacted, but writes the real keys to kubectl', async () => {
+      const user = { username: 'test' } as IUser;
+      kubectl.getPipeline.mockResolvedValue({
+        spec: { git: { keys: { priv: 'real-priv', pub: 'real-pub' } } },
+      });
+      kubectl.updatePipeline.mockResolvedValue(undefined);
+      await service.updatePipeline(
+        { ...mockPipeline, git: { keys: {}, webhook: {} } },
+        '1',
+        user,
+      );
+
+      const sentToKubectl = kubectl.updatePipeline.mock.calls[0][0];
+      expect(sentToKubectl.git.keys.priv).toBe('real-priv');
+      expect(sentToKubectl.git.keys.pub).toBe('real-pub');
+
+      const notified = notificationsService.send.mock.calls[0][0];
+      expect(notified.data.pipeline.git.keys.priv).toBeUndefined();
+      expect(notified.data.pipeline.git.keys.pub).toBeUndefined();
+      expect(notified.data.pipeline.registry.password).toBe('');
+    });
+
+    it('propagates the error instead of sending a success notification', async () => {
+      const user = { username: 'test' } as IUser;
+      kubectl.getPipeline.mockResolvedValue({ spec: { name: 'pipe1' } });
+      kubectl.updatePipeline.mockRejectedValue(new Error('boom'));
+      await expect(
+        service.updatePipeline(mockPipeline, '1', user),
+      ).rejects.toThrow('boom');
+      expect(notificationsService.send).not.toHaveBeenCalled();
     });
 
     it('should update a pipeline whose current version has no git', async () => {
@@ -323,6 +396,22 @@ describe('PipelinesService', () => {
       expect(kubectl.createPipeline).toHaveBeenCalledWith(mockPipeline);
       expect(notificationsService.send).toHaveBeenCalled();
       expect(result?.status).toBe('ok');
+    });
+
+    it('sends the notification with the secrets redacted', async () => {
+      const user = { username: 'test' } as IUser;
+      kubectl.createPipeline.mockResolvedValue(undefined);
+      await service.createPipeline(
+        {
+          ...mockPipeline,
+          git: { keys: { priv: 'priv', pub: 'pub' }, webhook: {} },
+        },
+        user,
+      );
+      const notified = notificationsService.send.mock.calls[0][0];
+      expect(notified.data.pipeline.git.keys.priv).toBeUndefined();
+      expect(notified.data.pipeline.git.keys.pub).toBeUndefined();
+      expect(notified.data.pipeline.registry.password).toBe('');
     });
 
     describe('countPipelines', () => {

@@ -299,6 +299,20 @@ describe('PipelinesController', () => {
     expect(result).toEqual({ name: 'pipeline1' });
   });
 
+  it('should reject updatePipeline when the body pipelineName does not match the URL', async () => {
+    const dto: any = {
+      ...validDockerPipeline,
+      pipelineName: 'other-pipeline',
+      resourceVersion: '1',
+    };
+    const req = { user: mockJWT };
+    await expect(
+      controller.updatePipeline(dto, req, 'pipeline1'),
+    ).rejects.toThrow();
+    expect(service.updatePipeline).not.toHaveBeenCalled();
+    expect(service.getPipeline).not.toHaveBeenCalled();
+  });
+
   it('should update a pipeline', async () => {
     const dto: any = {
       pipelineName: 'pipeline1',

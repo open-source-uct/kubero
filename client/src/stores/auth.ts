@@ -1,61 +1,52 @@
-// stores/authStore.ts
 import { defineStore } from 'pinia'
-import { jwtDecode } from 'jwt-decode'
-
-interface JwtPayload {
-  userId: string
-  username: string
-  role: string
-  permissions: string[]
-  scopeToOwnTeam?: boolean
-  priority?: number
-  exp: number
-  [key: string]: any
-}
+import axios from 'axios'
+import { disconnectSocketIO } from '../socket.io'
+import { useKuberoStore } from './kubero'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    token: '' as string,
+    sessionLoaded: false,
     permissions: [] as string[],
-    userId: '' as string,
-    username: '' as string,
-    role: '' as string,
+    userId: '',
+    username: '',
+    role: '',
     userGroups: [] as string[],
-    scopeToOwnTeam: false as boolean,
-    priority: 0 as number,
+    scopeToOwnTeam: false,
+    priority: 0,
   }),
-
   actions: {
-    loadToken(token: string) {
-      this.token = token
+    loadSession(user: any) {
+      this.userId = user.userId
+      this.username = user.username
+      this.role = user.role
+      this.permissions = user.permissions ?? []
+      this.userGroups = user.userGroups ?? []
+      this.scopeToOwnTeam = user.scopeToOwnTeam ?? false
+      this.priority = user.priority ?? 0
+      this.sessionLoaded = true
+    },
+    async initialize() {
+      if (this.sessionLoaded) return
       try {
-        const decoded = jwtDecode<JwtPayload>(token)
-        this.permissions = decoded.permissions || []
-        this.userId = decoded.userId
-        this.username = decoded.username || ''
-        this.role = decoded.role || ''
-        this.userGroups = decoded.userGroups || []
-        this.scopeToOwnTeam = decoded.scopeToOwnTeam || false
-        this.priority = decoded.priority || 0
-      } catch (e) {
-        console.error('Failed to decode JWT Token', e)
+        const { data } = await axios.get('/api/auth/session')
+        this.loadSession(data.user)
+      } catch {
         this.reset()
       }
     },
-
     reset() {
-      this.token = ''
-      this.permissions = []
-      this.userId = ''
-      this.username = ''
-      this.role = ''
-      this.userGroups = []
-      this.scopeToOwnTeam = false
-      this.priority = 0
+      delete axios.defaults.headers.common['Authorization']
+      localStorage.removeItem('kubero.JWT_TOKEN')
+      disconnectSocketIO()
+      const kubero = useKuberoStore().kubero
+      kubero.socket = null
+      kubero.isAuthenticated = false
+      kubero.nextGenSession = { username: '', token: '' }
+      this.$reset()
+      this.sessionLoaded = true
     },
   },
   getters: {
     hasPermission: (state) => (perm: string) => state.permissions.includes(perm),
   },
-
 })

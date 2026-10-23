@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Injectable } from '@nestjs/common';
 import { IdentityService } from '../identity.service';
 import { getJwtSecret } from '../jwt-secret';
+import { cookieToken } from '../session-cookie';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -10,7 +11,10 @@ dotenv.config();
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private readonly identity: IdentityService) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        cookieToken,
+      ]),
       ignoreExpiration: false,
       secretOrKey: getJwtSecret(),
     });

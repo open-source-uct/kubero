@@ -189,8 +189,6 @@ export class AppsService {
 
     const timestamp = new Date().getTime();
     if (contextName) {
-      this.kubectl.setCurrentContext(contextName);
-
       await this.kubectl.createBuildJob(
         namespace,
         appName,
@@ -205,6 +203,7 @@ export class AppsService {
           image: `${process.env.KUBERO_BUILD_REGISTRY}/${pipeline}-${appName}`,
           tag: app.spec.branch + '-' + timestamp,
         },
+        contextName,
       );
     }
 
@@ -422,7 +421,7 @@ export class AppsService {
 
   public async getAllAppsList(contextName: string) {
     this.logger.debug('getAppsList');
-    this.kubectl.setCurrentContext(contextName);
+
     const apps = await this.kubectl.getAllAppsList(contextName);
     const appslist = [] as IApp[];
     for (const app of apps.items) {
@@ -729,7 +728,6 @@ export class AppsService {
     const workloads: Workload[] = [];
 
     if (contextName) {
-      this.kubectl.setCurrentContext(contextName);
       const workload = await this.kubectl.getPods(namespace, contextName);
       //return workload
       for (const pod of workload) {
@@ -828,7 +826,14 @@ export class AppsService {
 
       const namespace = pipelineName + '-' + phaseName;
       const ws = await this.kubectl
-        .execInContainer(namespace, podName, containerName, command, execStream)
+        .execInContainer(
+          namespace,
+          podName,
+          containerName,
+          command,
+          execStream,
+          contextName,
+        )
         .catch((error) => {
           console.log(error);
           return;

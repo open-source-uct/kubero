@@ -70,6 +70,9 @@ export class KubernetesService {
   }
 
   private async initKubeConfig() {
+    this.kc = new KubeConfig();
+    this.contextClients.clear();
+    this.invalidatePipelinesCache();
     //this.config = config;
     //this.kc.loadFromDefault(); // should not be used since we want also load from base64 ENV var
 
@@ -94,6 +97,21 @@ export class KubernetesService {
       }
     }
 
+    const configuredContext = process.env.KUBERO_CONTEXT;
+    if (
+      configuredContext &&
+      this.kc.getContexts().length > 1 &&
+      !this.kc.getContexts().some((c) => c.name === configuredContext)
+    ) {
+      throw new NotFoundException('Unknown configured Kubernetes context');
+    }
+    if (
+      configuredContext &&
+      this.kc.getContexts().some((c) => c.name === configuredContext)
+    ) {
+      this.kc.setCurrentContext(configuredContext);
+    }
+    this.log = new KubeLog(this.kc);
     try {
       this.versionApi = this.kc.makeApiClient(VersionApi);
       this.coreV1Api = this.kc.makeApiClient(CoreV1Api);
@@ -192,36 +210,57 @@ export class KubernetesService {
     return this.kc.getContexts();
   }
 
-  public setCurrentContext(context: string) {
-    if (context) {
-      this.useContext(context);
-    }
+  // Each API client retains a private KubeConfig. Never change the context of
+  // a config already used by an in-flight request or a long-lived stream.
+  private contextClients = new Map<
+    string,
+    ReturnType<KubernetesService['createClients']>
+  >();
+
+  private createClients(kc: KubeConfig) {
+    return {
+      coreV1Api: kc.makeApiClient(CoreV1Api),
+      customObjectsApi: kc.makeApiClient(CustomObjectsApi),
+      batchV1Api: kc.makeApiClient(BatchV1Api),
+      metricsApi: new Metrics(kc),
+      exec: new Exec(kc),
+      log: new KubeLog(kc),
+    };
   }
 
-  // El KubeConfig es compartido entre todos los requests: fijarle un contexto
-  // que no existe lo deja sin credenciales para el resto de los usuarios hasta
-  // que otro request lo repare. Por eso solo se fija un contexto conocido.
-  //
-  // Si el nombre no existe pero el kubeconfig tiene un único contexto (el caso
-  // normal de un cluster único, o del modo in-cluster), no hay ambigüedad: se
-  // usa ese, como pasaba antes con los pipelines que declaran otro nombre. Con
-  // varios contextos un nombre desconocido sí se rechaza, para no operar sobre
-  // otro cluster por error.
-  private useContext(context: string) {
+  private clientsForContext(context?: string) {
+    if (!context || context === this.kc.getCurrentContext()) {
+      return {
+        coreV1Api: this.coreV1Api,
+        customObjectsApi: this.customObjectsApi,
+        batchV1Api: this.batchV1Api,
+        metricsApi: this.metricsApi,
+        exec: this.exec,
+        log: this.log,
+      };
+    }
     const contexts = this.kc.getContexts();
-    if (contexts.some((c) => c.name === context)) {
-      this.kc.setCurrentContext(context);
-      return;
+    let resolved = context;
+    if (!contexts.some((c) => c.name === context)) {
+      if (contexts.length !== 1) {
+        throw new NotFoundException(`Unknown kubernetes context "${context}"`);
+      }
+      // Preserve the existing single-cluster alias compatibility.
+      resolved = contexts[0].name;
     }
-    if (contexts.length === 1) {
-      this.logger.warn(
-        `Unknown kubernetes context "${context}": using the only one available ("${contexts[0].name}")`,
-      );
-      this.kc.setCurrentContext(contexts[0].name);
-      return;
+    let clients = this.contextClients.get(resolved);
+    if (!clients) {
+      const kc = new KubeConfig();
+      kc.loadFromString(this.kc.exportConfig());
+      kc.setCurrentContext(resolved);
+      clients = this.createClients(kc);
+      this.contextClients.set(resolved, clients);
     }
-    this.logger.warn('Unknown kubernetes context: ' + context);
-    throw new NotFoundException(`Unknown kubernetes context "${context}"`);
+    return clients;
+  }
+
+  public getLog(context?: string): KubeLog {
+    return this.clientsForContext(context).log;
   }
 
   public getCurrentContext() {
@@ -274,7 +313,6 @@ export class KubernetesService {
   public async getPipelinesList(
     userGroups: string[] = [],
   ): Promise<IKubectlPipelineList> {
-    this.kc.setCurrentContext(process.env.KUBERO_CONTEXT || 'default');
     let pipelines = {} as IKubectlPipelineList;
     pipelines.items = [];
     try {
@@ -301,7 +339,6 @@ export class KubernetesService {
     this.logger.debug('create pipeline: ' + pl.name);
     const pipeline = new KubectlPipeline(pl);
 
-    this.kc.setCurrentContext(process.env.KUBERO_CONTEXT || 'default');
     await this.customObjectsApi
       .createNamespacedCustomObject(
         'application.kubero.dev',
@@ -323,7 +360,6 @@ export class KubernetesService {
     const pipeline = new KubectlPipeline(pl);
     pipeline.metadata.resourceVersion = resourceVersion;
 
-    this.kc.setCurrentContext(process.env.KUBERO_CONTEXT || 'default');
     await this.customObjectsApi
       .replaceNamespacedCustomObject(
         'application.kubero.dev',
@@ -333,9 +369,9 @@ export class KubernetesService {
         pl.name,
         pipeline,
       )
-      .catch(() => {
-        this.logger.debug('❌ Error updating pipeline: ' + pl.name);
-        //this.logger.debug(error);
+      .catch((error) => {
+        this.logger.error('❌ Error updating pipeline: ' + pl.name);
+        throw error;
       })
       .finally(() => this.invalidatePipelinesCache());
   }
@@ -343,7 +379,6 @@ export class KubernetesService {
   public async deletePipeline(pipelineName: string) {
     this.invalidatePipelinesCache();
     this.logger.debug('delete pipeline: ' + pipelineName);
-    this.kc.setCurrentContext(process.env.KUBERO_CONTEXT || 'default');
     await this.customObjectsApi
       .deleteNamespacedCustomObject(
         'application.kubero.dev',
@@ -359,7 +394,6 @@ export class KubernetesService {
   }
 
   public async getPipeline(pipelineName: string): Promise<IKubectlPipeline> {
-    this.kc.setCurrentContext(process.env.KUBERO_CONTEXT || 'default');
     const pipeline = await this.customObjectsApi
       .getNamespacedCustomObject(
         'application.kubero.dev',
@@ -382,16 +416,14 @@ export class KubernetesService {
   }
 
   public async createApp(app: App, context: string) {
+    const { customObjectsApi } = this.clientsForContext(context);
     this.logger.debug('create app: ' + app.name);
-    if (context) {
-      this.useContext(context);
-    }
 
     const appl = new KubectlApp(app);
 
     const namespace = app.pipeline + '-' + app.phase;
 
-    await this.customObjectsApi
+    await customObjectsApi
       .createNamespacedCustomObject(
         'application.kubero.dev',
         'v1alpha1',
@@ -406,19 +438,17 @@ export class KubernetesService {
   }
 
   public async updateApp(app: App, resourceVersion: string, context: string) {
+    const { customObjectsApi } = this.clientsForContext(context);
     this.logger.debug('update app: ' + app.name);
-    if (context) {
-      this.useContext(context);
-    }
 
     const appl = new KubectlApp(app);
     appl.metadata.resourceVersion = resourceVersion;
 
     const namespace = app.pipeline + '-' + app.phase;
 
-    await this.customObjectsApi
+    await customObjectsApi
       .replaceNamespacedCustomObject(
-        //await this.customObjectsApi.patchNamespacedCustomObject(
+        //await customObjectsApi.patchNamespacedCustomObject(
         // patch : https://stackoverflow.com/questions/67520468/patch-k8s-custom-resource-with-kubernetes-client-node
         // https://github.com/kubernetes-client/javascript/blob/master/examples/patch-example.js
         'application.kubero.dev',
@@ -439,14 +469,12 @@ export class KubernetesService {
     appName: string,
     context: string,
   ) {
+    const { customObjectsApi } = this.clientsForContext(context);
     this.logger.debug('delete app: ' + appName);
 
     const namespace = pipelineName + '-' + phaseName;
-    if (context) {
-      this.useContext(context);
-    }
 
-    await this.customObjectsApi
+    await customObjectsApi
       .deleteNamespacedCustomObject(
         'application.kubero.dev',
         'v1alpha1',
@@ -465,12 +493,10 @@ export class KubernetesService {
     appName: string,
     context: string,
   ): Promise<IKubectlApp> {
+    const { customObjectsApi } = this.clientsForContext(context);
     const namespace = pipelineName + '-' + phaseName;
-    if (context) {
-      this.useContext(context);
-    }
 
-    const app = await this.customObjectsApi
+    const app = await customObjectsApi
       .getNamespacedCustomObject(
         'application.kubero.dev',
         'v1alpha1',
@@ -493,11 +519,9 @@ export class KubernetesService {
     namespace: string,
     context: string,
   ): Promise<IKubectlAppList> {
-    if (context) {
-      this.useContext(context);
-    }
+    const { customObjectsApi } = this.clientsForContext(context);
     try {
-      const appslist = await this.customObjectsApi.listNamespacedCustomObject(
+      const appslist = await customObjectsApi.listNamespacedCustomObject(
         'application.kubero.dev',
         'v1alpha1',
         namespace,
@@ -514,11 +538,9 @@ export class KubernetesService {
   }
 
   public async getAllAppsList(context: string): Promise<IKubectlAppList> {
-    if (context) {
-      this.useContext(context);
-    }
+    const { customObjectsApi } = this.clientsForContext(context);
     try {
-      const appslist = await this.customObjectsApi.listClusterCustomObject(
+      const appslist = await customObjectsApi.listClusterCustomObject(
         'application.kubero.dev',
         'v1alpha1',
         'kuberoapps',
@@ -540,10 +562,8 @@ export class KubernetesService {
     workloadType: string,
     context: string,
   ) {
+    const { customObjectsApi } = this.clientsForContext(context);
     this.logger.debug('restart app: ' + appName);
-    if (context) {
-      this.useContext(context);
-    }
 
     const namespace = pipelineName + '-' + phaseName;
     const deploymentName = appName + '-kuberoapp-' + workloadType;
@@ -568,7 +588,7 @@ export class KubernetesService {
       headers: { 'Content-type': 'application/json-patch+json' },
     };
     try {
-      await this.customObjectsApi.patchNamespacedCustomObject(
+      await customObjectsApi.patchNamespacedCustomObject(
         group,
         apiVersion,
         namespace,
@@ -630,13 +650,11 @@ export class KubernetesService {
   }
 
   public async getPods(namespace: string, context: string): Promise<V1Pod[]> {
+    const { coreV1Api } = this.clientsForContext(context);
     // faltaba cambiar de contexto antes de consultar (a diferencia de
     // getAppsList y el resto de los métodos de este archivo), así que
     // siempre leía del último contexto usado, no del que se le pasaba
-    if (context) {
-      this.useContext(context);
-    }
-    const pods = await this.coreV1Api.listNamespacedPod(namespace);
+    const pods = await coreV1Api.listNamespacedPod(namespace);
     return pods.body.items;
   }
 
@@ -670,9 +688,13 @@ export class KubernetesService {
       });
   }
 
-  public async getEvents(namespace: string): Promise<CoreV1Event[]> {
+  public async getEvents(
+    namespace: string,
+    context?: string,
+  ): Promise<CoreV1Event[]> {
+    const { coreV1Api } = this.clientsForContext(context);
     try {
-      const events = await this.coreV1Api.listNamespacedEvent(namespace);
+      const events = await coreV1Api.listNamespacedEvent(namespace);
       return events.body.items;
     } catch {
       //this.logger.debug(error);
@@ -683,7 +705,12 @@ export class KubernetesService {
     return events.items;
   }
 
-  public async getPodMetrics(namespace: string, appName: string): Promise<any> {
+  public async getPodMetrics(
+    namespace: string,
+    appName: string,
+    context?: string,
+  ): Promise<any> {
+    const { coreV1Api, metricsApi } = this.clientsForContext(context);
     //TODO make this a real type
     const ret: {
       name: string;
@@ -705,14 +732,14 @@ export class KubernetesService {
     }[] = [];
 
     try {
-      const metrics = await this.metricsApi.getPodMetrics(namespace);
+      const metrics = await metricsApi.getPodMetrics(namespace);
 
       for (let i = 0; i < metrics.items.length; i++) {
         const metric = metrics.items[i];
 
         if (!metric.metadata.name.startsWith(appName + '-')) continue;
 
-        const pod = await this.coreV1Api.readNamespacedPod(
+        const pod = await coreV1Api.readNamespacedPod(
           metric.metadata.name,
           namespace,
         );
@@ -842,8 +869,12 @@ export class KubernetesService {
     return -1;
   }
 
-  public async getPodUptimes(namespace: string): Promise<object> {
-    const pods = await this.coreV1Api.listNamespacedPod(namespace);
+  public async getPodUptimes(
+    namespace: string,
+    context?: string,
+  ): Promise<object> {
+    const { coreV1Api } = this.clientsForContext(context);
+    const pods = await coreV1Api.listNamespacedPod(namespace);
     const ret = Object();
     for (let i = 0; i < pods.body.items.length; i++) {
       const pod = pods.body.items[i];
@@ -953,7 +984,13 @@ export class KubernetesService {
     return ret;
   }
 
-  public deployApp(namespace: string, appName: string, tag: string) {
+  public deployApp(
+    namespace: string,
+    appName: string,
+    tag: string,
+    context?: string,
+  ) {
+    const { customObjectsApi } = this.clientsForContext(context);
     const deploymentName = appName + '-kuberoapp-web';
     this.logger.error(
       'deploy app: ' + appName,
@@ -978,7 +1015,7 @@ export class KubernetesService {
     const options = {
       headers: { 'Content-type': 'application/json-patch+json' },
     };
-    this.customObjectsApi
+    customObjectsApi
       .patchNamespacedCustomObject(
         group,
         apiVersion,
@@ -1026,11 +1063,13 @@ export class KubernetesService {
     containerName: string,
     command: string,
     stdin: internal.PassThrough,
+    context?: string,
   ): Promise<WebSocket> {
     //const command = ['ls', '-al', '.']
     //const command = ['bash']
     //const command = "bash"
-    const ws = await this.exec.exec(
+    const { exec } = this.clientsForContext(context);
+    const ws = await exec.exec(
       namespace,
       podName,
       containerName,
@@ -1044,7 +1083,6 @@ export class KubernetesService {
   }
 
   public async getKuberoConfig(namespace: string) {
-    this.kc.setCurrentContext(process.env.KUBERO_CONTEXT || 'default');
     try {
       const config = await this.customObjectsApi.getNamespacedCustomObject(
         'application.kubero.dev',
@@ -1132,21 +1170,21 @@ export class KubernetesService {
     if (!secretName) {
       return null;
     }
-    this.setCurrentContext(context);
+    const { coreV1Api } = this.clientsForContext(context);
     const sourceNamespace =
       process.env.KUBERO_SHARED_TLS_SECRET_NAMESPACE ||
       process.env.KUBERO_NAMESPACE ||
       'kubero';
 
     try {
-      await this.coreV1Api.readNamespacedSecret(secretName, targetNamespace);
+      await coreV1Api.readNamespacedSecret(secretName, targetNamespace);
       return secretName;
     } catch {
       // no existe en el namespace destino, hay que copiarlo
     }
 
     try {
-      const { body: source } = await this.coreV1Api.readNamespacedSecret(
+      const { body: source } = await coreV1Api.readNamespacedSecret(
         secretName,
         sourceNamespace,
       );
@@ -1160,7 +1198,7 @@ export class KubernetesService {
           namespace: targetNamespace,
         },
       };
-      await this.coreV1Api.createNamespacedSecret(targetNamespace, copy);
+      await coreV1Api.createNamespacedSecret(targetNamespace, copy);
       return secretName;
     } catch {
       this.logger.error(
@@ -1184,8 +1222,9 @@ export class KubernetesService {
       image: string;
       tag: string;
     },
-    //job: any, //V1Job,
+    context?: string,
   ): Promise<any> {
+    const { batchV1Api } = this.clientsForContext(context);
     this.logger.error('refactoring: loadJob not implemented');
     const job = this.loadJob(buildstrategy) as any;
     //const job = new Object() as any;
@@ -1238,16 +1277,21 @@ export class KubernetesService {
     this.logger.log('create build job: ' + job);
 
     try {
-      return await this.batchV1Api.createNamespacedJob(namespace, job);
+      return await batchV1Api.createNamespacedJob(namespace, job);
     } catch (error) {
       this.logger.error(error);
       this.logger.error('ERROR creating build job');
     }
   }
 
-  public async deleteKuberoBuildJob(namespace: string, buildName: string) {
+  public async deleteKuberoBuildJob(
+    namespace: string,
+    buildName: string,
+    context?: string,
+  ) {
+    const { batchV1Api } = this.clientsForContext(context);
     try {
-      await this.batchV1Api.deleteNamespacedJob(buildName, namespace);
+      await batchV1Api.deleteNamespacedJob(buildName, namespace);
     } catch {
       // this.logger.debug(error);
     }
@@ -1263,9 +1307,10 @@ export class KubernetesService {
     }
   }
 
-  public async getJobs(namespace: string): Promise<any> {
+  public async getJobs(namespace: string, context?: string): Promise<any> {
+    const { batchV1Api } = this.clientsForContext(context);
     try {
-      const jobs = await this.batchV1Api.listNamespacedJob(namespace);
+      const jobs = await batchV1Api.listNamespacedJob(namespace);
       return jobs.body;
     } catch {
       // this.logger.debug(error);

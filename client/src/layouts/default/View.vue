@@ -11,19 +11,8 @@ import { useAuthStore } from '../../stores/auth'
 import { mapWritableState } from 'pinia'
 
 
-import { useCookies } from "vue3-cookies";
-const { cookies } = useCookies();
 const authStore = useAuthStore();
-
 import axios from 'axios'
-//axios.defaults.headers.common['User-Agent'] = 'Kubero/3.x'
-//axios.defaults.headers.common['Authorization'] = 'Bearer ' + localStorage.getItem('kubero.JWT_TOKEN')
-const token = cookies.get("kubero.JWT_TOKEN")
-if (token) {
-    authStore.loadToken(token);
-    axios.defaults.headers.common['Authorization'] = 'Bearer ' + token
-}
-//axios.defaults.headers.common['vary'] = 'Accept-Encoding'
 
 export default defineComponent({
     name: 'DefaultView',
@@ -52,6 +41,7 @@ export default defineComponent({
                 axios
                     .get("/api/auth/session")
                     .then((result) => {
+                        authStore.loadSession(result.data.user);
                         console.log("isAuthenticated: " + result.data.isAuthenticated);
 
                         // safe version to vuetufy gloabl scope for use in components

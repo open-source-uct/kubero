@@ -4,6 +4,13 @@ import { User as PrismaUser } from '@prisma/client';
 import { HttpException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import axios from 'axios';
+import { MailService } from '../mail/mail.service';
+import * as dns from 'dns';
+import { safeHttpAgent, safeHttpsAgent } from '../common/utils/ssrf.util';
+
+const mailServiceMock = {
+  sendPasswordChangedEmail: jest.fn(),
+} as unknown as MailService;
 
 // Mock bcrypt
 jest.mock('bcrypt');
@@ -69,7 +76,7 @@ describe('UsersService', () => {
       () => 'hashedPassword',
     );
 
-    service = new UsersService();
+    service = new UsersService(mailServiceMock);
     // @ts-expect-error prisma es privado; se reemplaza por un mock
     service['prisma'] = prismaMock;
   });
@@ -102,6 +109,7 @@ describe('UsersService', () => {
         providerId: true,
         providerData: true,
         isActive: true,
+        sessionVersion: true,
         lastLogin: true,
         lastIp: true,
         createdAt: true,
@@ -206,6 +214,7 @@ describe('UsersService', () => {
     const updatedUser = {
       id: '1',
       username: 'user1',
+      email: 'user1@example.com',
       password: 'newpass',
     } as PrismaUser;
     prismaMock.user.update.mockResolvedValueOnce(updatedUser);
@@ -214,28 +223,134 @@ describe('UsersService', () => {
     expect(prismaMock.user.update).toHaveBeenCalledWith({
       omit: { password: true, twoFaSecret: true },
       where: { id: '1' },
-      data: { password: expect.any(String) }, // password will be hashed
+      data: {
+        password: expect.any(String),
+        sessionVersion: { increment: 1 },
+        tokens: { updateMany: { where: {}, data: { isActive: false } } },
+      },
     });
+    expect(mailServiceMock.sendPasswordChangedEmail).toHaveBeenCalledWith(
+      'user1@example.com',
+      'user1',
+    );
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.role.findUnique).not.toHaveBeenCalled();
   });
 
   it('updatePassword rejects resetting a cross-team user password for a scoped caller', async () => {
     prismaMock.user.findUnique.mockResolvedValueOnce({
+      roleId: 'student-role',
       userGroups: [{ name: 'OtroEquipo' }],
     });
     await expect(
-      service.updatePassword('1', 'newpass', ['MiEquipo'], true),
+      service.updatePassword('1', 'newpass', ['MiEquipo'], true, 50),
     ).rejects.toThrow(ForbiddenException);
+    expect(mockedBcrypt.hash).not.toHaveBeenCalled();
     expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(mailServiceMock.sendPasswordChangedEmail).not.toHaveBeenCalled();
   });
 
-  it('updatePassword allows resetting a same-team user password for a scoped caller', async () => {
+  it.each([10, 50])(
+    'updatePassword allows a scoped same-team target with priority %i for a priority-50 caller',
+    async (priority) => {
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        roleId: 'target-role',
+        userGroups: [{ name: 'MiEquipo' }],
+      });
+      prismaMock.role.findUnique.mockResolvedValueOnce({
+        priority,
+        scopeToOwnTeam: true,
+      });
+      const updatedUser = {
+        id: '1',
+        username: 'user1',
+        email: 'user1@example.com',
+      };
+      prismaMock.user.update.mockResolvedValueOnce(updatedUser);
+
+      await expect(
+        service.updatePassword('1', 'newpass', ['MiEquipo'], true, 50),
+      ).resolves.toEqual(updatedUser);
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        omit: { password: true, twoFaSecret: true },
+        where: { id: '1' },
+        data: {
+          password: 'hashedPassword',
+          sessionVersion: { increment: 1 },
+          tokens: { updateMany: { where: {}, data: { isActive: false } } },
+        },
+      });
+      expect(mailServiceMock.sendPasswordChangedEmail).toHaveBeenCalledWith(
+        updatedUser.email,
+        updatedUser.username,
+      );
+    },
+  );
+
+  it.each([
+    ['higher-priority scoped role', { priority: 60, scopeToOwnTeam: true }],
+    ['administrator role', { priority: 100, scopeToOwnTeam: false }],
+    ['low-priority global role', { priority: 0, scopeToOwnTeam: false }],
+    ['missing role', null],
+  ])(
+    'updatePassword rejects a same-team target with a %s before hashing or writing',
+    async (_description, role) => {
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        roleId: 'target-role',
+        userGroups: [{ name: 'everyone' }],
+      });
+      prismaMock.role.findUnique.mockResolvedValueOnce(role);
+
+      await expect(
+        service.updatePassword('1', 'newpass', ['everyone'], true, 50),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockedBcrypt.hash).not.toHaveBeenCalled();
+      expect(prismaMock.user.update).not.toHaveBeenCalled();
+      expect(mailServiceMock.sendPasswordChangedEmail).not.toHaveBeenCalled();
+    },
+  );
+
+  it('updatePassword rejects a same-team target without a role', async () => {
     prismaMock.user.findUnique.mockResolvedValueOnce({
+      roleId: null,
       userGroups: [{ name: 'MiEquipo' }],
     });
-    prismaMock.user.update.mockResolvedValueOnce({ id: '1' } as PrismaUser);
+
+    await expect(
+      service.updatePassword('1', 'newpass', ['MiEquipo'], true, 50),
+    ).rejects.toThrow(ForbiddenException);
+    expect(mockedBcrypt.hash).not.toHaveBeenCalled();
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(mailServiceMock.sendPasswordChangedEmail).not.toHaveBeenCalled();
+  });
+
+  it('updatePassword defaults a missing caller priority to zero', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      roleId: 'student-role',
+      userGroups: [{ name: 'MiEquipo' }],
+    });
+    prismaMock.role.findUnique.mockResolvedValueOnce({
+      priority: 10,
+      scopeToOwnTeam: true,
+    });
+
     await expect(
       service.updatePassword('1', 'newpass', ['MiEquipo'], true),
-    ).resolves.toEqual({ id: '1' });
+    ).rejects.toThrow(ForbiddenException);
+    expect(mockedBcrypt.hash).not.toHaveBeenCalled();
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(mailServiceMock.sendPasswordChangedEmail).not.toHaveBeenCalled();
+  });
+
+  it('updatePassword does not hash, write or notify for a missing scoped target', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce(null);
+
+    await expect(
+      service.updatePassword('missing', 'newpass', ['MiEquipo'], true, 50),
+    ).resolves.toBeUndefined();
+    expect(mockedBcrypt.hash).not.toHaveBeenCalled();
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(mailServiceMock.sendPasswordChangedEmail).not.toHaveBeenCalled();
   });
 
   it('should not pass unexpected fields to create', async () => {
@@ -256,10 +371,34 @@ describe('UsersService', () => {
     expect(data.username).toBe('user4');
   });
 
+  it('should not pass unexpected fields to update (roleId, 2FA, provider)', async () => {
+    prismaMock.user.update.mockResolvedValueOnce({ id: '1' } as PrismaUser);
+    await service.update('1', {
+      firstName: 'Ana',
+      roleId: 'admin-role-id',
+      twoFaEnabled: false,
+      twoFaSecret: 'attacker-secret',
+      providerId: 'x',
+      id: 'other-id',
+      createdAt: '2026-01-01',
+    });
+    const data = prismaMock.user.update.mock.calls[0][0].data;
+    expect(data).toEqual({ firstName: 'Ana' });
+  });
+
+  it('update still applies a role change sent as a role id', async () => {
+    prismaMock.role.findUnique.mockResolvedValueOnce({ name: 'admin' });
+    prismaMock.user.update.mockResolvedValueOnce({ id: '1' } as PrismaUser);
+    await service.update('1', { role: 'role-id' });
+    const data = prismaMock.user.update.mock.calls[0][0].data;
+    expect(data).toEqual({ role: { connect: { id: 'role-id' } } });
+  });
+
   it('should return undefined if updatePassword fails', async () => {
     prismaMock.user.update.mockRejectedValueOnce(new Error('Not found'));
     const user = await service.updatePassword('1', 'fail');
     expect(user).toBeUndefined();
+    expect(mailServiceMock.sendPasswordChangedEmail).not.toHaveBeenCalled();
   });
 
   it('should delete a user', async () => {
@@ -388,6 +527,23 @@ describe('UsersService', () => {
       expect(prismaMock.user.create).toHaveBeenCalled();
     });
 
+    it('does not create an OAuth account when its avatar URL is blocked', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(null);
+      prismaMock.role.findFirst.mockResolvedValueOnce({ id: 'role1' });
+      prismaMock.userGroup.findFirst.mockResolvedValueOnce({ id: 'group1' });
+
+      await expect(
+        service.findOneOrCreate(
+          'newuser',
+          'new@example.invalid',
+          'oauth2',
+          'http://169.254.169.254/latest/meta-data/',
+        ),
+      ).rejects.toThrow('The URL points to a blocked address');
+      expect(mockedAxios.get).not.toHaveBeenCalled();
+      expect(prismaMock.user.create).not.toHaveBeenCalled();
+    });
+
     it('should throw error if default role not found', async () => {
       prismaMock.user.findUnique.mockResolvedValueOnce(null);
       prismaMock.role.findFirst.mockResolvedValueOnce(null);
@@ -463,7 +619,12 @@ describe('UsersService', () => {
   describe('updateMyPassword', () => {
     it('should update password when current password is correct', async () => {
       const mockUser = { id: '1', password: 'hashedCurrentPassword' };
-      const updatedUser = { id: '1', password: 'hashedNewPassword' };
+      const updatedUser = {
+        id: '1',
+        username: 'user1',
+        email: 'user1@example.com',
+        password: 'hashedNewPassword',
+      };
 
       prismaMock.user.findUnique.mockResolvedValueOnce(mockUser);
       (mockedBcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
@@ -484,6 +645,10 @@ describe('UsersService', () => {
         'hashedCurrentPassword',
       );
       expect(mockedBcrypt.hash).toHaveBeenCalledWith('newPassword123', 10);
+      expect(mailServiceMock.sendPasswordChangedEmail).toHaveBeenCalledWith(
+        'user1@example.com',
+        'user1',
+      );
     });
 
     it('should return undefined for invalid input parameters', async () => {
@@ -520,6 +685,7 @@ describe('UsersService', () => {
       await expect(
         service.updateMyPassword('1', 'wrongPassword', 'newPassword123'),
       ).rejects.toThrow(HttpException);
+      expect(mailServiceMock.sendPasswordChangedEmail).not.toHaveBeenCalled();
     });
 
     it('should propagate database errors', async () => {
@@ -600,6 +766,7 @@ describe('UsersService', () => {
 
       expect(result).toBe(updatedUser);
       expect(prismaMock.user.update).toHaveBeenCalledWith({
+        omit: { password: true, twoFaSecret: true },
         where: { id: '1' },
         data: { image: 'data:image/jpeg;base64,ZmFrZS1pbWFnZS1kYXRh' },
       });
@@ -611,6 +778,7 @@ describe('UsersService', () => {
 
       expect(result1).toBeUndefined();
       expect(result2).toBeUndefined();
+      expect(prismaMock.user.update).not.toHaveBeenCalled();
     });
 
     it('should return undefined when update fails', async () => {
@@ -650,6 +818,8 @@ describe('UsersService', () => {
   });
 
   describe('generateUserDataFromImageUrl', () => {
+    afterEach(() => jest.restoreAllMocks());
+
     it('should generate base64 image data from URL', async () => {
       const imageBuffer = Buffer.from('fake-image-data');
       mockedAxios.get.mockResolvedValueOnce({
@@ -667,11 +837,87 @@ describe('UsersService', () => {
       );
       expect(mockedAxios.get).toHaveBeenCalledWith(
         'https://example.com/image.jpg',
-        {
+        expect.objectContaining({
           responseType: 'arraybuffer',
-        },
+          proxy: false,
+          httpAgent: safeHttpAgent,
+          httpsAgent: safeHttpsAgent,
+          maxRedirects: 3,
+          timeout: 10000,
+          maxContentLength: 1024 * 1024,
+          maxBodyLength: 1024 * 1024,
+        }),
       );
     });
+
+    it.each([
+      'not a url',
+      'file:///etc/passwd',
+      'ftp://example.com/image.jpg',
+      'http://user:password@example.com/image.jpg',
+      'http://localhost:2000/api/auth/methods',
+      'http://127.0.0.1/image.jpg',
+      'http://127.1/image.jpg',
+      'http://2130706433/image.jpg',
+      'http://0x7f000001/image.jpg',
+      'http://10.0.0.1/image.jpg',
+      'http://172.16.0.1/image.jpg',
+      'http://192.168.1.1/image.jpg',
+      'http://169.254.169.254/latest/meta-data/',
+      'http://[::1]/image.jpg',
+      'http://[fd00::1]/image.jpg',
+      'http://[::ffff:127.0.0.1]/image.jpg',
+    ])('rejects an unsafe avatar URL before downloading: %s', async (url) => {
+      await expect(
+        (service as any).generateUserDataFromImageUrl(url),
+      ).rejects.toThrow();
+      expect(mockedAxios.get).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [{ address: '10.0.0.1', family: 4 }],
+      [
+        { address: '8.8.8.8', family: 4 },
+        { address: '127.0.0.1', family: 4 },
+      ],
+    ])(
+      'rejects private DNS answers with the real HTTP adapter (%j)',
+      async (...addresses) => {
+        jest
+          .spyOn(dns, 'lookup')
+          .mockImplementation(((_host, _options, callback) =>
+            callback(null, addresses)) as any);
+        const realAxios = jest.requireActual<typeof axios>('axios');
+        mockedAxios.get.mockImplementationOnce((url, options) =>
+          realAxios.get(url, options),
+        );
+
+        await expect(
+          (service as any).generateUserDataFromImageUrl(
+            'http://blocked-avatar.example.invalid/image.jpg',
+          ),
+        ).rejects.toThrow('resolves to a blocked address');
+      },
+    );
+
+    it.each(['127.0.0.1', '169.254.169.254', 'localhost'])(
+      'rejects an avatar redirect to %s',
+      async (hostname) => {
+        mockedAxios.get.mockImplementationOnce(async (_url, options) => {
+          options!.beforeRedirect!(
+            { protocol: 'http:', hostname, path: '/image.jpg' },
+            { headers: {}, statusCode: 302 },
+          );
+          throw new Error('An unsafe redirect was accepted');
+        });
+
+        await expect(
+          (service as any).generateUserDataFromImageUrl(
+            'https://example.com/image.jpg',
+          ),
+        ).rejects.toThrow('The URL points to a blocked address');
+      },
+    );
 
     it('should throw error when image fetch fails', async () => {
       mockedAxios.get.mockResolvedValueOnce({
@@ -1058,13 +1304,16 @@ describe('UsersService safeguards', () => {
     prisma = {
       user: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        create: jest.fn(),
         count: jest.fn().mockResolvedValue(1), // queda otro admin
         delete: jest.fn().mockResolvedValue({}),
         update: jest.fn().mockResolvedValue({}),
       },
-      role: { findUnique: jest.fn() },
+      role: { findUnique: jest.fn(), findFirst: jest.fn() },
+      userGroup: { findFirst: jest.fn() },
     };
-    service = new UsersService();
+    service = new UsersService(mailServiceMock);
     // @ts-expect-error prisma es privado; se reemplaza por un mock
     service['prisma'] = prisma;
   });
@@ -1153,6 +1402,105 @@ describe('UsersService safeguards', () => {
       } as any);
       const user = await service.findOneOrCreate('ana', 'a@b.c', 'github', '');
       expect(user).toMatchObject({ username: 'ana' });
+    });
+
+    it('finds the account by providerId, without even looking at the username', async () => {
+      prisma.user.findFirst.mockResolvedValueOnce({
+        id: 'u3',
+        username: 'ana-renamed',
+        provider: 'github',
+        providerId: '12345',
+      });
+      const findOneFullSpy = jest.spyOn(service, 'findOneFull');
+      const user = await service.findOneOrCreate(
+        'ana-renamed',
+        'a@b.c',
+        'github',
+        '',
+        '12345',
+      );
+      expect(prisma.user.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { provider: 'github', providerId: '12345' },
+        }),
+      );
+      expect(user).toMatchObject({ id: 'u3' });
+      expect(findOneFullSpy).not.toHaveBeenCalled();
+    });
+
+    it('backfills the providerId on an account created before this fix', async () => {
+      prisma.user.findFirst.mockResolvedValueOnce(null);
+      jest.spyOn(service, 'findOneFull').mockResolvedValue({
+        id: 'u4',
+        username: 'ana',
+        provider: 'github',
+        providerId: null,
+      } as any);
+      prisma.user.update.mockResolvedValueOnce({
+        id: 'u4',
+        username: 'ana',
+        provider: 'github',
+        providerId: '999',
+      });
+
+      const user = await service.findOneOrCreate(
+        'ana',
+        'a@b.c',
+        'github',
+        '',
+        '999',
+      );
+
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'u4' },
+          data: { providerId: '999' },
+        }),
+      );
+      expect(user).toMatchObject({ providerId: '999' });
+    });
+
+    it('refuses a username already linked to a different providerId (reused/renamed GitHub account)', async () => {
+      prisma.user.findFirst.mockResolvedValueOnce(null);
+      jest.spyOn(service, 'findOneFull').mockResolvedValue({
+        id: 'u5',
+        username: 'ana',
+        provider: 'github',
+        providerId: '111',
+      } as any);
+
+      await expect(
+        service.findOneOrCreate('ana', 'a@b.c', 'github', '', '222'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('persists the providerId when creating a brand new OAuth account', async () => {
+      jest.spyOn(service, 'findOneFull').mockResolvedValue(null);
+      prisma.user.findFirst.mockResolvedValueOnce(null);
+      prisma.role.findFirst.mockResolvedValueOnce({
+        id: 'role1',
+        name: 'guest',
+      });
+      prisma.userGroup.findFirst.mockResolvedValueOnce({
+        id: 'group1',
+        name: 'everyone',
+      });
+      prisma.user.create.mockResolvedValueOnce({ id: 'u6' });
+
+      await service.findOneOrCreate(
+        'newghuser',
+        'new@b.c',
+        'github',
+        '',
+        '333',
+      );
+
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ providerId: '333' }),
+        }),
+      );
     });
   });
 });

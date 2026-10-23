@@ -75,7 +75,7 @@ export class LogsService {
         color: this.logcolor(podName),
         log: chunk.toString(),
       };
-      this.EventsGateway.sendLogline(roomname, logline);
+      void this.EventsGateway.sendLogline(roomname, logline);
     });
 
     const contextName = await this.pipelinesService.getContext(
@@ -86,10 +86,8 @@ export class LogsService {
     const namespace = pipelineName + '-' + phaseName;
 
     if (contextName) {
-      this.kubectl.setCurrentContext(contextName);
-
       // un pod puede tener varios contenedores, cada uno con su propio stream
-      const streamKey = podName + '/' + container;
+      const streamKey = `${contextName}/${namespace}/${podName}/${container}`;
 
       if (!this.podLogStreams.includes(streamKey)) {
         this.podLogStreams.push(streamKey);
@@ -102,7 +100,8 @@ export class LogsService {
         logStream.on('close', release);
         logStream.on('error', release);
 
-        this.kubectl.log
+        this.kubectl
+          .getLog(contextName)
           .log(namespace, podName, container, logStream, {
             follow: true,
             tailLines: 0,
@@ -218,6 +217,7 @@ export class LogsService {
               pipelineName,
               phaseName,
               appName,
+              contextName,
             );
             loglines = loglines.concat(ll);
           }
@@ -232,6 +232,7 @@ export class LogsService {
             pipelineName,
             phaseName,
             appName,
+            contextName,
           );
           loglines = loglines.concat(ll);
         } else if (
@@ -248,6 +249,7 @@ export class LogsService {
               pipelineName,
               phaseName,
               appName,
+              contextName,
             );
             loglines = loglines.concat(ll);
           }
@@ -265,6 +267,7 @@ export class LogsService {
     pipelineName: string,
     phaseName: string,
     appName: string,
+    contextName?: string,
   ): Promise<ILoglines[]> {
     const loglines: ILoglines[] = [];
 
@@ -276,12 +279,14 @@ export class LogsService {
     });
 
     try {
-      await this.kubectl.log.log(namespace, podName, containerName, logStream, {
-        follow: false,
-        tailLines: 80,
-        pretty: false,
-        timestamps: true,
-      });
+      await this.kubectl
+        .getLog(contextName)
+        .log(namespace, podName, containerName, logStream, {
+          follow: false,
+          tailLines: 80,
+          pretty: false,
+          timestamps: true,
+        });
     } catch {
       console.log('error getting logs for ' + podName + ' ' + containerName);
       return [];

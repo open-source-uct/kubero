@@ -141,6 +141,18 @@ describe('GroupsService protected teams', () => {
     expect(prisma.userGroup.update).toHaveBeenCalled();
   });
 
+  it.each(['admin', 'everyone'])(
+    'lets the description of the %s team change when the form resends its unchanged name',
+    async (name) => {
+      prisma.userGroup.findUnique.mockResolvedValue({ id: 'g', name });
+      await service.update('g', { name, description: 'nuevo' });
+      expect(prisma.userGroup.update).toHaveBeenCalledWith({
+        where: { id: 'g' },
+        data: { name, description: 'nuevo' },
+      });
+    },
+  );
+
   it('deletes and renames any other team', async () => {
     prisma.userGroup.findUnique.mockResolvedValue({ id: 'g', name: 'Taller1' });
     await service.delete('g');
@@ -213,6 +225,33 @@ describe('GroupsService scopeToOwnTeam', () => {
     await service.delete('g', ['Taller1'], true);
     expect(prisma.userGroup.update).toHaveBeenCalled();
     expect(prisma.userGroup.delete).toHaveBeenCalled();
+  });
+
+  it('ignores nested relations in the body (a scoped role cannot change members through a team edit)', async () => {
+    prisma.userGroup.findUnique.mockResolvedValue({
+      id: 'g',
+      name: 'Taller1',
+    });
+    await service.update(
+      'g',
+      {
+        name: 'Taller1',
+        description: 'x',
+        users: {
+          update: {
+            where: { id: 'caller-id' },
+            data: { role: { connect: { name: 'admin' } } },
+          },
+          connect: { id: 'other-team-user' },
+        },
+      } as any,
+      ['Taller1'],
+      true,
+    );
+    expect(prisma.userGroup.update).toHaveBeenCalledWith({
+      where: { id: 'g' },
+      data: { name: 'Taller1', description: 'x' },
+    });
   });
 
   it('create joins the caller to the new team when scoped (otherwise it would be invisible to them)', async () => {

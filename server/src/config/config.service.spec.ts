@@ -62,17 +62,6 @@ jest.mock('bcrypt', () => ({
   hashSync: jest.fn(() => 'hashed'),
   genSaltSync: jest.fn(() => 'salt'),
 }));
-jest.mock('sqlite3', () => {
-  return {
-    Database: jest.fn().mockImplementation(() => ({
-      run: jest.fn(),
-      all: jest.fn(),
-      get: jest.fn(),
-      close: jest.fn(),
-    })),
-  };
-});
-
 describe('ConfigService', () => {
   let service: ConfigService;
   let kubectl: any;

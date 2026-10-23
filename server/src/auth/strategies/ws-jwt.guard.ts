@@ -3,8 +3,7 @@ import { CanActivate, Injectable, Logger } from '@nestjs/common';
 /**
  * Guard de los mensajes del websocket. La autenticación se hace al conectar
  * (EventsGateway.handleConnection) y deja la identidad en `client.data.user`;
- * aquí solo se comprueba que exista y que el JWT no haya caducado desde
- * entonces.
+ * cada mensaje vuelve a comprobar revocación y autorización en la BD.
  */
 @Injectable()
 export class WsJwtGuard implements CanActivate {
@@ -25,11 +24,15 @@ export class WsJwtGuard implements CanActivate {
       client.disconnect(true);
       return false;
     }
-    if (expiresAt && Date.now() > expiresAt) {
+    if (expiresAt && Date.now() >= expiresAt) {
       this.logger.debug('Socket token expired, disconnecting client');
       client.disconnect(true);
       return false;
     }
-    return true;
+    if (!client.data.revalidate) {
+      client.disconnect(true);
+      return false;
+    }
+    return client.data.revalidate();
   }
 }

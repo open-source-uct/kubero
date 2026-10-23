@@ -174,6 +174,7 @@
 import { defineComponent, ref, onMounted, watch } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../../stores/auth'
+import router from '../../router'
 import { useI18n } from 'vue-i18n'
 import { confirmDestructiveAction } from '../../utils/destructiveConfirmation'
 import { handledApiErrorConfig, notifyApiError } from '../../utils/apiFeedback'
@@ -323,6 +324,8 @@ export default defineComponent({
         changePasswordDialog.value = false
         passwordError.value = false
         passwordForm.value = { currentPassword: '', newPassword: '', confirmPassword: '' }
+        authStore.reset()
+        await router.push('/login')
       } catch (e: any) {
         passwordError.value = true
         passwordErrorMessage.value = e.response?.data?.message || 'Failed to change password'

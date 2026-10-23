@@ -95,13 +95,18 @@ describe('UsersController', () => {
   });
 
   describe('updateUserPassword', () => {
-    it('passes the caller scope so a scoped role cannot reset another team password', async () => {
+    it('passes the authenticated caller scope and priority for password authorization', async () => {
       const scopedReq = {
-        user: { userId: 'u1', userGroups: ['Taller1'], scopeToOwnTeam: true },
+        user: {
+          userId: 'u1',
+          userGroups: ['Taller1'],
+          scopeToOwnTeam: true,
+          priority: 50,
+        },
       };
       await controller.updateUserPassword(
         'u2',
-        { password: 'newpass' } as any,
+        { password: 'newpass', priority: 100, scopeToOwnTeam: false } as any,
         scopedReq,
       );
       expect(users.updatePassword).toHaveBeenCalledWith(
@@ -109,6 +114,7 @@ describe('UsersController', () => {
         'newpass',
         ['Taller1'],
         true,
+        50,
       );
     });
   });

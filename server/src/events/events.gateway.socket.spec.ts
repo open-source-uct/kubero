@@ -46,6 +46,9 @@ describe('EventsGateway with real sockets', () => {
   let url: string;
   const clients: ClientSocket[] = [];
   const write = jest.fn();
+  const revoked = new Set<string>();
+  const changed = new Map<string, any>();
+  const expired = new Set<string>();
 
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -74,7 +77,8 @@ describe('EventsGateway with real sockets', () => {
   beforeAll(async () => {
     const jwt = {
       verify: (token: string) => {
-        if (!USERS[token]) throw new Error('invalid token');
+        if (!USERS[token] || expired.has(token))
+          throw new Error('invalid token');
         return { userId: USERS[token].userId, exp: 4e9 };
       },
     };
@@ -83,7 +87,11 @@ describe('EventsGateway with real sockets', () => {
         // la BD real tarda: sin latencia la carrera con el primer mensaje del
         // cliente no se reproduce
         await new Promise((r) => setTimeout(r, 80));
-        return Object.values(USERS).find((u) => u.userId === payload.userId);
+        if (revoked.has(payload.userId)) throw new Error('Session revoked');
+        return structuredClone(
+          changed.get(payload.userId) ??
+            Object.values(USERS).find((u) => u.userId === payload.userId),
+        );
       },
     };
     const pipelines = {
@@ -146,6 +154,14 @@ describe('EventsGateway with real sockets', () => {
   });
 
   beforeEach(() => write.mockClear());
+
+  afterEach(async () => {
+    clients.splice(0).forEach((client) => client.close());
+    await wait(30);
+    revoked.clear();
+    changed.clear();
+    expired.clear();
+  });
 
   it('disconnects a socket that connects without a token and sends it nothing', async () => {
     const anon = await open();
@@ -257,5 +273,50 @@ describe('EventsGateway with real sockets', () => {
     });
     await wait(300);
     expect(write).toHaveBeenCalledWith('ls\r');
+  });
+
+  it.each(['userGroups', 'permissions', 'role'])(
+    'removes passive subscribers before output after a %s change',
+    async (field) => {
+      const ana = await open('tok-taller1');
+      ana.socket.emit('join', { room: 'p1-production-web' });
+      ana.socket.emit('join', { room: 'p1-production-web-pod-c-terminal' });
+      await wait(250);
+      changed.set('u1', {
+        ...USERS['tok-taller1'],
+        [field]: field === 'role' ? 'guest' : [],
+      });
+      await gateway.sendLogline('p1-production-web', {
+        log: 'private after revocation',
+      });
+      await gateway.sendTerminalLine(
+        'p1-production-web-pod-c-terminal',
+        'private after revocation',
+      );
+      await wait(100);
+      expect(ana.received).toEqual([]);
+      expect(ana.state.disconnectReason).toBe('io server disconnect');
+    },
+  );
+
+  it('checks server-side session revocation before processing terminal input', async () => {
+    const ana = await open('tok-taller1');
+    revoked.add('u1');
+    ana.socket.emit('terminal', {
+      room: 'p1-production-web-pod-c-terminal',
+      data: 'stale input',
+    });
+    await wait(200);
+    expect(write).not.toHaveBeenCalled();
+    expect(ana.state.disconnectReason).toBe('io server disconnect');
+  });
+
+  it('does not send events to an expired passive connection', async () => {
+    const ana = await open('tok-taller1');
+    expired.add('tok-taller1');
+    await gateway.sendEvent('newApp', { private: true });
+    await wait(100);
+    expect(ana.received).toEqual([]);
+    expect(ana.state.disconnectReason).toBe('io server disconnect');
   });
 });

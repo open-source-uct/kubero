@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import {
   MetricsOptions,
   IMetric,
+  IClusterUsage,
   PrometheusQuery,
   Rule,
 } from './metrics.interface';
@@ -77,6 +78,46 @@ export class MetricsService {
     } catch {
       return false;
     }
+  }
+
+  // Suma el uso real de CPU/memoria de todas las apps de Kubero del cluster
+  // entero (sin filtrar por namespace/pipeline) — el contenedor
+  // kuberoapp-web/kuberoapp-worker es el único que el operador le pone a las
+  // apps desplegadas por Kubero, así que alcanza para separarlas del resto de
+  // los servicios del cluster (gitlab, wazuh, sonarqube, etc. no lo usan).
+  public async getClusterWideUsage(): Promise<IClusterUsage> {
+    const cpuQuery =
+      'sum(rate(container_cpu_usage_seconds_total{container=~"kuberoapp-web|kuberoapp-worker"}[5m]))';
+    const memoryQuery =
+      'sum(container_memory_rss{container=~"kuberoapp-web|kuberoapp-worker"})';
+    // capacidad total del cluster (todos los nodos) — para mostrar qué
+    // porcentaje de eso están usando las apps de Kubero, en vez de un "total"
+    // inventado
+    const cpuCapacityQuery =
+      'sum(kube_node_status_allocatable{resource="cpu"})';
+    const memoryCapacityQuery =
+      'sum(kube_node_status_allocatable{resource="memory"})';
+    let cpuCores = 0;
+    let memoryBytes = 0;
+    let cpuCapacityCores = 0;
+    let memoryCapacityBytes = 0;
+    try {
+      const [cpuResult, memoryResult, cpuCapacityResult, memoryCapacityResult] =
+        await Promise.all([
+          this.prom.instantQuery(cpuQuery),
+          this.prom.instantQuery(memoryQuery),
+          this.prom.instantQuery(cpuCapacityQuery),
+          this.prom.instantQuery(memoryCapacityQuery),
+        ]);
+      cpuCores = cpuResult.result[0]?.value?.value ?? 0;
+      memoryBytes = memoryResult.result[0]?.value?.value ?? 0;
+      cpuCapacityCores = cpuCapacityResult.result[0]?.value?.value ?? 0;
+      memoryCapacityBytes = memoryCapacityResult.result[0]?.value?.value ?? 0;
+    } catch (error) {
+      console.log('error fetching cluster-wide usage');
+      console.log(error);
+    }
+    return { cpuCores, memoryBytes, cpuCapacityCores, memoryCapacityBytes };
   }
 
   public async getLongTermMetrics(
@@ -458,13 +499,14 @@ export class MetricsService {
     pipelineName: string,
     phaseName: string,
     appName: string,
+    context?: string,
   ) {
     const namespace = pipelineName + '-' + phaseName;
-    return this.kubectl.getPodMetrics(namespace, appName);
+    return this.kubectl.getPodMetrics(namespace, appName, context);
   }
 
-  public getUptimes(pipelineName: string, phaseName: string) {
+  public getUptimes(pipelineName: string, phaseName: string, context?: string) {
     const namespace = pipelineName + '-' + phaseName;
-    return this.kubectl.getPodUptimes(namespace);
+    return this.kubectl.getPodUptimes(namespace, context);
   }
 }

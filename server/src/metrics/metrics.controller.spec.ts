@@ -40,6 +40,7 @@ describe('MetricsController', () => {
       getHttpResponseTrafficMetrics: jest.fn(),
       getCPUMetrics: jest.fn(),
       getRules: jest.fn(),
+      getClusterWideUsage: jest.fn(),
     } as any;
 
     pipelinesService = { getContext: jest.fn().mockResolvedValue('ctx') };
@@ -62,15 +63,33 @@ describe('MetricsController', () => {
   it('should get metrics for a specific app', async () => {
     service.getPodMetrics.mockResolvedValue({ cpu: 1, mem: 2 });
     const result = await controller.getMetrics('pipe', 'dev', 'app1', mockReq);
-    expect(service.getPodMetrics).toHaveBeenCalledWith('pipe', 'dev', 'app1');
+    expect(service.getPodMetrics).toHaveBeenCalledWith(
+      'pipe',
+      'dev',
+      'app1',
+      'ctx',
+    );
     expect(result).toEqual({ cpu: 1, mem: 2 });
   });
 
   it('should get uptimes', async () => {
     service.getUptimes.mockResolvedValue([{ pod: 'a', uptime: 123 }]);
     const result = await controller.getUptimes('pipe', 'dev', mockReq);
-    expect(service.getUptimes).toHaveBeenCalledWith('pipe', 'dev');
+    expect(service.getUptimes).toHaveBeenCalledWith('pipe', 'dev', 'ctx');
     expect(result).toEqual([{ pod: 'a', uptime: 123 }]);
+  });
+
+  it('should get cluster-wide usage', async () => {
+    const usage = {
+      cpuCores: 1.2,
+      memoryBytes: 4096,
+      cpuCapacityCores: 16,
+      memoryCapacityBytes: 32000000000,
+    };
+    service.getClusterWideUsage.mockResolvedValue(usage);
+    const result = await controller.getClusterUsage();
+    expect(service.getClusterWideUsage).toHaveBeenCalled();
+    expect(result).toEqual(usage);
   });
 
   it('should get timeseries', async () => {
