@@ -77,6 +77,7 @@ const routes = [
       {
         path: '/activity',
         name: 'Activity',
+        meta: { requiredAnyPermissions: ['audit:read', 'audit:write'] },
         component: () => import('@/views/Activity.vue'),
       },
     ],
@@ -134,6 +135,7 @@ const routes = [
       {
         path: '/settings',
         name: 'Settings',
+        meta: { requiredAnyPermissions: ['config:read', 'config:write'] },
         component: () => import('@/views/Settings.vue'),
       },
     ],
@@ -145,6 +147,7 @@ const routes = [
       {
         path: '/runpacks',
         name: 'Runpacks',
+        meta: { requiredAnyPermissions: ['config:read', 'config:write'] },
         component: () => import('@/views/Runpacks.vue'),
       },
     ],
@@ -156,6 +159,7 @@ const routes = [
       {
         path: '/podsizes',
         name: 'Pod Sizes',
+        meta: { requiredAnyPermissions: ['config:read', 'config:write'] },
         component: () => import('@/views/Podsizes.vue'),
       },
     ],
@@ -167,6 +171,7 @@ const routes = [
       {
         path: '/notifications',
         name: 'Notifications',
+        meta: { requiredAnyPermissions: ['config:read', 'config:write'] },
         component: () => import('@/views/Notifications.vue'),
       },
     ],
