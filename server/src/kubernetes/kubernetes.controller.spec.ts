@@ -91,8 +91,7 @@ describe('KubernetesController', () => {
     it('should let a team read the events of its own pipeline namespace', async () => {
       service.getEvents.mockResolvedValue([]);
       await controller.getEvents('mine-dev', teamReq);
-      expect(service.setCurrentContext).toHaveBeenCalledWith('ctx1');
-      expect(service.getEvents).toHaveBeenCalledWith('mine-dev');
+      expect(service.getEvents).toHaveBeenCalledWith('mine-dev', 'ctx1');
     });
 
     it('should refuse the events of a namespace outside its pipelines', async () => {
@@ -109,14 +108,14 @@ describe('KubernetesController', () => {
       service.getEvents.mockResolvedValue([]);
       await controller.getEvents('kube-system', adminReq);
       expect(pipelines.listPipelines).not.toHaveBeenCalled();
-      expect(service.getEvents).toHaveBeenCalledWith('kube-system');
+      expect(service.getEvents).toHaveBeenCalledWith('kube-system', undefined);
     });
   });
 
   it('should get events', async () => {
     service.getEvents.mockResolvedValue([mockCoreV1Event]);
     const result = await controller.getEvents('default', adminReq);
-    expect(service.getEvents).toHaveBeenCalledWith('default');
+    expect(service.getEvents).toHaveBeenCalledWith('default', undefined);
     expect(result).toEqual([
       {
         count: 1,

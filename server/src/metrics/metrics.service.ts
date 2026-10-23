@@ -499,13 +499,14 @@ export class MetricsService {
     pipelineName: string,
     phaseName: string,
     appName: string,
+    context?: string,
   ) {
     const namespace = pipelineName + '-' + phaseName;
-    return this.kubectl.getPodMetrics(namespace, appName);
+    return this.kubectl.getPodMetrics(namespace, appName, context);
   }
 
-  public getUptimes(pipelineName: string, phaseName: string) {
+  public getUptimes(pipelineName: string, phaseName: string, context?: string) {
     const namespace = pipelineName + '-' + phaseName;
-    return this.kubectl.getPodUptimes(namespace);
+    return this.kubectl.getPodUptimes(namespace, context);
   }
 }

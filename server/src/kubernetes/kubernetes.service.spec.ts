@@ -6,6 +6,7 @@ jest.mock('@kubernetes/client-node', () => {
     ...actual,
     KubeConfig: jest.fn().mockImplementation(() => ({
       loadFromString: jest.fn(),
+      exportConfig: jest.fn().mockReturnValue('{}'),
       loadFromFile: jest.fn(),
       loadFromCluster: jest.fn(),
       setCurrentContext: jest.fn(),
@@ -217,7 +218,8 @@ describe('KubernetesService', () => {
   it('should switch context before getting pods', async () => {
     // antes no cambiaba de contexto y siempre leía del último usado
     await service.getPods('ns', 'ctx');
-    expect((service as any).kc.setCurrentContext).toHaveBeenCalledWith('ctx');
+    expect((service as any).kc.setCurrentContext).not.toHaveBeenCalled();
+    expect((service as any).contextClients.has('ctx')).toBe(true);
   });
 
   it('should refuse an unknown context without touching the shared kubeconfig', async () => {
@@ -237,9 +239,7 @@ describe('KubernetesService', () => {
     ]);
     (service as any).kc.setCurrentContext.mockClear();
     await service.getPods('ns', 'kind-kubero');
-    expect((service as any).kc.setCurrentContext).toHaveBeenCalledWith(
-      'inClusterContext',
-    );
+    expect((service as any).contextClients.has('inClusterContext')).toBe(true);
     expect((service as any).kc.setCurrentContext).not.toHaveBeenCalledWith(
       'kind-kubero',
     );
@@ -530,7 +530,7 @@ describe('KubernetesService', () => {
 
       const result = await service.ensureSharedTlsSecret(
         'ramtun-production',
-        'ctx',
+        'default',
       );
 
       expect(result).toBeNull();
@@ -544,7 +544,7 @@ describe('KubernetesService', () => {
 
       const result = await service.ensureSharedTlsSecret(
         'ramtun-production',
-        'ctx',
+        'default',
       );
 
       expect(result).toBe('inf-uct-cl-tls');
@@ -567,7 +567,7 @@ describe('KubernetesService', () => {
 
       const result = await service.ensureSharedTlsSecret(
         'ramtun-production',
-        'ctx',
+        'default',
       );
 
       expect(result).toBe('inf-uct-cl-tls');
@@ -589,7 +589,7 @@ describe('KubernetesService', () => {
 
       const result = await service.ensureSharedTlsSecret(
         'ramtun-production',
-        'ctx',
+        'default',
       );
 
       expect(result).toBeNull();

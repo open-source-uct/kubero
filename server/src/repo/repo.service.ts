@@ -305,6 +305,7 @@ export class RepoService {
         event = headers['x-gitlab-event'];
         delivery = headers['x-gitlab-event-uuid'];
         signature = headers['x-gitlab-token'];
+        webhook = this.gitlabApi.getWebhook(event, delivery, signature, body);
         break;
       case 'bitbucket':
         event = headers['x-event-key'];

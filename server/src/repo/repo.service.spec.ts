@@ -376,4 +376,36 @@ describe('RepoService', () => {
     expect(spy).toHaveBeenCalledWith('unknown repoprovider: unknown');
     spy.mockRestore();
   });
+  describe('GitLab webhook routing', () => {
+    const headers = {
+      'x-gitlab-event': 'Push Hook',
+      'x-gitlab-event-uuid': 'fixture-delivery',
+      'x-gitlab-token': 'fixture-secret',
+    };
+    it('delegates verification and does not rebuild when verification fails', async () => {
+      await service.handleWebhook('gitlab', headers, {});
+      expect(service['gitlabApi'].getWebhook).toHaveBeenCalledWith(
+        'Push Hook',
+        'fixture-delivery',
+        'fixture-secret',
+        {},
+      );
+      expect(appsService.rebuildApp).not.toHaveBeenCalled();
+      expect(notificationsService.send).not.toHaveBeenCalled();
+    });
+    it('processes a verified push', async () => {
+      (service['gitlabApi'].getWebhook as jest.Mock).mockReturnValue({
+        event: 'push',
+        branch: 'feature/example',
+        repo: { ssh_url: 'ssh://repo' },
+        verified: true,
+      });
+      await service.handleWebhook('gitlab', headers, {});
+      expect(appsService.getAppsByRepoAndBranch).toHaveBeenCalledWith(
+        'ssh://repo',
+        'feature/example',
+      );
+      expect(appsService.rebuildApp).toHaveBeenCalledTimes(1);
+    });
+  });
 });

@@ -179,4 +179,51 @@ describe('webhook verification', () => {
       expect(logged).not.toContain('attacker-guess');
     });
   });
+  describe('GitLab event payloads', () => {
+    const instance = () =>
+      new GitlabApi('https://gitlab.example', 'fixture-token');
+    it('preserves slashes in branch names', () => {
+      expect(
+        instance().getWebhook('Push Hook', 'd1', SECRET, {
+          ...pushBody,
+          ref: 'refs/heads/feature/example',
+        }),
+      ).toMatchObject({
+        branch: 'feature/example',
+        event: 'push',
+        verified: true,
+      });
+    });
+    it.each([
+      ['open', 'opened'],
+      ['reopen', 'reopened'],
+      ['close', 'closed'],
+      ['merge', 'closed'],
+    ])('normalizes merge request action %s', (action, expected) => {
+      expect(
+        instance().getWebhook('Merge Request Hook', 'd1', SECRET, {
+          object_attributes: {
+            action,
+            source_branch: 'feature/example',
+            source: { git_ssh_url: 'ssh://source/repo' },
+          },
+        }),
+      ).toMatchObject({
+        action: expected,
+        branch: 'feature/example',
+        repo: { ssh_url: 'ssh://source/repo' },
+        verified: true,
+      });
+    });
+    it.each([
+      undefined,
+      {},
+      { ref: 'refs/tags/v1' },
+      { ref: 'refs/heads/main' },
+    ])('rejects malformed payloads without throwing', (body) => {
+      expect(instance().getWebhook('Push Hook', 'd1', SECRET, body)).toBe(
+        false,
+      );
+    });
+  });
 });

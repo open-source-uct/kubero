@@ -257,21 +257,28 @@ export class GitlabApi extends Repo {
       return false;
     }
 
-    let branch: string = 'main';
-    let ssh_url: string = '';
-    let action;
-    if (body.ref != undefined) {
-      const ref = body.ref;
-      const refs = ref.split('/');
-      branch = refs[refs.length - 1];
-      ssh_url = body.project.git_ssh_url;
-    } else if (body.pull_request != undefined) {
-      action = body.action;
-      branch = body.pull_request.head.ref;
-      ssh_url = body.pull_request.head.repo.ssh_url;
+    let branch: string;
+    let ssh_url: string;
+    let action: IWebhook['action'];
+    if (event === 'Push Hook') {
+      if (typeof body?.ref !== 'string' || !body.ref.startsWith('refs/heads/'))
+        return false;
+      branch = body.ref.slice('refs/heads/'.length);
+      ssh_url = body.project?.git_ssh_url;
     } else {
-      ssh_url = body.project.git_ssh_url;
+      const attributes = body?.object_attributes;
+      const actions: Record<string, IWebhook['action']> = {
+        open: 'opened',
+        reopen: 'reopened',
+        close: 'closed',
+        merge: 'closed',
+      };
+      action = actions[attributes?.action];
+      if (!action) return false;
+      branch = attributes?.source_branch;
+      ssh_url = attributes?.source?.git_ssh_url;
     }
+    if (!branch || typeof ssh_url !== 'string' || !ssh_url) return false;
 
     try {
       const webhook: IWebhook = {

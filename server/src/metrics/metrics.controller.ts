@@ -30,7 +30,7 @@ export class MetricsController {
   // pasar por Kubernetes, así que hay que comprobar el equipo a mano: getContext
   // lanza 403 si el usuario no tiene acceso al pipeline.
   private async assertAccess(pipeline: string, phase: string, req: any) {
-    await this.pipelinesService.getContext(
+    return this.pipelinesService.getContext(
       pipeline,
       phase,
       req.user.userGroups,
@@ -56,8 +56,8 @@ export class MetricsController {
     @Param('app') app: string,
     @Request() req: any,
   ) {
-    await this.assertAccess(pipeline, phase, req);
-    return this.metricsService.getPodMetrics(pipeline, phase, app);
+    const context = await this.assertAccess(pipeline, phase, req);
+    return this.metricsService.getPodMetrics(pipeline, phase, app, context);
   }
 
   @Get('/uptimes/:pipeline/:phase')
@@ -77,8 +77,8 @@ export class MetricsController {
     @Param('phase') phase: string,
     @Request() req: any,
   ) {
-    await this.assertAccess(pipeline, phase, req);
-    return this.metricsService.getUptimes(pipeline, phase);
+    const context = await this.assertAccess(pipeline, phase, req);
+    return this.metricsService.getUptimes(pipeline, phase, context);
   }
 
   @Get('/timeseries')
