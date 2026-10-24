@@ -67,21 +67,21 @@ export class MailService {
   // best-effort: que falle el envío no debe romper el cambio de contraseña
   async sendPasswordChangedEmail(
     to: string | undefined | null,
-    username: string,
+    displayName: string,
   ): Promise<void> {
     if (!this.transporter || !to) {
       return;
     }
-    const safeUsername = escapeHtml(username);
+    const safeDisplayName = escapeHtml(displayName);
     const text =
-      `Hola ${username},\n\n` +
-      'Te avisamos que la contraseña de tu cuenta de Kubero fue cambiada recién. ' +
+      `Hola ${displayName},\n\n` +
+      'Te avisamos que la contraseña de tu cuenta de Kubero fue cambiada exitosamente. ' +
       'Si no fuiste tú, contacta a un administrador de la plataforma.\n\n' +
       '— Kubero';
     const html = emailLayout(
       'Tu contraseña fue cambiada',
-      `<p style="margin:0 0 12px; color:#444444; font-size:14px; line-height:1.5;">Hola <strong>${safeUsername}</strong>,</p>
-       <p style="margin:0 0 12px; color:#444444; font-size:14px; line-height:1.5;">Te avisamos que la contraseña de tu cuenta de Kubero fue cambiada recién.</p>
+      `<p style="margin:0 0 12px; color:#444444; font-size:14px; line-height:1.5;">Hola <strong>${safeDisplayName}</strong>,</p>
+       <p style="margin:0 0 12px; color:#444444; font-size:14px; line-height:1.5;">Te avisamos que la contraseña de tu cuenta de Kubero fue cambiada exitosamente.</p>
        <p style="margin:0; color:#444444; font-size:14px; line-height:1.5;">Si no fuiste tú, contacta a un administrador de la plataforma lo antes posible.</p>`,
     );
     try {
@@ -96,6 +96,51 @@ export class MailService {
     } catch (error) {
       this.logger.error(
         `No se pudo enviar el correo de cambio de contraseña a ${to}`,
+        error,
+      );
+    }
+  }
+
+  // best-effort: que falle el envío no debe romper el flujo de "olvidé mi
+  // contraseña" (la respuesta al usuario es siempre la misma, exista o no
+  // la cuenta, así que un fallo de envío no debe filtrarse tampoco).
+  async sendPasswordResetEmail(
+    to: string,
+    displayName: string,
+    resetUrl: string,
+  ): Promise<void> {
+    if (!this.transporter) {
+      return;
+    }
+    const safeDisplayName = escapeHtml(displayName);
+    const safeResetUrl = escapeHtml(resetUrl);
+    const text =
+      `Hola ${displayName},\n\n` +
+      'Pediste restablecer la contraseña de tu cuenta de Kubero. Entra al siguiente link para elegir una nueva (vence en 30 minutos):\n\n' +
+      `${resetUrl}\n\n` +
+      'Si no fuiste tú, puedes ignorar este correo — tu contraseña actual sigue funcionando.\n\n' +
+      '— Kubero';
+    const html = emailLayout(
+      'Restablecer tu contraseña',
+      `<p style="margin:0 0 12px; color:#444444; font-size:14px; line-height:1.5;">Hola <strong>${safeDisplayName}</strong>,</p>
+       <p style="margin:0 0 20px; color:#444444; font-size:14px; line-height:1.5;">Pediste restablecer la contraseña de tu cuenta de Kubero. El siguiente enlace vence en 30 minutos:</p>
+       <p style="margin:0 0 20px;"><a href="${safeResetUrl}" style="background:${BRAND_BLUE}; color:#ffffff; text-decoration:none; padding:10px 20px; border-radius:6px; font-size:14px; display:inline-block;">Elegir nueva contraseña</a></p>
+       <p style="margin:0; color:#444444; font-size:14px; line-height:1.5;">Si no fuiste tú, puedes ignorar este correo — tu contraseña actual sigue funcionando.</p>`,
+    );
+    try {
+      await this.transporter.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to,
+        subject: 'Restablece tu contraseña de Kubero',
+        text,
+        html,
+      });
+      this.logger.debug(
+        `Correo de restablecimiento de contraseña enviado a ${to}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `No se pudo enviar el correo de restablecimiento de contraseña a ${to}`,
         error,
       );
     }

@@ -1,5 +1,6 @@
 import { HttpException } from '@nestjs/common';
 import { LoginThrottleService } from './login-throttle.service';
+import { PasswordResetService } from './password-reset.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
@@ -27,6 +28,10 @@ describe('AuthController', () => {
       providers: [
         { provide: AuthService, useValue: service },
         LoginThrottleService,
+        {
+          provide: PasswordResetService,
+          useValue: { requestReset: jest.fn(), resetPassword: jest.fn() },
+        },
       ],
     }).compile();
 

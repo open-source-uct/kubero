@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginThrottleService } from './login-throttle.service';
+import { PasswordResetService } from './password-reset.service';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
@@ -22,6 +23,8 @@ import {
   LoginOKResponseDTO,
   LoginDTO,
   GetSessionDTO,
+  ForgotPasswordDTO,
+  ResetPasswordDTO,
 } from './auth.dto';
 import { OKDTO } from '../common/dto/ok.dto';
 import { JwtAuthGuard } from './strategies/jwt.guard';
@@ -33,6 +36,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly loginThrottle: LoginThrottleService,
+    private readonly passwordResetService: PasswordResetService,
   ) {}
 
   @Post('login')
@@ -67,6 +71,44 @@ export class AuthController {
       this.loginThrottle.recordFailure(ip, auth.username);
       throw error;
     }
+  }
+
+  @Post('forgot-password')
+  @ApiOperation({
+    summary: 'Request a password reset link',
+    description:
+      'Siempre responde OK, exista o no el correo, para no revelar qué cuentas existen.',
+  })
+  @ApiOkResponse({ type: OKDTO, isArray: false })
+  async forgotPassword(
+    @Body() dto: ForgotPasswordDTO,
+    @Request() req: any,
+  ): Promise<OKDTO> {
+    const ip: string = req?.ip ?? 'unknown';
+    await this.passwordResetService.requestReset(dto.email, ip);
+    return {
+      message:
+        'Si el correo existe, te llegará un enlace para restablecer tu contraseña.',
+      status: '200',
+    } as OKDTO;
+  }
+
+  @Post('reset-password')
+  @ApiOperation({
+    summary: 'Reset the password using a token from the forgot-password email',
+  })
+  @ApiOkResponse({ type: OKDTO, isArray: false })
+  async resetPassword(
+    @Body() dto: ResetPasswordDTO,
+    @Request() req: any,
+  ): Promise<OKDTO> {
+    const ip: string = req?.ip ?? 'unknown';
+    await this.passwordResetService.resetPassword(
+      dto.token,
+      dto.newPassword,
+      ip,
+    );
+    return { message: 'Contraseña actualizada', status: '200' } as OKDTO;
   }
 
   @Get('logout')
