@@ -96,11 +96,26 @@ model User {
   providerId   String? // ID from the external provider (e.g., GitHub ID)
   providerData String? // JSON string for additional provider data
 
-  tokens Token[]
+  tokens              Token[]
+  passwordResetTokens PasswordResetToken[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   Audit     Audit[]
+}
+
+// Solo se guarda el hash del token (como las contraseñas); el token real
+// nunca toca la base de datos, solo va en el link del correo. Así una fuga
+// de la base no sirve para resetear contraseñas ajenas.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  createdAt DateTime @default(now())
 }
 
 model UserGroup {

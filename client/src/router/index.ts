@@ -185,6 +185,16 @@ const routes = [
         name: 'Login',
         component: () => import('@/views/Login.vue'),
       },
+      {
+        path: '/forgot-password',
+        name: 'Forgot Password',
+        component: () => import('@/views/ForgotPassword.vue'),
+      },
+      {
+        path: '/reset-password',
+        name: 'Reset Password',
+        component: () => import('@/views/ResetPassword.vue'),
+      },
     ],
   },
   {
@@ -229,7 +239,12 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
 
-  if (to.name === 'Login' || to.name === 'Setup') return
+  if (
+    to.name === 'Login' ||
+    to.name === 'Setup' ||
+    to.name === 'Forgot Password' ||
+    to.name === 'Reset Password'
+  ) return
   delete axios.defaults.headers.common['Authorization']
   await authStore.initialize()
   if (!authStore.userId) return { name: 'Login' }

@@ -65,8 +65,14 @@
                         color="primary"
                         prepend-inner-icon="mdi-lock-outline"
                         required
-                        class="mb-4"
+                        class="mb-2"
                     ></v-text-field>
+
+                    <div class="text-right mb-4">
+                        <router-link to="/forgot-password" class="text-caption text-primary text-decoration-none">
+                            {{ $t('user.forgotPassword') }}
+                        </router-link>
+                    </div>
 
                     <v-btn
                         block

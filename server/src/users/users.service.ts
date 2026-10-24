@@ -14,6 +14,7 @@ import * as bcrypt from 'bcrypt';
 import axios from 'axios';
 import { MailService } from '../mail/mail.service';
 import { assertSafeUrl, safeAxiosOptions } from '../common/utils/ssrf.util';
+import { displayNameOf } from '../common/utils/display-name.util';
 
 // This should be a real class/interface representing a user entity
 export type User = any;
@@ -648,7 +649,10 @@ export class UsersService {
         },
       });
       this.logger.debug(`Password updated for user with ID ${userId}.`);
-      void this.mailService.sendPasswordChangedEmail(user.email, user.username);
+      void this.mailService.sendPasswordChangedEmail(
+        user.email,
+        displayNameOf(user),
+      );
       return user;
     } catch (error) {
       this.logger.debug(
@@ -723,7 +727,7 @@ export class UsersService {
       this.logger.debug(`Password updated for user with ID ${userId}.`);
       void this.mailService.sendPasswordChangedEmail(
         updatedUser.email,
-        updatedUser.username,
+        displayNameOf(updatedUser),
       );
       return updatedUser;
     } catch (error) {
