@@ -1,4 +1,4 @@
-FROM node:22-alpine AS build
+FROM node:24.22.1-alpine AS build
 ENV NODE_ENV=development
 
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
@@ -26,7 +26,7 @@ COPY client ./client
 RUN cd /build/client && \
     pnpm run build
 
-FROM node:22-alpine AS release
+FROM node:24.22.1-alpine AS release
 ARG VERSION=unknown
 
 LABEL maintainer='www.kubero.dev'
