@@ -15,6 +15,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { IdentityService } from './identity.service';
 import { LoginThrottleService } from './login-throttle.service';
+import { PasswordResetService } from './password-reset.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 jest.mock('dotenv', () => ({ config: jest.fn() }));
@@ -82,6 +83,10 @@ describe('session lifecycle (isolated SQLite and HTTP)', () => {
         { provide: IdentityService, useValue: identity },
         JwtStrategy,
         LoginThrottleService,
+        {
+          provide: PasswordResetService,
+          useValue: { requestReset: jest.fn(), resetPassword: jest.fn() },
+        },
       ],
     }).compile();
     app = module.createNestApplication({ logger: false });

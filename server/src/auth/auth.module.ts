@@ -16,6 +16,9 @@ import { RolesService } from '../roles/roles.service';
 import { getJwtSecret } from './jwt-secret';
 import { LoginThrottleService } from './login-throttle.service';
 import { IdentityService } from './identity.service';
+import { MailModule } from '../mail/mail.module';
+import { PasswordResetService } from './password-reset.service';
+import { PasswordResetThrottleService } from './password-reset-throttle.service';
 dotenv.config();
 
 const providers: Provider[] = [
@@ -24,6 +27,8 @@ const providers: Provider[] = [
   RolesService,
   IdentityService,
   LoginThrottleService,
+  PasswordResetService,
+  PasswordResetThrottleService,
 ];
 if (ConfigService.getOauth2Enabled()) {
   providers.push(Oauth2Strategy);
@@ -39,6 +44,7 @@ if (ConfigService.getGithubEnabled()) {
     AuditModule,
     KubernetesModule,
     ConfigModule,
+    MailModule,
     JwtModule.register({
       secret: getJwtSecret(),
       signOptions: {

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsEmail, IsString, IsNotEmpty, MinLength } from 'class-validator';
 import { AuthenticatedUser } from './identity.service';
 
 export class GetMethodsDTO {
@@ -28,6 +28,25 @@ export class LoginDTO {
   @IsString()
   @IsNotEmpty()
   password: string;
+}
+
+export class ForgotPasswordDTO {
+  @ApiProperty()
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+}
+
+export class ResetPasswordDTO {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  token: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(8)
+  newPassword: string;
 }
 
 export class GetSessionDTO {

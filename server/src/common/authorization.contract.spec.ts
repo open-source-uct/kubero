@@ -22,6 +22,8 @@ const PERMISSIONS_ALL_KEY = 'permissions_all';
 // Endpoints que deben ser públicos (sin sesión).
 const PUBLIC: string[] = [
   'AuthController.login', // aún no hay sesión
+  'AuthController.forgotPassword', // aún no hay sesión; se protege con throttling propio
+  'AuthController.resetPassword', // aún no hay sesión; el token hace de credencial
   'AuthController.getMethods', // el login lo necesita para dibujarse
   'AuthController.github', // flujo OAuth (no se usa, pero lo maneja passport)
   'AuthController.githubCallback',
