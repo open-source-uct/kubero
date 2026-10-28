@@ -2209,7 +2209,7 @@ export default defineComponent({
         );
         this.$router.push(`/pipeline/${this.pipeline}/apps`);
       } catch (error) {
-        notifyApiError(error, "updateApp");
+        notifyApiError(error, "updateApp", { showValidationDetails: true });
       } finally {
         this.loading = false;
       }
@@ -2343,7 +2343,7 @@ export default defineComponent({
         this.name = "";
         this.$router.push({ path: "/pipeline/" + this.pipeline + "/apps" });
       } catch (error) {
-        notifyApiError(error, "createApp");
+        notifyApiError(error, "createApp", { showValidationDetails: true });
       } finally {
         this.loading = false;
       }
