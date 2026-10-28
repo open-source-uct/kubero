@@ -504,8 +504,13 @@ export class KubernetesService {
         'kuberoapps',
         appName,
       )
-      .catch(() => {
-        // this.logger.debug(error);
+      .catch((error) => {
+        // Solo "no existe" se trata como app vacía; un error de permisos o de
+        // red disfrazado de app vacía se terminaba mostrando como un 404.
+        if (error?.statusCode === 404) {
+          return undefined;
+        }
+        throw error;
       });
 
     if (app) {

@@ -86,6 +86,17 @@
             </v-menu>
         </header>
 
+        <v-alert v-if="loadError" type="error" variant="tonal" class="mb-4">
+            {{ $t('app.form.detailLoadError') }}
+            <template #append>
+                <v-btn variant="text" @click="loadApp">{{ $t('global.retry') }}</v-btn>
+            </template>
+        </v-alert>
+        <!-- el status lo escribe el operador: sin él, la app existe pero no está desplegada -->
+        <v-alert v-else-if="appData.metadata && !appData.status" type="info" variant="tonal" class="mb-4">
+            {{ $t('app.form.pendingDeploy') }}
+        </v-alert>
+
         <nav class="app-detail-tabs" :aria-label="$t('app.nav.overview')">
             <v-tabs v-model="tab" color="primary" show-arrows>
                 <v-tab prepend-icon="mdi-view-dashboard-outline">{{ $t('app.nav.overview') }}</v-tab>
@@ -105,7 +116,7 @@
                 <Builds :pipeline="pipeline" :phase="phase" :app="app" :appData="appData" :pipelineData="pipelineData"/>
             </v-window-item>
             <v-window-item :transition="false" :reverse-transition="false" class="background">
-                <Metrics :pipeline="pipeline" :phase="phase" :app="app" :host="appData.spec.ingress.hosts[0].host" :active="tab == 2"/>
+                <Metrics :pipeline="pipeline" :phase="phase" :app="app" :host="appData.spec.ingress?.hosts?.[0]?.host ?? ''" :active="tab == 2"/>
             </v-window-item>
             <v-window-item :transition="false" :reverse-transition="false" class="background">
                 <LogsTab :pipeline="pipeline" :phase="phase" :app="app" :deploymentstrategy="appData.spec.deploymentstrategy" :buildstrategy="appData.spec.buildstrategy" :hasAddons="(appData.spec.addons?.length ?? 0) > 0" :addons="appData.spec.addons ?? []"/>
@@ -171,7 +182,10 @@ export default defineComponent({
                 }
             ],
             pipelineData: {},
+            loadError: false,
             appData: {
+                metadata: undefined as object | undefined,
+                status: undefined as object | undefined,
                 spec: {
                     deploymentstrategy: "git",
                     buildstrategy: "plain",
@@ -203,13 +217,25 @@ export default defineComponent({
             });
         },
         loadApp() {
+            this.loadError = false;
             axios.get('/api/apps/'+this.pipeline+'/'+this.phase+'/'+this.app).then(response => {
+                // Una respuesta sin spec dejaba a la plantilla leyendo
+                // appData.spec.ingress de algo vacío: el render fallaba y el
+                // router quedaba trabado (cambiaba la URL pero no la vista).
+                if (!response.data?.spec) {
+                    this.loadError = true;
+                    return;
+                }
                 this.appData = response.data;
-                //console.log(this.appData);
+            }).catch(() => {
+                this.loadError = true;
             });
         },
         ActionOpenApp() {
-            window.open(`https://${this.appData.spec.ingress.hosts[0].host}`, '_blank');
+            const host = this.appData.spec.ingress?.hosts?.[0]?.host;
+            if (host) {
+                window.open(`https://${host}`, '_blank');
+            }
         },
         ActionEditApp() {
             this.$router.push(`/pipeline/${this.pipeline}/${this.phase}/apps/${this.app}`);

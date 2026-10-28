@@ -1,5 +1,5 @@
 import * as YAML from 'yaml';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PipelinesService } from '../pipelines/pipelines.service';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -44,20 +44,26 @@ export class AppsService {
     );
 
     if (contextName) {
-      try {
-        const app = await this.kubectl.getApp(
-          pipelineName,
-          phaseName,
-          appName,
-          contextName,
+      const app = await this.kubectl.getApp(
+        pipelineName,
+        phaseName,
+        appName,
+        contextName,
+      );
+      if (!app?.metadata) {
+        throw new NotFoundException(
+          `App "${appName}" not found in ${pipelineName}/${phaseName}`,
         );
-        app.metadata.managedFields = [{}];
-        app.status.deployedRelease = undefined;
-        return app;
-      } catch (error) {
-        this.logger.error('getApp error: ' + error);
-        return null;
       }
+      app.metadata.managedFields = [{}];
+      // El status lo escribe el operador: una app que todavía no procesó (o
+      // que no puede procesar, p. ej. si está caído) no lo tiene. Antes esto
+      // lanzaba y la API respondía 200 vacío, rompiendo el detalle y el
+      // formulario de edición.
+      if (app.status) {
+        app.status.deployedRelease = undefined;
+      }
+      return app;
     }
   }
 

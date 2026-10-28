@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { AppsService } from './apps.service';
 import { PipelinesService } from '../pipelines/pipelines.service';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
@@ -171,6 +172,45 @@ describe('AppsService', () => {
       expect(result).toBeDefined();
       expect(kubectl.getApp).toHaveBeenCalled();
     });
+    it('returns an app the operator has not processed yet (no status) instead of failing', async () => {
+      (pipelinesService.getContext as jest.Mock).mockResolvedValue('ctx');
+      (kubectl.getApp as jest.Mock).mockResolvedValue({
+        metadata: { name: 'a' },
+        spec: { name: 'a' },
+      });
+      const result = await service.getApp('p', 'ph', 'a', mockUSerGroups);
+      expect(result).toEqual({
+        metadata: { name: 'a', managedFields: [{}] },
+        spec: { name: 'a' },
+      });
+    });
+
+    it('hides the deployed release manifest when the app has a status', async () => {
+      (pipelinesService.getContext as jest.Mock).mockResolvedValue('ctx');
+      (kubectl.getApp as jest.Mock).mockResolvedValue({
+        metadata: {},
+        status: { deployedRelease: { name: 'a', manifest: 'secret stuff' } },
+      });
+      const result: any = await service.getApp('p', 'ph', 'a', mockUSerGroups);
+      expect(result.status.deployedRelease).toBeUndefined();
+    });
+
+    it('throws NotFound (not an empty 200) when the app does not exist', async () => {
+      (pipelinesService.getContext as jest.Mock).mockResolvedValue('ctx');
+      (kubectl.getApp as jest.Mock).mockResolvedValue({});
+      await expect(
+        service.getApp('p', 'ph', 'a', mockUSerGroups),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('propagates Kubernetes errors instead of returning null', async () => {
+      (pipelinesService.getContext as jest.Mock).mockResolvedValue('ctx');
+      (kubectl.getApp as jest.Mock).mockRejectedValue(new Error('forbidden'));
+      await expect(
+        service.getApp('p', 'ph', 'a', mockUSerGroups),
+      ).rejects.toThrow('forbidden');
+    });
+
     it('should return null if context does not exist', async () => {
       (pipelinesService.getContext as jest.Mock).mockResolvedValue(null);
       const result = await service.getApp('p', 'ph', 'a', mockUSerGroups);
