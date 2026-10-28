@@ -44,6 +44,13 @@
         {{ $t("app.form.warning") }}
       </v-alert>
 
+      <v-alert v-if="loadError" type="error" variant="tonal">
+        {{ $t("app.form.loadError") }}
+        <template #append>
+          <v-btn variant="text" @click="loadApp">{{ $t("global.retry") }}</v-btn>
+        </template>
+      </v-alert>
+
       <v-card
         class="uct-card app-basics-card"
         color="cardBackground"
@@ -1041,7 +1048,7 @@
           size="large"
           variant="flat"
           @click="updateApp()"
-          :disabled="!valid"
+          :disabled="!valid || loadError"
           >{{ $t("global.update") }}</v-btn
         >
       </div>
@@ -1356,6 +1363,9 @@ export default defineComponent({
       },
       name: "",
       resourceVersion: "",
+      // si falla la carga al editar, el formulario queda con valores por
+      // defecto: guardarlo sobrescribiría la app real con datos vacíos
+      loadError: false,
       /*
       phases: [
         { text: 'Production', value: 'production' },
@@ -1872,9 +1882,14 @@ export default defineComponent({
     },
     loadApp() {
       if (this.app !== "new") {
+        this.loadError = false;
         axios
           .get(`/api/apps/${this.pipeline}/${this.phase}/${this.app}`)
           .then((response) => {
+            if (!response.data?.spec || !response.data?.metadata) {
+              this.loadError = true;
+              return;
+            }
             this.resourceVersion = response.data.metadata.resourceVersion;
 
             // Open Panel if there is some data to show
@@ -1988,6 +2003,9 @@ export default defineComponent({
 
             // remove loaded domain from taken domains
             this.takenDomains = this.whiteListDomains(this.takenDomains);
+          })
+          .catch(() => {
+            this.loadError = true;
           });
       }
     },
@@ -2081,6 +2099,9 @@ export default defineComponent({
       }
     },
     async updateApp() {
+      if (this.loadError) {
+        return;
+      }
       this.loading = true;
       try {
         if (

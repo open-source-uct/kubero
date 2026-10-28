@@ -132,6 +132,7 @@ const messages = {
         edit: "Edit",
         delete: "Delete",
         remove: "Remove",
+        retry: "Try again",
       },
       feedback: {
         regionLabel: 'Application notifications',
@@ -362,6 +363,9 @@ const messages = {
         form: {
           createNewApp: 'Create a new App in {pipeline}',
           editApp: 'Edit {app} in {pipeline}',
+          loadError: 'The app could not be loaded. Saving is disabled so its configuration is not overwritten with an empty form.',
+          detailLoadError: 'The app could not be loaded.',
+          pendingDeploy: 'This app has not been deployed yet. If it stays like this for more than a few minutes, contact an administrator.',
           warning: 'Please change all passwords, tokens and select the correct storageClass for your cluster.',
           appName: 'App Name',
           domain: 'Domain',

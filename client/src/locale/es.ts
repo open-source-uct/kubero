@@ -132,6 +132,7 @@ const messages = {
     edit: 'Editar',
     delete: 'Eliminar',
     remove: 'Quitar',
+    retry: 'Reintentar',
   },
   feedback: {
     regionLabel: 'Notificaciones de la aplicación',
@@ -362,6 +363,9 @@ const messages = {
     form: {
       createNewApp: 'Crear una nueva App en {pipeline}',
       editApp: 'Editar {app} en {pipeline}',
+      loadError: 'No se pudo cargar la app. Se deshabilitó el guardado para no sobrescribir su configuración con un formulario vacío.',
+      detailLoadError: 'No se pudo cargar la app.',
+      pendingDeploy: 'Esta app todavía no se desplegó. Si sigue así por más de unos minutos, avisa a un administrador.',
       warning: 'Por favor, cambia todas las contraseñas, tokens y selecciona la storageClass correcta para tu clúster.',
       appName: 'Nombre de la app',
       domain: 'Dominio',
