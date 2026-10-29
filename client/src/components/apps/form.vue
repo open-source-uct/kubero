@@ -986,7 +986,7 @@
         <div class="uct-section-title">
           {{ $t("app.titles.addOns") }}
         </div>
-        <Addons :addons="addons" :appname="name" />
+        <Addons :addons="addons" :appname="name" :persisted="app !== 'new'" />
       </div>
 
       <!-- ENV VAR OVERLAP DIALOG -->

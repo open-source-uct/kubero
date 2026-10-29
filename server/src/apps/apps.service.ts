@@ -1,5 +1,11 @@
 import * as YAML from 'yaml';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { PipelinesService } from '../pipelines/pipelines.service';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -12,6 +18,38 @@ import { ConfigService } from '../config/config.service';
 import { KubectlTemplate } from '../templates/template';
 import { Stream } from 'stream';
 import { EventsGateway } from '../events/events.gateway';
+
+const DNS_LABEL = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+
+// nombre del addon -> su definición. El nombre (metadata.name) es con lo que
+// el operador crea el release del addon y etiqueta sus volúmenes.
+export function addonsByName(addons: unknown): Map<string, unknown> {
+  const byName = new Map<string, unknown>();
+  if (!Array.isArray(addons)) return byName;
+  for (const addon of addons) {
+    const definitions = addon?.resourceDefinitions;
+    if (!definitions || typeof definitions !== 'object') continue;
+    for (const definition of Object.values<any>(definitions)) {
+      const name = definition?.metadata?.name;
+      if (typeof name === 'string') byName.set(name, definition);
+    }
+  }
+  return byName;
+}
+
+// JSON con las claves ordenadas, para comparar definiciones sin depender del
+// orden en que el cliente las serializa
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, v) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(
+          Object.keys(v)
+            .sort()
+            .map((k) => [k, v[k]]),
+        )
+      : v,
+  );
+}
 
 @Injectable()
 export class AppsService {
@@ -91,6 +129,11 @@ export class AppsService {
       app.phase,
       userGroups,
     );
+    await this.assertNoLeftoverAddonVolumes(
+      app.pipeline + '-' + app.phase,
+      [...addonsByName(app.addons).keys()],
+      contextName,
+    );
     await this.applySharedTlsSecret(app, contextName);
     await this.kubectl.createApp(app, contextName);
 
@@ -139,6 +182,80 @@ export class AppsService {
   // Si KUBERO_SHARED_TLS_SECRET_NAME está seteado, reemplaza el secretName del Ingress por
   // el secreto TLS compartido (copiado al namespace de la app) y deja de pedirle el
   // certificado a cert-manager. Si no está seteado, no hace nada (comportamiento actual).
+  // Los datos de un addon (usuario, contraseñas, base) solo se aplican al
+  // crearlo: la base ya inicializada los ignora y, en Postgres, el chart
+  // conserva la contraseña vieja del secret y el operador queda actualizando
+  // el release en bucle. Para usar otros datos hay que borrarlo y recrearlo.
+  private assertAddonsUnchanged(
+    before: Map<string, unknown>,
+    after: Map<string, unknown>,
+  ) {
+    for (const [name, definition] of after) {
+      if (
+        before.has(name) &&
+        canonical(before.get(name)) !== canonical(definition)
+      ) {
+        throw new BadRequestException(
+          `El addon "${name}" ya existe y sus datos no se pueden modificar. Para usar otros, elimínalo, guarda la app y vuelve a crearlo.`,
+        );
+      }
+    }
+  }
+
+  // Un addon nuevo con el nombre de uno borrado antes reutilizaría su volumen
+  // (y su base, con los datos y credenciales viejos) en vez de partir de cero.
+  private async assertNoLeftoverAddonVolumes(
+    namespace: string,
+    newAddonNames: string[],
+    context: string,
+  ) {
+    for (const name of newAddonNames) {
+      if (!DNS_LABEL.test(name)) continue; // ya lo rechaza AppValidationDto
+      const volumes = await this.kubectl.getAddonVolumes(
+        namespace,
+        name,
+        context,
+      );
+      if (volumes.some((v) => v.metadata?.deletionTimestamp)) {
+        throw new ConflictException(
+          `El volumen del addon "${name}" anterior todavía se está borrando. Espera unos segundos y vuelve a guardar.`,
+        );
+      }
+      if (volumes.length > 0) {
+        throw new ConflictException(
+          `Ya existe un volumen de datos de un addon "${name}" anterior. Usa otro nombre o pide a un administrador que lo elimine.`,
+        );
+      }
+    }
+  }
+
+  private async deleteAddonVolumes(
+    namespace: string,
+    addonNames: string[],
+    context: string,
+  ) {
+    for (const name of addonNames) {
+      if (!DNS_LABEL.test(name)) continue;
+      try {
+        const deleted = await this.kubectl.deleteAddonVolumes(
+          namespace,
+          name,
+          context,
+        );
+        if (deleted.length) {
+          this.logger.log(
+            `Deleted data volumes of addon ${name} in ${namespace}: ${deleted.join(', ')}`,
+          );
+        }
+      } catch (error) {
+        // la app ya se guardó: el volumen queda huérfano, pero no se revierte
+        this.logger.error(
+          `Could not delete data volumes of addon ${name} in ${namespace}: ${error}`,
+        );
+      }
+    }
+  }
+
   private async applySharedTlsSecret(app: App, context: string) {
     const sharedTlsSecret = await this.kubectl.ensureSharedTlsSecret(
       `${app.pipeline}-${app.phase}`,
@@ -253,10 +370,22 @@ export class AppsService {
       userGroups,
     );
     if (contextName) {
+      // los addons se leen antes de borrar la app: después ya no hay de dónde
+      const app = await this.kubectl.getApp(
+        pipelineName,
+        phaseName,
+        appName,
+        contextName,
+      );
       await this.kubectl.deleteApp(
         pipelineName,
         phaseName,
         appName,
+        contextName,
+      );
+      await this.deleteAddonVolumes(
+        pipelineName + '-' + phaseName,
+        [...addonsByName(app?.spec?.addons).keys()],
         contextName,
       );
       //this.removeAppFromState(pipelineName, phaseName, appName);
@@ -675,6 +804,28 @@ export class AppsService {
       userGroups,
     );
 
+    // antes de disparar builds o tocar el clúster: un cambio rechazado no
+    // debe dejar nada a medias
+    const namespace = app.pipeline + '-' + app.phase;
+    let removedAddons: string[] = [];
+    if (contextName) {
+      const previous = await this.kubectl.getApp(
+        app.pipeline,
+        app.phase,
+        app.name,
+        contextName,
+      );
+      const before = addonsByName(previous?.spec?.addons);
+      const after = addonsByName(app.addons);
+      this.assertAddonsUnchanged(before, after);
+      await this.assertNoLeftoverAddonVolumes(
+        namespace,
+        [...after.keys()].filter((name) => !before.has(name)),
+        contextName,
+      );
+      removedAddons = [...before.keys()].filter((name) => !after.has(name));
+    }
+
     if (
       app.deploymentstrategy == 'git' &&
       (app.buildstrategy == 'dockerfile' ||
@@ -692,6 +843,7 @@ export class AppsService {
     if (contextName) {
       await this.applySharedTlsSecret(app, contextName);
       await this.kubectl.updateApp(app, resourceVersion, contextName);
+      await this.deleteAddonVolumes(namespace, removedAddons, contextName);
       // IMPORTANT TODO : Update this.appStateList !!
 
       const m = {

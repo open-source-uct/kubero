@@ -1,8 +1,17 @@
 <template>
   <v-form v-model="valid">
 
+  <v-alert
+    v-if="showButtons && hasLockedAddons"
+    type="info"
+    variant="tonal"
+    class="mt-4"
+  >
+    {{ $t('app.form.addonsLocked') }}
+  </v-alert>
+
   <v-row class="pt-5">
-    <v-col v-for="addon in addons" v-bind:key="addon.kind"
+    <v-col v-for="addon in addons" v-bind:key="addonName(addon) || addon.kind"
       cols="12"
       md="3"
     >
@@ -25,6 +34,7 @@
             <div v-if="showButtons">
               <v-divider class="my-3"></v-divider>
               <v-btn
+                v-if="canEdit(addon)"
                 variant="text"
                 color="primary"
                 @click="editAddon(addon)"
@@ -277,6 +287,17 @@ export default defineComponent({
             type: Boolean,
             default: true
         },
+        // true si se está editando una app que ya existe en el clúster: sus
+        // addons ya fueron creados y sus datos no se pueden modificar
+        persisted: {
+            type: Boolean,
+            default: false
+        },
+    },
+    computed: {
+        hasLockedAddons(): boolean {
+            return this.addons.some((addon) => !this.canEdit(addon));
+        },
     },
     data: () => ({
         valid: false,
@@ -290,6 +311,10 @@ export default defineComponent({
             },
         ] as AddonOption[],
         selectedAddon: {} as Addon,
+        // addons agregados en esta sesión y todavía no guardados: esos sí se
+        // pueden seguir editando, porque aún no existen en el clúster
+        newInSession: [] as string[],
+        editingIndex: -1,
         baseRule: [
           (v: any) => !!v || 'Field is required',
         ],
@@ -302,6 +327,16 @@ export default defineComponent({
         this.loadAddons();
     },
     methods: {
+        addonName(addon: Addon): string {
+            const definition = Object.values(addon?.resourceDefinitions ?? {})[0] as any;
+            return definition?.metadata?.name ?? '';
+        },
+        // Un addon ya creado no se edita: la base ignora usuario, contraseñas y
+        // nombre nuevos, y en Postgres el operador quedaba actualizándolo en
+        // bucle. Para usar otros datos se elimina y se vuelve a crear.
+        canEdit(addon: Addon): boolean {
+            return !this.persisted || this.newInSession.includes(this.addonName(addon));
+        },
         openNewDialog() {
             this.mode = 'create';
             this.dialog = true;
@@ -324,23 +359,25 @@ export default defineComponent({
         async deleteAddon(addon: Addon) {
             const confirmed = await confirmDestructiveAction({
                 title: this.$t('feedback.confirmRemove.title', { name: addon.displayName || addon.kind }),
-                text: this.$t('feedback.confirmRemove.message'),
+                // un addon ya creado se lleva su base al guardar (el server
+                // borra su volumen): eso no se puede deshacer
+                text: this.canEdit(addon)
+                    ? this.$t('feedback.confirmRemove.message')
+                    : this.$t('app.form.addonDeleteData'),
                 confirmButtonText: this.$t('global.remove'),
                 cancelButtonText: this.$t('global.cancel'),
             });
             if (!confirmed) return;
 
             // remove addon from local view and kuberoapp yaml
-            for (let i = 0; i < this.addons.length; i++) {
-              if (this.addons[i].kind == addon.kind) {
-                this.addons.splice(i, 1);
-                break;
-              }
-            }
+            const index = this.addons.indexOf(addon);
+            if (index !== -1) this.addons.splice(index, 1);
+            this.newInSession = this.newInSession.filter((name) => name !== this.addonName(addon));
         },
         editAddon(addon: Addon) {
             //console.log(addon);
             this.mode = 'edit';
+            this.editingIndex = this.addons.indexOf(addon);
 
             // search in available addons for the selected addon
             for (let i = 0; i < this.availableAddons.length; i++) {
@@ -412,7 +449,9 @@ export default defineComponent({
                 env: this.selectedAddon.env,
                 icon: this.selectedAddon.icon,
                 displayName: this.selectedAddon.displayName,
-                resourceDefinitions: this.selectedAddon.resourceDefinitions,
+                // copia: la plantilla del addon es compartida, y sin esto dos
+                // addons del mismo tipo terminaban con la misma definición
+                resourceDefinitions: JSON.parse(JSON.stringify(this.selectedAddon.resourceDefinitions)),
             } as Addon;
 
             if (this.mode === 'create') {
@@ -424,15 +463,20 @@ export default defineComponent({
         },
         addAddon(addon: Addon) {
             this.addons.push(addon);
+            this.newInSession.push(this.addonName(addon));
             this.$emit('addon-added', addon);
         },
         updateAddon(addon: Addon) {
-            for (let i = 0; i < this.addons.length; i++) {
-              if (this.addons[i].kind == addon.kind) {
-                this.addons[i] = addon;
-                break;
-              }
+            // por posición, no por tipo: con dos addons del mismo tipo se
+            // reemplazaba siempre el primero
+            if (this.editingIndex !== -1) {
+                const previousName = this.addonName(this.addons[this.editingIndex]);
+                this.addons[this.editingIndex] = addon;
+                this.newInSession = this.newInSession.map((name) =>
+                    name === previousName ? this.addonName(addon) : name,
+                );
             }
+            this.editingIndex = -1;
             this.$emit('addon-updated', addon);
         },
     }

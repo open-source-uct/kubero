@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
-import { AppsService } from './apps.service';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
+import { AppsService, addonsByName } from './apps.service';
 import { PipelinesService } from '../pipelines/pipelines.service';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -136,6 +140,8 @@ describe('AppsService', () => {
             updateApp: jest.fn(),
             execInContainer: jest.fn(),
             ensureSharedTlsSecret: jest.fn(),
+            getAddonVolumes: jest.fn().mockResolvedValue([]),
+            deleteAddonVolumes: jest.fn().mockResolvedValue([]),
           },
         },
         {
@@ -371,6 +377,176 @@ describe('AppsService', () => {
       await service.rebuildApp(app, mockUSerGroups);
       expect(spy).toHaveBeenCalled();
       expect(notificationsService.send).toHaveBeenCalled();
+    });
+  });
+
+  describe('addons: inmutables una vez creados, y sus volúmenes', () => {
+    const pg = (name: string, password: string, reorder = false) => {
+      const auth = reorder
+        ? { password, username: 'u', postgresPassword: 'p', database: 'd' }
+        : { postgresPassword: 'p', username: 'u', password, database: 'd' };
+      return {
+        kind: 'KuberoAddonPostgres',
+        resourceDefinitions: {
+          KuberoAddonPostgres: {
+            metadata: { name },
+            spec: { postgres: { auth } },
+          },
+        },
+      };
+    };
+    const appWith = (addons: unknown[]) =>
+      new App({ ...mockApp, addons } as any);
+    const stored = (addons: unknown[]) => ({ metadata: {}, spec: { addons } });
+
+    beforeEach(() => {
+      process.env.KUBERO_READONLY = 'false';
+      (pipelinesService.getContext as jest.Mock).mockResolvedValue('ctx');
+    });
+
+    it('rejects changing the data of an existing addon, before touching the cluster', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue(
+        stored([pg('app-postgres', 'old')]),
+      );
+      await expect(
+        service.updateApp(
+          appWith([pg('app-postgres', 'new')]),
+          'rv',
+          user,
+          mockUSerGroups,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(kubectl.updateApp).not.toHaveBeenCalled();
+      expect(kubectl.deleteAddonVolumes).not.toHaveBeenCalled();
+    });
+
+    it('accepts an unchanged addon even if the client sends its keys in another order', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue(
+        stored([pg('app-postgres', 'same')]),
+      );
+      await service.updateApp(
+        appWith([pg('app-postgres', 'same', true)]),
+        'rv',
+        user,
+        mockUSerGroups,
+      );
+      expect(kubectl.updateApp).toHaveBeenCalled();
+      expect(kubectl.deleteAddonVolumes).not.toHaveBeenCalled();
+    });
+
+    it('deletes the data volumes of a removed addon after saving the app', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue(
+        stored([pg('app-postgres', 'x')]),
+      );
+      await service.updateApp(appWith([]), 'rv', user, mockUSerGroups);
+      expect(kubectl.updateApp).toHaveBeenCalled();
+      expect(kubectl.deleteAddonVolumes).toHaveBeenCalledWith(
+        'pipeline-phase',
+        'app-postgres',
+        'ctx',
+      );
+    });
+
+    it('still saves the app if deleting the volume fails', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue(
+        stored([pg('app-postgres', 'x')]),
+      );
+      (kubectl.deleteAddonVolumes as jest.Mock).mockRejectedValue(
+        new Error('forbidden'),
+      );
+      await expect(
+        service.updateApp(appWith([]), 'rv', user, mockUSerGroups),
+      ).resolves.not.toThrow();
+      expect(kubectl.updateApp).toHaveBeenCalled();
+    });
+
+    it('rejects a new addon whose name still has a volume from a previous one', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue(stored([]));
+      (kubectl.getAddonVolumes as jest.Mock).mockResolvedValue([
+        { metadata: { name: 'data-app-postgres-0' } },
+      ]);
+      await expect(
+        service.updateApp(
+          appWith([pg('app-postgres', 'x')]),
+          'rv',
+          user,
+          mockUSerGroups,
+        ),
+      ).rejects.toThrow(ConflictException);
+      expect(kubectl.updateApp).not.toHaveBeenCalled();
+    });
+
+    it('tells the user to wait when that volume is still being deleted', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue(stored([]));
+      (kubectl.getAddonVolumes as jest.Mock).mockResolvedValue([
+        {
+          metadata: {
+            name: 'data-app-postgres-0',
+            deletionTimestamp: new Date(),
+          },
+        },
+      ]);
+      await expect(
+        service.updateApp(
+          appWith([pg('app-postgres', 'x')]),
+          'rv',
+          user,
+          mockUSerGroups,
+        ),
+      ).rejects.toThrow('todavía se está borrando');
+    });
+
+    it('checks for leftover volumes when creating an app too', async () => {
+      (kubectl.getAddonVolumes as jest.Mock).mockResolvedValue([
+        { metadata: { name: 'data-app-postgres-0' } },
+      ]);
+      await expect(
+        service.createApp(
+          appWith([pg('app-postgres', 'x')]),
+          user,
+          mockUSerGroups,
+        ),
+      ).rejects.toThrow(ConflictException);
+      expect(kubectl.createApp).not.toHaveBeenCalled();
+    });
+
+    it('deletes the data volumes of every addon when the app is deleted', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue(
+        stored([pg('app-postgres', 'x'), pg('app-redis', 'y')]),
+      );
+      await service.deleteApp('pipeline', 'phase', 'app', user, mockUSerGroups);
+      expect(kubectl.deleteApp).toHaveBeenCalled();
+      expect(kubectl.deleteAddonVolumes).toHaveBeenCalledWith(
+        'pipeline-phase',
+        'app-postgres',
+        'ctx',
+      );
+      expect(kubectl.deleteAddonVolumes).toHaveBeenCalledWith(
+        'pipeline-phase',
+        'app-redis',
+        'ctx',
+      );
+    });
+
+    it('never builds a label selector from an invalid addon name', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue(
+        stored([pg('bad name', 'x')]),
+      );
+      await service.deleteApp('pipeline', 'phase', 'app', user, mockUSerGroups);
+      expect(kubectl.deleteAddonVolumes).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addonsByName', () => {
+    it('maps metadata.name to its definition and ignores malformed entries', () => {
+      const map = addonsByName([
+        { resourceDefinitions: { K: { metadata: { name: 'a' } } } },
+        { resourceDefinitions: null },
+        {},
+        'junk',
+      ]);
+      expect([...map.keys()]).toEqual(['a']);
+      expect(addonsByName(undefined).size).toBe(0);
     });
   });
 

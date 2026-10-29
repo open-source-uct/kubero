@@ -366,6 +366,8 @@ const messages = {
           loadError: 'The app could not be loaded. Saving is disabled so its configuration is not overwritten with an empty form.',
           detailLoadError: 'The app could not be loaded.',
           pendingDeploy: 'This app has not been deployed yet. If it stays like this for more than a few minutes, contact an administrator.',
+          addonsLocked: 'The data of an existing addon (user, passwords, database) cannot be changed. To use different values, remove it, save the app and create it again.',
+          addonDeleteData: 'Saving the app will delete this addon together with its database and all its data. This cannot be undone.',
           warning: 'Please change all passwords, tokens and select the correct storageClass for your cluster.',
           appName: 'App Name',
           domain: 'Domain',
