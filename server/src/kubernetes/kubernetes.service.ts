@@ -35,6 +35,7 @@ import {
   NetworkingV1Api,
   V1Job,
   V1Secret,
+  V1PersistentVolumeClaim,
 } from '@kubernetes/client-node';
 import { WebSocket } from 'ws';
 import stream from 'stream';
@@ -518,6 +519,48 @@ export class KubernetesService {
     } else {
       return {} as IKubectlApp;
     }
+  }
+
+  // Volúmenes de datos de un addon (Postgres, MySQL, ...). Los crea el
+  // StatefulSet del addon a partir de volumeClaimTemplates, y Kubernetes les
+  // copia la etiqueta app.kubernetes.io/instance=<nombre del addon> de su
+  // selector. Los volúmenes propios de la app (extraVolumes) no la llevan.
+  public async getAddonVolumes(
+    namespace: string,
+    addonName: string,
+    context: string,
+  ): Promise<V1PersistentVolumeClaim[]> {
+    const { coreV1Api } = this.clientsForContext(context);
+    const res = await coreV1Api.listNamespacedPersistentVolumeClaim(
+      namespace,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      `app.kubernetes.io/instance=${addonName}`,
+    );
+    return res.body.items;
+  }
+
+  // Al borrar un StatefulSet, Kubernetes conserva sus volúmenes: un addon
+  // recreado con el mismo nombre reutilizaba la base vieja e ignoraba los
+  // datos nuevos (usuario, contraseña, base). Mientras un pod lo use, el
+  // volumen queda en Terminating y se borra cuando el pod desaparece.
+  public async deleteAddonVolumes(
+    namespace: string,
+    addonName: string,
+    context: string,
+  ): Promise<string[]> {
+    const { coreV1Api } = this.clientsForContext(context);
+    const volumes = await this.getAddonVolumes(namespace, addonName, context);
+    const deleted: string[] = [];
+    for (const volume of volumes) {
+      const name = volume.metadata?.name;
+      if (!name || volume.metadata?.deletionTimestamp) continue;
+      await coreV1Api.deleteNamespacedPersistentVolumeClaim(name, namespace);
+      deleted.push(name);
+    }
+    return deleted;
   }
 
   public async getAppsList(

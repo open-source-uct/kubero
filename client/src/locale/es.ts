@@ -366,6 +366,8 @@ const messages = {
       loadError: 'No se pudo cargar la app. Se deshabilitó el guardado para no sobrescribir su configuración con un formulario vacío.',
       detailLoadError: 'No se pudo cargar la app.',
       pendingDeploy: 'Esta app todavía no se desplegó. Si sigue así por más de unos minutos, avisa a un administrador.',
+      addonsLocked: 'Los datos de un addon ya creado (usuario, contraseñas, base de datos) no se pueden modificar. Para usar otros, elimínalo, guarda la app y vuelve a crearlo.',
+      addonDeleteData: 'Al guardar la app se borrará este addon junto con su base de datos y todos sus datos. Esta acción no se puede deshacer.',
       warning: 'Por favor, cambia todas las contraseñas, tokens y selecciona la storageClass correcta para tu clúster.',
       appName: 'Nombre de la app',
       domain: 'Dominio',
