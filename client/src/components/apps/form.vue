@@ -705,6 +705,17 @@
                 </v-btn>
               </v-col>
             </v-row>
+            <v-alert
+              v-if="postgresWarnings.length > 0"
+              type="warning"
+              variant="tonal"
+              class="mt-4"
+              :title="$t('app.form.postgresEnvTitle')"
+            >
+              <ul class="pl-4">
+                <li v-for="(warning, index) in postgresWarnings" :key="index">{{ warning }}</li>
+              </ul>
+            </v-alert>
           </v-expansion-panel-text>
         </v-expansion-panel>
 
@@ -986,7 +997,29 @@
         <div class="uct-section-title">
           {{ $t("app.titles.addOns") }}
         </div>
-        <Addons :addons="addons" :appname="name" :persisted="app !== 'new'" />
+        <!-- en una app ya creada los addons se guardan al instante; la versión
+             nueva de la app evita que el próximo "Actualizar" choque -->
+        <Addons
+          :addons="addons"
+          :appname="name"
+          :pipeline="pipeline"
+          :phase="phase"
+          :persisted="app !== 'new'"
+          :env-vars="envVars"
+          @saved="onAddonsSaved"
+        />
+        <!-- las variables de la app y sus addons de Postgres tienen que coincidir -->
+        <v-alert
+          v-if="postgresWarnings.length > 0"
+          type="warning"
+          variant="tonal"
+          class="mt-4"
+          :title="$t('app.form.postgresEnvTitle')"
+        >
+          <ul class="pl-4">
+            <li v-for="(warning, index) in postgresWarnings" :key="index">{{ warning }}</li>
+          </ul>
+        </v-alert>
       </div>
 
       <!-- ENV VAR OVERLAP DIALOG -->
@@ -1063,6 +1096,7 @@ import { defineComponent } from "vue";
 import { useKuberoStore } from "../../stores/kubero";
 import { handledApiErrorConfig, notifyApiError } from "../../utils/apiFeedback";
 import Breadcrumbs from "../breadcrumbs.vue";
+import { postgresEnvWarnings } from "../../utils/postgresEnv";
 import Swal from "sweetalert2";
 
 type App = {
@@ -1363,6 +1397,9 @@ export default defineComponent({
       },
       name: "",
       resourceVersion: "",
+      // configuración (metadata.generation) cargada: permite guardar aunque el
+      // operador haya escrito el estado de la app después de abrir el formulario
+      generation: "",
       // si falla la carga al editar, el formulario queda con valores por
       // defecto: guardarlo sobrescribiría la app real con datos vacíos
       loadError: false,
@@ -1615,6 +1652,14 @@ export default defineComponent({
         { title: this.$t('app.form.newValue'), key: 'newValue' },
       ];
     },
+    // Avisos (sin bloquear el guardado) cuando las variables de conexión de la
+    // app no coinciden con sus addons de Postgres: host, puerto, usuario,
+    // contraseña o base distintos
+    postgresWarnings(): string[] {
+      return postgresEnvWarnings(this.envVars, this.addons).map((warning) =>
+        this.$t(`app.form.${warning.key}`, warning.params),
+      );
+    },
     duplicateEnvVarNames() {
       const names = this.envVars.map(env => env.name.trim()).filter(name => name !== '');
       const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
@@ -1653,6 +1698,12 @@ export default defineComponent({
     Breadcrumbs,
   },
   methods: {
+    // un addon creado o quitado al instante cambia la app en el clúster: el
+    // formulario toma su versión nueva para que "Actualizar" no choque
+    onAddonsSaved(saved: { resourceVersion?: string; generation?: number }) {
+      if (saved?.resourceVersion) this.resourceVersion = saved.resourceVersion;
+      if (saved?.generation !== undefined) this.generation = String(saved.generation);
+    },
     addDomainLine() {
       this.ingress.hosts.push({
         host: "",
@@ -1891,6 +1942,7 @@ export default defineComponent({
               return;
             }
             this.resourceVersion = response.data.metadata.resourceVersion;
+            this.generation = String(response.data.metadata.generation ?? "");
 
             // Open Panel if there is some data to show
             if (response.data.spec.envVars.length > 0) {
@@ -2205,7 +2257,10 @@ export default defineComponent({
         await axios.put(
           `/api/apps/${this.pipeline}/${this.phase}/${this.app}/${this.resourceVersion}`,
           postdata,
-          handledApiErrorConfig
+          {
+            ...handledApiErrorConfig,
+            params: this.generation ? { generation: this.generation } : undefined,
+          }
         );
         this.$router.push(`/pipeline/${this.pipeline}/apps`);
       } catch (error) {

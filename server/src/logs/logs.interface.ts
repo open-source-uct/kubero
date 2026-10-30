@@ -9,4 +9,6 @@ export interface ILoglines {
   container: string;
   color: string;
   log: string;
+  // línea del contenedor anterior, que terminó antes de un reinicio
+  previous?: boolean;
 }
