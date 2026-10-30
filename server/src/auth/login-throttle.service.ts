@@ -21,6 +21,8 @@ export class LoginThrottleService {
   private static readonly MAX_TRACKED = 10000;
 
   private failures = new Map<string, number[]>();
+  // cuándo se registró en la auditoría el último bloqueo de cada usuario
+  private blockReported = new Map<string, number>();
 
   private keys(ip: string, username: string): [string, string] {
     const user = (username ?? '').toString().toLowerCase().slice(0, 200);
@@ -64,18 +66,43 @@ export class LoginThrottleService {
     }
   }
 
-  recordFailure(ip: string, username: string, now = Date.now()): void {
+  // Devuelve cuántos fallos lleva el usuario en la ventana, contando este:
+  // la auditoría registra solo el primero, para que un ataque no llene (y
+  // rote) el historial con miles de entradas iguales.
+  recordFailure(ip: string, username: string, now = Date.now()): number {
     if (this.failures.size >= LoginThrottleService.MAX_TRACKED) {
       // memoria acotada: se descartan las entradas vencidas
       for (const key of [...this.failures.keys()]) {
         this.recent(key, now);
       }
     }
+    let count = 0;
     for (const key of this.keys(ip, username)) {
       const list = this.recent(key, now);
       list.push(now);
       this.failures.set(key, list);
+      count = list.length;
     }
+    return count;
+  }
+
+  // true la primera vez que se bloquea a un usuario dentro de la ventana:
+  // el bloqueo se registra una vez, no con cada intento rechazado
+  shouldReportBlock(username: string, now = Date.now()): boolean {
+    const user = this.keys('', username)[1];
+    const last = this.blockReported.get(user);
+    if (last !== undefined && now - last < LoginThrottleService.WINDOW_MS) {
+      return false;
+    }
+    if (this.blockReported.size >= LoginThrottleService.MAX_TRACKED) {
+      for (const [key, t] of this.blockReported) {
+        if (now - t >= LoginThrottleService.WINDOW_MS) {
+          this.blockReported.delete(key);
+        }
+      }
+    }
+    this.blockReported.set(user, now);
+    return true;
   }
 
   // Un login correcto limpia los fallos de esa pareja y de ese usuario.

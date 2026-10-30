@@ -23,6 +23,7 @@ describe('PasswordResetService', () => {
   let mailMock: jest.Mocked<Pick<MailService, 'sendPasswordResetEmail'>>;
   let usersMock: jest.Mocked<Pick<UsersService, 'updatePassword'>>;
   let throttleMock: jest.Mocked<PasswordResetThrottleService>;
+  let auditMock: any;
   const previousUrl = process.env.KUBERO_URL;
 
   beforeEach(() => {
@@ -44,10 +45,12 @@ describe('PasswordResetService', () => {
       record: jest.fn(),
     } as any;
 
+    auditMock = { log: jest.fn().mockResolvedValue(undefined) };
     service = new PasswordResetService(
       mailMock as unknown as MailService,
       usersMock as unknown as UsersService,
       throttleMock,
+      auditMock,
     );
     // @ts-expect-error prisma es privado; se reemplaza por un mock
     service['prisma'] = prismaMock;
@@ -136,6 +139,26 @@ describe('PasswordResetService', () => {
       expect(resetUrl).toMatch(
         /^https:\/\/kubero\.example\.com\/reset-password\?token=[0-9a-f]{64}$/,
       );
+
+      // queda en la auditoría, a nombre del sistema (quien pide no tiene por
+      // qué ser el dueño) y sin el token
+      expect(auditMock.log).toHaveBeenCalledTimes(1);
+      const entry = auditMock.log.mock.calls[0][0];
+      expect(entry).toMatchObject({
+        user: '1',
+        action: 'password-reset-requested',
+        resource: 'security',
+        pipeline: '',
+      });
+      expect(entry.message).toContain('ana');
+      expect(entry.message).toContain('1.1.1.1');
+      expect(entry.message).not.toMatch(/[0-9a-f]{64}/);
+    });
+
+    it('no registra nada en la auditoría para un correo que no existe', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(null);
+      await service.requestReset('fantasma@example.com', '1.1.1.1');
+      expect(auditMock.log).not.toHaveBeenCalled();
     });
   });
 
@@ -196,6 +219,13 @@ describe('PasswordResetService', () => {
       expect(usersMock.updatePassword).toHaveBeenCalledWith(
         'u1',
         'nuevaPassword123',
+      );
+      expect(auditMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user: 'u1',
+          action: 'password-reset-completed',
+          resource: 'security',
+        }),
       );
     });
 

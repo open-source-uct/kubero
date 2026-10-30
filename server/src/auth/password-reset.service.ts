@@ -5,6 +5,7 @@ import { MailService } from '../mail/mail.service';
 import { UsersService } from '../users/users.service';
 import { displayNameOf } from '../common/utils/display-name.util';
 import { PasswordResetThrottleService } from './password-reset-throttle.service';
+import { AuditService } from '../audit/audit.service';
 
 const TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutos
 // Piso de tiempo de respuesta para requestReset: sin esto, un correo que sí
@@ -26,7 +27,25 @@ export class PasswordResetService {
     private readonly mailService: MailService,
     private readonly usersService: UsersService,
     private readonly throttle: PasswordResetThrottleService,
+    private readonly auditService: AuditService,
   ) {}
+
+  // Pedidos y restablecimientos quedan en la auditoría (solo los ve el admin).
+  // Antes no había registro: un pedido hecho por otra persona no se podía
+  // rastrear. Va sin esperar, para no alterar el piso de tiempo de respuesta.
+  private audit(action: string, message: string, userId = '1'): void {
+    void this.auditService.log({
+      user: userId,
+      severity: 'warning',
+      action,
+      resource: 'security',
+      namespace: '',
+      phase: '',
+      app: '',
+      pipeline: '',
+      message,
+    });
+  }
 
   private hashToken(token: string): string {
     return crypto.createHash('sha256').update(token).digest('hex');
@@ -51,14 +70,18 @@ export class PasswordResetService {
     }
 
     const start = Date.now();
-    await this.doRequestReset(email.trim().toLowerCase(), baseUrl);
+    await this.doRequestReset(email.trim().toLowerCase(), baseUrl, ip);
     const elapsed = Date.now() - start;
     if (elapsed < MIN_REQUEST_RESET_MS) {
       await sleep(MIN_REQUEST_RESET_MS - elapsed);
     }
   }
 
-  private async doRequestReset(email: string, baseUrl: string): Promise<void> {
+  private async doRequestReset(
+    email: string,
+    baseUrl: string,
+    ip: string,
+  ): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { email } });
     // Los usuarios de GitHub/OAuth2 no tienen una contraseña real (se les
     // asigna una aleatoria que nunca usan, entran por el proveedor externo);
@@ -83,6 +106,12 @@ export class PasswordResetService {
     });
 
     const resetUrl = `${baseUrl.replace(/\/+$/, '')}/reset-password?token=${rawToken}`;
+    // el usuario de la entrada es el sistema: quien pide el restablecimiento
+    // no tiene por qué ser el dueño de la cuenta
+    this.audit(
+      'password-reset-requested',
+      `Se pidió restablecer la contraseña de ${user.username} (IP ${ip})`,
+    );
     void this.mailService.sendPasswordResetEmail(
       user.email,
       displayNameOf(user),
@@ -123,5 +152,10 @@ export class PasswordResetService {
     if (!updated) {
       throw new BadRequestException('No se pudo actualizar la contraseña');
     }
+    this.audit(
+      'password-reset-completed',
+      `Se restableció la contraseña con un enlace enviado por correo (IP ${ip})`,
+      record.userId,
+    );
   }
 }

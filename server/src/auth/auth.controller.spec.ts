@@ -21,6 +21,7 @@ describe('AuthController', () => {
       getSession: jest.fn(),
       getMethods: jest.fn(),
       loginOAuth2: jest.fn(),
+      auditAuthEvent: jest.fn(),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -60,7 +61,7 @@ describe('AuthController', () => {
         req,
         res,
       );
-      expect(service.login).toHaveBeenCalledWith('user', 'pw');
+      expect(service.login).toHaveBeenCalledWith('user', 'pw', req.ip);
       expect(result).toEqual({ access_token: 'token' });
     });
 
@@ -76,6 +77,31 @@ describe('AuthController', () => {
         controller.login({ username: 'ana', password: 'x' }, req, res),
       ).rejects.toMatchObject({ status: 429 });
       expect(service.login).not.toHaveBeenCalled();
+    });
+
+    it('records only the first failed login and the block once, not every attempt', async () => {
+      service.login.mockRejectedValue(new HttpException('Forbidden', 403));
+      for (let i = 0; i < LoginThrottleService.MAX_PER_IP_AND_USER; i++) {
+        await expect(
+          controller.login({ username: 'profe', password: 'x' }, req, res),
+        ).rejects.toMatchObject({ status: 403 });
+      }
+      for (let i = 0; i < 5; i++) {
+        await expect(
+          controller.login({ username: 'profe', password: 'x' }, req, res),
+        ).rejects.toMatchObject({ status: 429 });
+      }
+      const actions = service.auditAuthEvent.mock.calls.map((c) => c[0]);
+      expect(actions).toEqual(['login-failed', 'login-blocked']);
+      expect(service.auditAuthEvent.mock.calls[0][1]).toContain('"profe"');
+    });
+
+    it('keeps control characters out of the audited username', async () => {
+      service.login.mockRejectedValueOnce(new HttpException('Forbidden', 403));
+      await expect(
+        controller.login({ username: 'ana\nfalso', password: 'x' }, req, res),
+      ).rejects.toBeDefined();
+      expect(service.auditAuthEvent.mock.calls[0][1]).toContain('"anafalso"');
     });
 
     it('should not count a successful login as a failure and clear previous ones', async () => {

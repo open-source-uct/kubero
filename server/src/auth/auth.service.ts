@@ -3,6 +3,7 @@ import { UsersService } from '../users/users.service';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { ConfigService } from '../config/config.service';
 import { AuditService } from '../audit/audit.service';
+import { AuditEntry } from '../audit/audit.interface';
 import { RolesService } from '../roles/roles.service';
 import { getJwtSecret } from './jwt-secret';
 import { JwtService } from '@nestjs/jwt';
@@ -70,11 +71,39 @@ export class AuthService {
     return null;
   }
 
-  async login(username: string, password: string) {
+  // Registra en la auditoría un evento de autenticación. No pertenece a ningún
+  // pipeline, así que solo lo ve el admin (la auditoría de los demás roles se
+  // filtra por sus pipelines). Antes no quedaba registro de quién entraba o
+  // intentaba entrar, ni de quién pedía restablecer una contraseña.
+  auditAuthEvent(
+    action: string,
+    message: string,
+    userId = '1',
+    severity: AuditEntry['severity'] = 'normal',
+  ): void {
+    void this.auditService.log({
+      user: userId,
+      severity,
+      action,
+      resource: 'security',
+      namespace: '',
+      phase: '',
+      app: '',
+      pipeline: '',
+      message,
+    });
+  }
+
+  async login(username: string, password: string, ip = 'desconocida') {
     const user = await this.validateUser(username, password);
     if (!user) {
       throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
     }
+    this.auditAuthEvent(
+      'login',
+      `Inicio de sesión de ${user.username} (IP ${ip})`,
+      user.id,
+    );
 
     const { permissions, scopeToOwnTeam, priority } =
       await this.rolesService.getPermissions(user.roleId);

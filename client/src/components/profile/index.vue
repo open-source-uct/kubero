@@ -87,6 +87,8 @@
                 <v-text-field v-model="editedUser.firstName" :label="$t('user.firstName')" variant="outlined" :rules="[v => !!v || $t('user.errors.firstNameRequired')]" />
                 <v-text-field v-model="editedUser.lastName" :label="$t('user.lastName')" variant="outlined" :rules="[v => !!v || $t('user.errors.lastNameRequired')]" />
                 <v-text-field v-model="editedUser.email" :label="$t('user.email')" type="email" variant="outlined" :rules="[v => !!v || $t('user.errors.emailRequired'), v => /.+@.+\..+/.test(v) || $t('user.errors.emailValid')]" />
+                <!-- cambiar el correo cambia por dónde se recupera la cuenta: el server pide la contraseña actual -->
+                <v-text-field v-if="emailChanged" v-model="editedUser.currentPassword" :label="$t('user.currentPassword')" :hint="$t('user.emailChangeNeedsPassword')" persistent-hint type="password" autocomplete="current-password" variant="outlined" :rules="[v => !!v || $t('user.errors.currentPasswordRequired')]" />
               </v-card-text>
               <v-card-actions><v-spacer /><v-btn variant="text" @click="editProfileDialog = false">{{ $t('global.cancel') }}</v-btn><v-btn color="primary" variant="flat" @click="saveProfile">{{ $t('global.save') }}</v-btn></v-card-actions>
             </v-card>
@@ -171,7 +173,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch } from 'vue'
+import { computed, defineComponent, ref, onMounted, watch } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../../stores/auth'
 import router from '../../router'
@@ -283,15 +285,22 @@ export default defineComponent({
       editedUser.value = {
         firstName: user.value.firstName,
         lastName: user.value.lastName,
-        email: user.value.email
+        email: user.value.email,
+        currentPassword: ''
       }
       profileError.value = false
       editProfileDialog.value = true
     }
 
+    // mismo criterio que el server: sin espacios ni distinción de mayúsculas
+    const emailChanged = computed(() =>
+      (editedUser.value.email ?? '').trim().toLowerCase() !== (user.value.email ?? '').trim().toLowerCase()
+    )
+
     const saveProfile = async () => {
       try {
-        await axios.put('/api/users/profile', editedUser.value)
+        const { currentPassword, ...profile } = editedUser.value
+        await axios.put('/api/users/profile', emailChanged.value ? { ...profile, currentPassword } : profile)
         editProfileDialog.value = false
         profileError.value = false
         await loadProfile()
@@ -382,6 +391,7 @@ export default defineComponent({
     return {
       locale,
       availableLanguages,
+      emailChanged,
       user,
       defaultAvatar,
       tokens,

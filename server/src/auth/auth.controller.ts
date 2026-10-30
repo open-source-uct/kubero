@@ -55,10 +55,31 @@ export class AuthController {
     @Response({ passthrough: true }) res: any,
   ) {
     const ip: string = req?.ip ?? 'unknown';
+    // el nombre lo escribe quien intenta entrar: acotado para la auditoría
+    const attempted = String(auth?.username ?? '')
+      // eslint-disable-next-line no-control-regex -- se quitan a propósito
+      .replace(/[\u0000-\u001f\u007f]/g, '')
+      .slice(0, 100);
     // 429 si ya hubo demasiados intentos fallidos con este usuario
-    this.loginThrottle.assertAllowed(ip, auth.username);
     try {
-      const result = await this.authService.login(auth.username, auth.password);
+      this.loginThrottle.assertAllowed(ip, auth.username);
+    } catch (error) {
+      if (this.loginThrottle.shouldReportBlock(auth.username)) {
+        this.authService.auditAuthEvent(
+          'login-blocked',
+          `Inicio de sesión bloqueado por exceso de intentos fallidos para "${attempted}" (IP ${ip})`,
+          '1',
+          'warning',
+        );
+      }
+      throw error;
+    }
+    try {
+      const result = await this.authService.login(
+        auth.username,
+        auth.password,
+        ip,
+      );
       res.cookie(
         SESSION_COOKIE,
         result.access_token,
@@ -68,7 +89,16 @@ export class AuthController {
       this.loginThrottle.reset(ip, auth.username);
       return result;
     } catch (error) {
-      this.loginThrottle.recordFailure(ip, auth.username);
+      // solo el primer fallo de la ventana va a la auditoría; los siguientes
+      // quedan resumidos en el evento de bloqueo
+      if (this.loginThrottle.recordFailure(ip, auth.username) === 1) {
+        this.authService.auditAuthEvent(
+          'login-failed',
+          `Intento de inicio de sesión fallido para "${attempted}" (IP ${ip})`,
+          '1',
+          'warning',
+        );
+      }
       throw error;
     }
   }
