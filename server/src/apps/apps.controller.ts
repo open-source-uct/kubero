@@ -12,6 +12,7 @@ import {
   Put,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 import { AppsService } from './apps.service';
 import { IUser } from '../auth/auth.interface';
@@ -128,6 +129,8 @@ export class AppsController {
     @Param('resourceVersion') resourceVersion: string,
     @Body() app: any,
     @Request() req: any,
+    // configuración (metadata.generation) que tenía la app al abrir el formulario
+    @Query('generation') generation?: string,
   ) {
     const validationErrors = await validate(
       plainToInstance(AppValidationDto, app),
@@ -153,6 +156,7 @@ export class AppsController {
       resourceVersion,
       user,
       req.user.userGroups,
+      generation,
     );
   }
 
@@ -182,6 +186,74 @@ export class AppsController {
       pipeline,
       phase,
       app,
+      user,
+      req.user.userGroups,
+    );
+  }
+
+  // Agrega un addon a una app ya creada, sin esperar a "Actualizar"
+  @Post('/:pipeline/:phase/:app/addons')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:write')
+  @UseGuards(ReadonlyGuard)
+  @ApiOperation({ summary: 'Add an addon to an existing app' })
+  @ApiForbiddenResponse({
+    description: 'Error: Unauthorized',
+    type: OKDTO,
+    isArray: false,
+  })
+  @ApiBearerAuth('bearerAuth')
+  async addAddon(
+    @Param('pipeline') pipeline: string,
+    @Param('phase') phase: string,
+    @Param('app') app: string,
+    @Body() addon: any,
+    @Request() req: any,
+  ) {
+    const user: IUser = {
+      id: req.user.userId,
+      strategy: req.user.strategy,
+      username: req.user.username,
+    };
+    return this.appsService.addAddon(
+      pipeline,
+      phase,
+      app,
+      addon,
+      user,
+      req.user.userGroups,
+    );
+  }
+
+  // Quita un addon de una app ya creada y borra su volumen de datos
+  @Delete('/:pipeline/:phase/:app/addons/:addon')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:write')
+  @UseGuards(ReadonlyGuard)
+  @ApiOperation({ summary: 'Remove an addon from an existing app' })
+  @ApiForbiddenResponse({
+    description: 'Error: Unauthorized',
+    type: OKDTO,
+    isArray: false,
+  })
+  @ApiBearerAuth('bearerAuth')
+  async removeAddon(
+    @Param('pipeline') pipeline: string,
+    @Param('phase') phase: string,
+    @Param('app') app: string,
+    @Param('addon') addon: string,
+    @Request() req: any,
+  ) {
+    const user: IUser = {
+      id: req.user.userId,
+      strategy: req.user.strategy,
+      username: req.user.username,
+    };
+    return this.appsService.removeAddon(
+      pipeline,
+      phase,
+      app,
+      addon,
       user,
       req.user.userGroups,
     );

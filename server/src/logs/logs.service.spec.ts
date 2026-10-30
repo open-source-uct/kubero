@@ -39,6 +39,7 @@ describe('LogsService', () => {
     };
     eventsGateway = {
       sendLogline: jest.fn(),
+      hasListeners: jest.fn().mockReturnValue(true),
     };
     appsService = {
       getApp: jest.fn().mockResolvedValue({ spec: { addons: [] } }),
@@ -49,6 +50,13 @@ describe('LogsService', () => {
       eventsGateway,
       appsService,
     );
+  });
+
+  afterEach(() => {
+    for (const watcher of (service as any).roomWatchers.values()) {
+      clearInterval(watcher.timer);
+    }
+    jest.useRealTimers();
   });
 
   it('should be defined', () => {
@@ -157,7 +165,18 @@ describe('LogsService', () => {
   });
 
   describe('startLogging', () => {
-    it('should call emitLogs for matching pods and containers', async () => {
+    // pod de la app con un contenedor en el estado indicado
+    const appPod = (state: any, name = 'app-kuberoapp-web-abc-123') => ({
+      metadata: { name, labels: {} },
+      spec: { containers: [{ name: 'kuberoapp-web' }] },
+      status: { containerStatuses: [{ name: 'kuberoapp-web', state }] },
+    });
+    const running = (startedAt: number) => ({
+      running: { startedAt: new Date(startedAt).toISOString() },
+    });
+    const logOptions = (call: number) => kubectl.log.log.mock.calls[call][4];
+
+    it('should stream matching pods and containers', async () => {
       pipelinesService.getContext.mockResolvedValue('ctx');
       kubectl.getPods.mockResolvedValue([
         {
@@ -165,16 +184,116 @@ describe('LogsService', () => {
           spec: { containers: [{ name: 'web' }] },
         },
       ]);
-      const spy = jest.spyOn(service, 'emitLogs').mockResolvedValue(undefined);
       await service.startLogging('pipe', 'phase', 'app', mockUserGroups);
-      expect(spy).toHaveBeenCalledWith(
-        'pipe',
-        'phase',
-        'app',
+      expect(kubectl.log.log).toHaveBeenCalledTimes(1);
+      expect(kubectl.log.log.mock.calls[0].slice(0, 3)).toEqual([
+        'pipe-phase',
         'app-kuberoapp-123',
         'web',
-        ['group1', 'group2'],
+      ]);
+      expect(logOptions(0)).toMatchObject({ follow: true, tailLines: 0 });
+    });
+
+    it('waits for a container that is still being created and streams it once it runs', async () => {
+      jest.useFakeTimers();
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      kubectl.getPods.mockResolvedValue([
+        appPod({ waiting: { reason: 'ContainerCreating' } }),
+      ]);
+      await service.startLogging('pipe', 'phase', 'app', mockUserGroups);
+      expect(kubectl.log.log).not.toHaveBeenCalled();
+
+      kubectl.getPods.mockResolvedValue([appPod(running(Date.now() + 1000))]);
+      await jest.advanceTimersByTimeAsync(LogsService.WATCH_INTERVAL_MS);
+      expect(kubectl.log.log).toHaveBeenCalledTimes(1);
+      // arrancó mientras alguien miraba: se piden sus líneas desde el inicio
+      expect(logOptions(0).sinceSeconds).toBeGreaterThan(0);
+      expect(logOptions(0).tailLines).toBeUndefined();
+    });
+
+    it('reopens the stream after the container restarts', async () => {
+      jest.useFakeTimers();
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      let stream: any;
+      kubectl.log.log.mockImplementation((_ns, _pod, _container, logStream) => {
+        stream = logStream;
+        return Promise.resolve({ abort: jest.fn() });
+      });
+      kubectl.getPods.mockResolvedValue([appPod(running(Date.now() - 60000))]);
+      await service.startLogging('pipe', 'phase', 'app', mockUserGroups);
+      expect(kubectl.log.log).toHaveBeenCalledTimes(1);
+
+      // el contenedor se cae: el stream termina y el pod queda reiniciándose
+      stream.destroy();
+      kubectl.getPods.mockResolvedValue([
+        appPod({ waiting: { reason: 'CrashLoopBackOff' } }),
+      ]);
+      await jest.advanceTimersByTimeAsync(LogsService.WATCH_INTERVAL_MS);
+      expect(kubectl.log.log).toHaveBeenCalledTimes(1);
+
+      kubectl.getPods.mockResolvedValue([appPod(running(Date.now()))]);
+      await jest.advanceTimersByTimeAsync(LogsService.WATCH_INTERVAL_MS);
+      expect(kubectl.log.log).toHaveBeenCalledTimes(2);
+      expect(logOptions(1).sinceSeconds).toBeGreaterThan(0);
+    });
+
+    it('follows the new pod of a redeploy', async () => {
+      jest.useFakeTimers();
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      kubectl.getPods.mockResolvedValue([
+        appPod(running(Date.now() - 60000), 'app-kuberoapp-web-old-1'),
+      ]);
+      await service.startLogging('pipe', 'phase', 'app', mockUserGroups);
+
+      kubectl.getPods.mockResolvedValue([
+        appPod(running(Date.now()), 'app-kuberoapp-web-new-2'),
+      ]);
+      await jest.advanceTimersByTimeAsync(LogsService.WATCH_INTERVAL_MS);
+      expect(kubectl.log.log).toHaveBeenCalledTimes(2);
+      expect(kubectl.log.log.mock.calls[1][1]).toBe('app-kuberoapp-web-new-2');
+    });
+
+    it('does not open the same stream twice while it is still running', async () => {
+      jest.useFakeTimers();
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      kubectl.log.log.mockResolvedValue({ abort: jest.fn() });
+      kubectl.getPods.mockResolvedValue([appPod(running(Date.now() - 60000))]);
+      await service.startLogging('pipe', 'phase', 'app', mockUserGroups);
+      await jest.advanceTimersByTimeAsync(LogsService.WATCH_INTERVAL_MS * 3);
+      expect(kubectl.log.log).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops watching and closes the streams when nobody has the logs open', async () => {
+      jest.useFakeTimers();
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      const abort = jest.fn();
+      kubectl.log.log.mockResolvedValue({ abort });
+      kubectl.getPods.mockResolvedValue([appPod(running(Date.now() - 60000))]);
+      await service.startLogging('pipe', 'phase', 'app', mockUserGroups);
+
+      eventsGateway.hasListeners.mockReturnValue(false);
+      await jest.advanceTimersByTimeAsync(
+        LogsService.WATCH_INTERVAL_MS * LogsService.IDLE_ROUNDS,
       );
+      expect(eventsGateway.hasListeners).toHaveBeenCalledWith('pipe-phase-app');
+      expect(abort).toHaveBeenCalled();
+      expect((service as any).roomWatchers.size).toBe(0);
+      expect((service as any).podLogStreams).toEqual([]);
+    });
+
+    it('keeps a single watcher per app', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      kubectl.getPods.mockResolvedValue([]);
+      await service.startLogging('pipe', 'phase', 'app', mockUserGroups);
+      await service.startLogging('pipe', 'phase', 'app', mockUserGroups);
+      expect((service as any).roomWatchers.size).toBe(1);
+    });
+
+    it('does nothing without access to the pipeline', async () => {
+      pipelinesService.getContext.mockResolvedValue(undefined);
+      await service.startLogging('pipe', 'phase', 'app', mockUserGroups);
+      expect(kubectl.getPods).not.toHaveBeenCalled();
+      expect((service as any).roomWatchers.size).toBe(0);
     });
   });
 
@@ -210,6 +329,52 @@ describe('LogsService', () => {
       );
       expect(Array.isArray(result)).toBe(true);
       expect(result[0].container).toBe('web');
+    });
+
+    it('adds the last lines of the previous container after a restart', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      kubectl.getPods.mockResolvedValue([
+        {
+          metadata: { name: 'app-kuberoapp-web-abc-123', labels: {} },
+          spec: { containers: [{ name: 'kuberoapp-web' }] },
+          status: {
+            containerStatuses: [{ name: 'kuberoapp-web', restartCount: 3 }],
+          },
+        },
+      ]);
+      const spy = jest.spyOn(service, 'fetchLogs').mockResolvedValue([]);
+      await service.getLogsHistory(
+        'pipe',
+        'phase',
+        'app',
+        'web',
+        mockUserGroups,
+      );
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy.mock.calls[0][7]).toBeUndefined();
+      expect(spy.mock.calls[1][7]).toBe(true);
+    });
+
+    it('does not ask for previous logs when the container never restarted', async () => {
+      pipelinesService.getContext.mockResolvedValue('ctx');
+      kubectl.getPods.mockResolvedValue([
+        {
+          metadata: { name: 'app-kuberoapp-web-abc-123', labels: {} },
+          spec: { containers: [{ name: 'kuberoapp-web' }] },
+          status: {
+            containerStatuses: [{ name: 'kuberoapp-web', restartCount: 0 }],
+          },
+        },
+      ]);
+      const spy = jest.spyOn(service, 'fetchLogs').mockResolvedValue([]);
+      await service.getLogsHistory(
+        'pipe',
+        'phase',
+        'app',
+        'web',
+        mockUserGroups,
+      );
+      expect(spy).toHaveBeenCalledTimes(1);
     });
 
     it('should return empty array for unknown container', async () => {
@@ -390,6 +555,31 @@ describe('LogsService', () => {
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBeGreaterThan(0);
       expect(result[0].log).toBeDefined();
+    });
+
+    it('marks the lines of the previous container', async () => {
+      kubectl.log.log.mockImplementation(
+        (_ns, _pod, _container, logStream, options) => {
+          expect(options).toMatchObject({ previous: true, tailLines: 40 });
+          logStream.emit(
+            'data',
+            Buffer.from('2024-05-23T12:00:00Z intento 15/15\n'),
+          );
+          return Promise.resolve();
+        },
+      );
+      const result = await service.fetchLogs(
+        'ns',
+        'pod-foo-bar-123-456',
+        'web',
+        'pipe',
+        'phase',
+        'app',
+        'ctx',
+        true,
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].previous).toBe(true);
     });
 
     it('should return empty array on error', async () => {

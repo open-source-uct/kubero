@@ -243,6 +243,7 @@ describe('AppsController', () => {
         'resourceVersion',
         mockApp,
         req,
+        '7',
       );
       expect(result).toEqual(mockApp);
       expect(mockAppsService.updateApp).toHaveBeenCalledWith(
@@ -250,6 +251,7 @@ describe('AppsController', () => {
         'resourceVersion',
         mockUser,
         mockUserGroups,
+        '7',
       );
     });
   });
