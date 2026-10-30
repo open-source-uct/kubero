@@ -50,6 +50,7 @@ describe('AuthService', () => {
     };
     auditService = {
       getAuditEnabled: jest.fn().mockReturnValue(true),
+      log: jest.fn().mockResolvedValue(undefined),
     };
     jwtService = {
       sign: jest.fn().mockReturnValue('signed-token'),
@@ -150,6 +151,28 @@ describe('AuthService', () => {
       await expect(service.login('test', 'wrong')).rejects.toThrow(
         HttpException,
       );
+    });
+
+    it('records a successful login in the audit log, outside any pipeline', async () => {
+      jest
+        .spyOn(service, 'validateUser')
+        .mockResolvedValueOnce({ id: 'u7', username: 'ana' });
+      await service.login('ana', 'pass', '10.0.0.9');
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user: 'u7',
+          action: 'login',
+          resource: 'security',
+          pipeline: '',
+          message: expect.stringContaining('ana'),
+        }),
+      );
+    });
+
+    it('does not record a login that failed in the service', async () => {
+      jest.spyOn(service, 'validateUser').mockResolvedValueOnce(null);
+      await expect(service.login('ana', 'bad')).rejects.toThrow(HttpException);
+      expect(auditService.log).not.toHaveBeenCalled();
     });
   });
 

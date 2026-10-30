@@ -5,6 +5,14 @@ const BRAND_BLUE = '#0075B4';
 const BRAND_GRAY = '#878787';
 const BRAND_GRAY_LIGHT = '#F4F6F9';
 
+// "ana.lopez@uct.cl" -> "an***@uct.cl": el aviso va al correo anterior y no
+// tiene por qué mostrar entera la dirección nueva
+export function maskEmail(email: string): string {
+  const [local, domain] = String(email ?? '').split('@');
+  if (!domain) return '***';
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -96,6 +104,47 @@ export class MailService {
     } catch (error) {
       this.logger.error(
         `No se pudo enviar el correo de cambio de contraseña a ${to}`,
+        error,
+      );
+    }
+  }
+
+  // best-effort: se avisa al correo ANTERIOR, que es el que puede detectar
+  // que alguien le cambió la cuenta (el nuevo podría ser del atacante)
+  async sendEmailChangedEmail(
+    to: string | undefined | null,
+    displayName: string,
+    newEmail: string,
+  ): Promise<void> {
+    if (!this.transporter || !to) {
+      return;
+    }
+    const masked = maskEmail(newEmail);
+    const safeDisplayName = escapeHtml(displayName);
+    const safeMasked = escapeHtml(masked);
+    const text =
+      `Hola ${displayName},\n\n` +
+      `El correo de tu cuenta de Kubero se cambió a ${masked}. Desde ahora los avisos y la recuperación de contraseña llegarán a esa dirección.\n\n` +
+      'Si no fuiste tú, contacta a un administrador de la plataforma lo antes posible.\n\n' +
+      '— Kubero';
+    const html = emailLayout(
+      'El correo de tu cuenta cambió',
+      `<p style="margin:0 0 12px; color:#444444; font-size:14px; line-height:1.5;">Hola <strong>${safeDisplayName}</strong>,</p>
+       <p style="margin:0 0 12px; color:#444444; font-size:14px; line-height:1.5;">El correo de tu cuenta de Kubero se cambió a <strong>${safeMasked}</strong>. Desde ahora los avisos y la recuperación de contraseña llegarán a esa dirección.</p>
+       <p style="margin:0; color:#444444; font-size:14px; line-height:1.5;">Si no fuiste tú, contacta a un administrador de la plataforma lo antes posible.</p>`,
+    );
+    try {
+      await this.transporter.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to,
+        subject: 'El correo de tu cuenta de Kubero cambió',
+        text,
+        html,
+      });
+      this.logger.debug(`Correo de cambio de correo enviado a ${to}`);
+    } catch (error) {
+      this.logger.error(
+        `No se pudo enviar el aviso de cambio de correo a ${to}`,
         error,
       );
     }

@@ -6,6 +6,8 @@ import { UsersService } from './users.service';
 describe('UsersController', () => {
   let controller: UsersController;
   let users: {
+    findAll: jest.Mock;
+    updateMyProfile: jest.Mock;
     create: jest.Mock;
     delete: jest.Mock;
     findByUsername: jest.Mock;
@@ -15,6 +17,8 @@ describe('UsersController', () => {
 
   beforeEach(async () => {
     users = {
+      findAll: jest.fn(),
+      updateMyProfile: jest.fn(),
       create: jest.fn(),
       delete: jest.fn(),
       findByUsername: jest.fn(),
@@ -67,6 +71,87 @@ describe('UsersController', () => {
         ['everyone'],
         false,
       );
+    });
+  });
+
+  describe('datos privados de los compañeros de equipo', () => {
+    const profesor = {
+      id: 'p1',
+      username: 'profe',
+      firstName: 'Ignacio',
+      email: 'profe@uct.cl',
+      lastIp: '10.0.0.5',
+      lastLogin: new Date(),
+      provider: 'local',
+      providerId: null,
+      providerData: null,
+      tokens: [{ id: 't1' }],
+      role: { name: 'profesor' },
+      userGroups: [{ name: 'grupo10' }],
+    };
+    const yo = { ...profesor, id: 'e1', username: 'alumno', email: 'a@uct.cl' };
+    const estudiante = {
+      user: {
+        userId: 'e1',
+        userGroups: ['grupo10'],
+        scopeToOwnTeam: true,
+        permissions: ['user:read', 'app:write'],
+      },
+    };
+    const docente = {
+      user: { ...estudiante.user, userId: 'p1', permissions: ['user:write'] },
+    };
+    const hidden = [
+      'email',
+      'lastIp',
+      'lastLogin',
+      'provider',
+      'providerId',
+      'providerData',
+      'tokens',
+    ];
+
+    it('hides email, IP, provider and tokens of teammates from a role without user:write', async () => {
+      users.findAll.mockResolvedValue([profesor, yo]);
+      const [other, own] = await controller.getPipelines(estudiante);
+      for (const field of hidden) expect(other).not.toHaveProperty(field);
+      expect(other).toMatchObject({
+        id: 'p1',
+        username: 'profe',
+        firstName: 'Ignacio',
+        role: { name: 'profesor' },
+      });
+      // los datos propios se ven completos
+      expect(own.email).toBe('a@uct.cl');
+    });
+
+    it('applies the same rule when looking up one user', async () => {
+      users.findById.mockResolvedValue(profesor);
+      users.findByUsername.mockResolvedValue(profesor);
+      const byId = await controller.getUserById('p1', estudiante);
+      const byName = await controller.getUserByUsername('profe', estudiante);
+      expect(byId).not.toHaveProperty('email');
+      expect(byName).not.toHaveProperty('email');
+    });
+
+    it('keeps everything for a role that manages users', async () => {
+      users.findAll.mockResolvedValue([yo]);
+      const [other] = await controller.getPipelines(docente);
+      expect(other.email).toBe('a@uct.cl');
+      expect(other.lastIp).toBe('10.0.0.5');
+    });
+
+    it('returns null as is when the user does not exist', async () => {
+      users.findById.mockResolvedValue(null);
+      await expect(controller.getUserById('x', estudiante)).resolves.toBeNull();
+    });
+  });
+
+  describe('updateProfile', () => {
+    it('sends the own profile (with the current password) to the checked update', async () => {
+      const body = { email: 'nuevo@uct.cl', currentPassword: 'secreto' };
+      await controller.updateProfile(req, body);
+      expect(users.updateMyProfile).toHaveBeenCalledWith('u1', body);
     });
   });
 

@@ -71,7 +71,14 @@ describe('session lifecycle (isolated SQLite and HTTP)', () => {
     };
     users = new UsersService({ sendPasswordChangedEmail: jest.fn() } as any);
     Object.defineProperty(users, 'prisma', { value: prisma });
-    auth = new AuthService(users, roles, {} as any, {} as any, {} as any, jwt);
+    auth = new AuthService(
+      users,
+      roles,
+      {} as any,
+      {} as any,
+      { log: jest.fn().mockResolvedValue(undefined) } as any,
+      jwt,
+    );
     identity = new IdentityService(users, roles);
     tokens = new TokenService(auth, users, roles);
     Object.defineProperty(tokens, 'prisma', { value: prisma });
