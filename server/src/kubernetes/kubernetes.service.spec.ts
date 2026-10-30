@@ -1,3 +1,4 @@
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { KubernetesService } from './kubernetes.service';
 
 jest.mock('@kubernetes/client-node', () => {
@@ -144,6 +145,62 @@ describe('KubernetesService', () => {
     await expect(
       service.updatePipeline({ name: 'test' } as any, '1'),
     ).rejects.toThrow('boom');
+  });
+
+  it('reports a rejected app update instead of answering as if it was saved', async () => {
+    const api = (service as any).customObjectsApi;
+    api.replaceNamespacedCustomObject.mockRejectedValueOnce({
+      statusCode: 409,
+    });
+    await expect(
+      service.updateApp(
+        { name: 'app', pipeline: 'p', phase: 'ph' } as any,
+        'old',
+        'default',
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    api.replaceNamespacedCustomObject.mockRejectedValueOnce({
+      statusCode: 422,
+      body: { message: 'spec.addons: invalid' },
+    });
+    await expect(
+      service.updateApp(
+        { name: 'app', pipeline: 'p', phase: 'ph' } as any,
+        '1',
+        'default',
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('replaces an app object keeping its resourceVersion and returns the new one', async () => {
+    const api = (service as any).customObjectsApi;
+    api.replaceNamespacedCustomObject.mockResolvedValueOnce({
+      body: { metadata: { resourceVersion: '8' } },
+    });
+    const body = { metadata: { name: 'app', resourceVersion: '7' } } as any;
+    const updated = await service.replaceAppObject(
+      'p-ph',
+      'app',
+      body,
+      'default',
+    );
+    expect(api.replaceNamespacedCustomObject).toHaveBeenLastCalledWith(
+      'application.kubero.dev',
+      'v1alpha1',
+      'p-ph',
+      'kuberoapps',
+      'app',
+      body,
+    );
+    expect(updated.metadata.resourceVersion).toBe('8');
+
+    api.replaceNamespacedCustomObject.mockRejectedValueOnce({
+      statusCode: 409,
+    });
+    await expect(
+      service.replaceAppObject('p-ph', 'app', body, 'default'),
+    ).rejects.toThrow(ConflictException);
   });
 
   it('should deletePipeline', async () => {

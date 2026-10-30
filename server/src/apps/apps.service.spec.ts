@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { AppsService, addonsByName } from './apps.service';
@@ -142,6 +143,7 @@ describe('AppsService', () => {
             ensureSharedTlsSecret: jest.fn(),
             getAddonVolumes: jest.fn().mockResolvedValue([]),
             deleteAddonVolumes: jest.fn().mockResolvedValue([]),
+            replaceAppObject: jest.fn(),
           },
         },
         {
@@ -537,6 +539,263 @@ describe('AppsService', () => {
     });
   });
 
+  describe('addons al instante (agregar y quitar sin "Actualizar")', () => {
+    const pg = (name: string, extra: object = {}) => ({
+      kind: 'KuberoAddonPostgres',
+      resourceDefinitions: {
+        KuberoAddonPostgres: {
+          metadata: { name },
+          spec: { postgres: { auth: { postgresPassword: 'p', ...extra } } },
+        },
+      },
+    });
+    const stored = (addons: unknown[], resourceVersion = '10') => ({
+      apiVersion: 'application.kubero.dev/v1alpha1',
+      kind: 'KuberoApp',
+      metadata: { name: 'app', resourceVersion },
+      spec: { name: 'app', image: { repository: 'ghcr.io/x/app' }, addons },
+    });
+    const replaced = () =>
+      (kubectl.replaceAppObject as jest.Mock).mock.calls.map((c) => c[2]);
+    const conflict = new ConflictException('changed');
+
+    beforeEach(() => {
+      (pipelinesService.getContext as jest.Mock).mockResolvedValue('ctx');
+      (kubectl.replaceAppObject as jest.Mock).mockResolvedValue({
+        metadata: { resourceVersion: '11', generation: 4 },
+      });
+      AppsService.VOLUME_WAIT_MS = 50;
+      AppsService.VOLUME_POLL_MS = 1;
+    });
+
+    it('adds the addon to the stored app, keeps the rest and returns the new version', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue(
+        stored([pg('app-redis')]),
+      );
+      const result = await service.addAddon(
+        'pipe',
+        'prod',
+        'app',
+        pg('app-postgres'),
+        user,
+        mockUSerGroups,
+      );
+      expect(result).toEqual({ resourceVersion: '11', generation: 4 });
+      const body = replaced()[0];
+      expect(body.metadata.resourceVersion).toBe('10');
+      expect(body.spec.image).toEqual({ repository: 'ghcr.io/x/app' });
+      expect(body.spec.addons).toHaveLength(2);
+      expect(notificationsService.send).toHaveBeenCalled();
+    });
+
+    it('rejects an invalid addon before touching the cluster', async () => {
+      const noPassword = pg('app-postgres');
+      (
+        noPassword.resourceDefinitions.KuberoAddonPostgres.spec.postgres
+          .auth as any
+      ).postgresPassword = '';
+      await expect(
+        service.addAddon(
+          'pipe',
+          'prod',
+          'app',
+          noPassword,
+          user,
+          mockUSerGroups,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(kubectl.getApp).not.toHaveBeenCalled();
+      expect(kubectl.replaceAppObject).not.toHaveBeenCalled();
+    });
+
+    it('rejects an addon whose name the app already uses', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue(
+        stored([pg('app-postgres')]),
+      );
+      await expect(
+        service.addAddon(
+          'pipe',
+          'prod',
+          'app',
+          pg('app-postgres'),
+          user,
+          mockUSerGroups,
+        ),
+      ).rejects.toThrow(ConflictException);
+      expect(kubectl.replaceAppObject).not.toHaveBeenCalled();
+    });
+
+    it('rejects an addon whose name still has the volume of a previous one', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue(stored([]));
+      (kubectl.getAddonVolumes as jest.Mock).mockResolvedValue([
+        { metadata: { name: 'data-app-postgres-0' } },
+      ]);
+      await expect(
+        service.addAddon(
+          'pipe',
+          'prod',
+          'app',
+          pg('app-postgres'),
+          user,
+          mockUSerGroups,
+        ),
+      ).rejects.toThrow(ConflictException);
+      expect(kubectl.replaceAppObject).not.toHaveBeenCalled();
+    });
+
+    it('reads the app again and retries when someone saved it in between', async () => {
+      (kubectl.getApp as jest.Mock)
+        .mockResolvedValueOnce(stored([], '10'))
+        .mockResolvedValueOnce(stored([pg('app-redis')], '12'));
+      (kubectl.replaceAppObject as jest.Mock)
+        .mockRejectedValueOnce(conflict)
+        .mockResolvedValueOnce({ metadata: { resourceVersion: '13' } });
+      const result = await service.addAddon(
+        'pipe',
+        'prod',
+        'app',
+        pg('app-postgres'),
+        user,
+        mockUSerGroups,
+      );
+      expect(result.resourceVersion).toBe('13');
+      // el segundo intento parte de la versión nueva y no pierde el otro addon
+      expect(replaced()[1].metadata.resourceVersion).toBe('12');
+      expect(replaced()[1].spec.addons).toHaveLength(2);
+    });
+
+    it('gives up after a few conflicts instead of overwriting', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue(stored([]));
+      (kubectl.replaceAppObject as jest.Mock).mockRejectedValue(conflict);
+      await expect(
+        service.addAddon(
+          'pipe',
+          'prod',
+          'app',
+          pg('app-postgres'),
+          user,
+          mockUSerGroups,
+        ),
+      ).rejects.toThrow(ConflictException);
+      expect(kubectl.replaceAppObject).toHaveBeenCalledTimes(
+        AppsService.ADDON_CHANGE_ATTEMPTS,
+      );
+    });
+
+    it('answers 404 when the app does not exist', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue({});
+      await expect(
+        service.addAddon(
+          'pipe',
+          'prod',
+          'app',
+          pg('app-postgres'),
+          user,
+          mockUSerGroups,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('removes only that addon, deletes its volume and waits until it is gone', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue(
+        stored([pg('app-postgres'), pg('app-redis')]),
+      );
+      (kubectl.getAddonVolumes as jest.Mock)
+        .mockResolvedValueOnce([{ metadata: { name: 'data-app-postgres-0' } }])
+        .mockResolvedValue([]);
+      const result = await service.removeAddon(
+        'pipe',
+        'prod',
+        'app',
+        'app-postgres',
+        user,
+        mockUSerGroups,
+      );
+      expect(result).toEqual({
+        resourceVersion: '11',
+        generation: 4,
+        volumesPending: false,
+      });
+      const kept = replaced()[0].spec.addons;
+      expect(kept).toHaveLength(1);
+      expect(
+        kept[0].resourceDefinitions.KuberoAddonPostgres.metadata.name,
+      ).toBe('app-redis');
+      expect(kubectl.deleteAddonVolumes).toHaveBeenCalledWith(
+        'pipe-prod',
+        'app-postgres',
+        'ctx',
+      );
+    });
+
+    it('tells the client when the volume is still being deleted', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue(
+        stored([pg('app-postgres')]),
+      );
+      (kubectl.getAddonVolumes as jest.Mock).mockResolvedValue([
+        { metadata: { name: 'data-app-postgres-0', deletionTimestamp: 'x' } },
+      ]);
+      const result = await service.removeAddon(
+        'pipe',
+        'prod',
+        'app',
+        'app-postgres',
+        user,
+        mockUSerGroups,
+      );
+      expect(result.volumesPending).toBe(true);
+    });
+
+    it('answers 404 for an addon the app does not have, without changing it', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue(
+        stored([pg('app-redis')]),
+      );
+      await expect(
+        service.removeAddon(
+          'pipe',
+          'prod',
+          'app',
+          'app-postgres',
+          user,
+          mockUSerGroups,
+        ),
+      ).rejects.toThrow(NotFoundException);
+      expect(kubectl.replaceAppObject).not.toHaveBeenCalled();
+      expect(kubectl.deleteAddonVolumes).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invalid addon name before reading the app', async () => {
+      await expect(
+        service.removeAddon(
+          'pipe',
+          'prod',
+          'app',
+          'Mi Base',
+          user,
+          mockUSerGroups,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(kubectl.getApp).not.toHaveBeenCalled();
+    });
+
+    it('does not touch apps of pipelines the user cannot access', async () => {
+      (pipelinesService.getContext as jest.Mock).mockRejectedValue(
+        new ForbiddenException(),
+      );
+      await expect(
+        service.removeAddon(
+          'pipe',
+          'prod',
+          'app',
+          'app-postgres',
+          user,
+          mockUSerGroups,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(kubectl.getApp).not.toHaveBeenCalled();
+    });
+  });
+
   describe('addonsByName', () => {
     it('maps metadata.name to its definition and ignores malformed entries', () => {
       const map = addonsByName([
@@ -566,6 +825,52 @@ describe('AppsService', () => {
       expect(kubectl.updateApp).toHaveBeenCalled();
       expect(notificationsService.send).toHaveBeenCalled();
     });
+    describe('versión de la app al guardar', () => {
+      const stored = (resourceVersion: string, generation: number) => ({
+        metadata: { name: 'app', resourceVersion, generation },
+        spec: { addons: [] },
+      });
+      const savedVersion = () =>
+        (kubectl.updateApp as jest.Mock).mock.calls[0][1];
+
+      beforeEach(() => {
+        (pipelinesService.getContext as jest.Mock).mockResolvedValue('ctx');
+      });
+
+      it('saves over the current version when only the status written by the operator changed', async () => {
+        // el formulario cargó la versión 100 (generation 7); después el
+        // operador escribió el estado y la app quedó en la 105, sin cambiar
+        // su configuración
+        (kubectl.getApp as jest.Mock).mockResolvedValue(stored('105', 7));
+        await service.updateApp(
+          new App(mockApp),
+          '100',
+          user,
+          mockUSerGroups,
+          '7',
+        );
+        expect(savedVersion()).toBe('105');
+      });
+
+      it('keeps the loaded version when someone changed the configuration, so the conflict is reported', async () => {
+        (kubectl.getApp as jest.Mock).mockResolvedValue(stored('105', 8));
+        await service.updateApp(
+          new App(mockApp),
+          '100',
+          user,
+          mockUSerGroups,
+          '7',
+        );
+        expect(savedVersion()).toBe('100');
+      });
+
+      it('keeps the loaded version when the client does not send the generation', async () => {
+        (kubectl.getApp as jest.Mock).mockResolvedValue(stored('105', 7));
+        await service.updateApp(new App(mockApp), '100', user, mockUSerGroups);
+        expect(savedVersion()).toBe('100');
+      });
+    });
+
     it('should not call updateApp if readonly', async () => {
       process.env.KUBERO_READONLY = 'true';
       const app = new App(mockApp);

@@ -18,6 +18,7 @@ import { ConfigService } from '../config/config.service';
 import { KubectlTemplate } from '../templates/template';
 import { Stream } from 'stream';
 import { EventsGateway } from '../events/events.gateway';
+import { addonProblems } from './dto/app-validation.dto';
 
 const DNS_LABEL = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 
@@ -55,6 +56,11 @@ function canonical(value: unknown): string {
 export class AppsService {
   private logger = new Logger(AppsService.name);
   private YAML = YAML;
+  // cuánto esperar a que se borre el volumen de un addon eliminado
+  static VOLUME_WAIT_MS = 30000;
+  static VOLUME_POLL_MS = 2000;
+  // intentos al guardar un cambio de addons si la app cambió entremedio
+  static readonly ADDON_CHANGE_ATTEMPTS = 3;
 
   constructor(
     private kubectl: KubernetesService,
@@ -196,7 +202,7 @@ export class AppsService {
         canonical(before.get(name)) !== canonical(definition)
       ) {
         throw new BadRequestException(
-          `El addon "${name}" ya existe y sus datos no se pueden modificar. Para usar otros, elimínalo, guarda la app y vuelve a crearlo.`,
+          `El addon "${name}" ya existe y sus datos no se pueden modificar. Para usar otros, elimínalo y vuelve a crearlo.`,
         );
       }
     }
@@ -780,6 +786,7 @@ export class AppsService {
     resourceVersion: string,
     user: IUser,
     userGroups: string[],
+    generation?: string,
   ) {
     this.logger.debug(
       'update App: ' +
@@ -808,6 +815,7 @@ export class AppsService {
     // debe dejar nada a medias
     const namespace = app.pipeline + '-' + app.phase;
     let removedAddons: string[] = [];
+    let version = resourceVersion;
     if (contextName) {
       const previous = await this.kubectl.getApp(
         app.pipeline,
@@ -815,6 +823,18 @@ export class AppsService {
         app.name,
         contextName,
       );
+      // El operador escribe el estado de la app (status) después de cada
+      // despliegue, y eso cambia su resourceVersion aunque nadie haya tocado su
+      // configuración. Si la configuración (generation) sigue siendo la que se
+      // cargó en el formulario, se guarda sobre la versión actual; si cambió,
+      // alguien más guardó la app y el conflicto es real.
+      if (
+        generation !== undefined &&
+        previous?.metadata?.resourceVersion &&
+        String(previous.metadata.generation) === String(generation)
+      ) {
+        version = previous.metadata.resourceVersion;
+      }
       const before = addonsByName(previous?.spec?.addons);
       const after = addonsByName(app.addons);
       this.assertAddonsUnchanged(before, after);
@@ -842,7 +862,7 @@ export class AppsService {
 
     if (contextName) {
       await this.applySharedTlsSecret(app, contextName);
-      await this.kubectl.updateApp(app, resourceVersion, contextName);
+      await this.kubectl.updateApp(app, version, contextName);
       await this.deleteAddonVolumes(namespace, removedAddons, contextName);
       // IMPORTANT TODO : Update this.appStateList !!
 
@@ -868,6 +888,228 @@ export class AppsService {
       } as INotification;
       void this.NotificationsService.send(m);
     }
+  }
+
+  // Los addons de una app ya creada se agregan y se quitan al instante, sin
+  // esperar a "Actualizar": antes un addon "eliminado" seguía existiendo hasta
+  // guardar la app, y el estudiante podía creer que ya lo había borrado. Solo
+  // cambia la lista de addons; el resto de la app queda como está guardado,
+  // así otros cambios del formulario sin guardar no se aplican por accidente.
+  public async addAddon(
+    pipelineName: string,
+    phaseName: string,
+    appName: string,
+    addon: unknown,
+    user: IUser,
+    userGroups: string[],
+  ): Promise<{ resourceVersion: string; generation: number }> {
+    const problems = addonProblems([addon]);
+    if (problems.length > 0) {
+      throw new BadRequestException(problems.join('. '));
+    }
+    const names = [...addonsByName([addon]).keys()];
+    if (names.length === 0) {
+      throw new BadRequestException('El addon no tiene nombre');
+    }
+
+    const { resourceVersion, generation } = await this.changeAddons(
+      pipelineName,
+      phaseName,
+      appName,
+      userGroups,
+      async (addons, namespace, context) => {
+        const existing = addonsByName(addons);
+        const repeated = names.find((name) => existing.has(name));
+        if (repeated) {
+          throw new ConflictException(
+            `Esta app ya tiene un addon "${repeated}". Usa otro nombre.`,
+          );
+        }
+        await this.assertNoLeftoverAddonVolumes(namespace, names, context);
+        return [...addons, addon];
+      },
+    );
+    this.notifyAddonChange(
+      pipelineName,
+      phaseName,
+      appName,
+      user,
+      'Added addon ' + names.join(', ') + ' to app: ' + appName,
+    );
+    return { resourceVersion, generation };
+  }
+
+  public async removeAddon(
+    pipelineName: string,
+    phaseName: string,
+    appName: string,
+    addonName: string,
+    user: IUser,
+    userGroups: string[],
+  ): Promise<{
+    resourceVersion: string;
+    generation: number;
+    volumesPending: boolean;
+  }> {
+    if (!DNS_LABEL.test(addonName)) {
+      throw new BadRequestException('El nombre del addon no es válido');
+    }
+    let removed: string[] = [];
+    const { resourceVersion, generation, namespace, context } =
+      await this.changeAddons(
+        pipelineName,
+        phaseName,
+        appName,
+        userGroups,
+        async (addons) => {
+          const matches = (a: unknown) => addonsByName([a]).has(addonName);
+          const kept = addons.filter((a) => !matches(a));
+          if (kept.length === addons.length) {
+            throw new NotFoundException(
+              `La app no tiene un addon "${addonName}"`,
+            );
+          }
+          removed = [...addonsByName(addons.filter(matches)).keys()];
+          return kept;
+        },
+      );
+
+    // se espera a que el volumen desaparezca: así crear enseguida otro addon
+    // con el mismo nombre parte con una base nueva en vez de chocar con el
+    // volumen que aún se está borrando
+    await this.deleteAddonVolumes(namespace, removed, context);
+    const volumesPending = !(await this.waitForAddonVolumesGone(
+      namespace,
+      removed,
+      context,
+    ));
+    this.notifyAddonChange(
+      pipelineName,
+      phaseName,
+      appName,
+      user,
+      'Removed addon ' + removed.join(', ') + ' from app: ' + appName,
+    );
+    return { resourceVersion, generation, volumesPending };
+  }
+
+  // Lee la app guardada, aplica el cambio a su lista de addons y la reemplaza
+  // con su resourceVersion. Si alguien la guardó entremedio, vuelve a leerla y
+  // reintenta en vez de pisar ese cambio.
+  private async changeAddons(
+    pipelineName: string,
+    phaseName: string,
+    appName: string,
+    userGroups: string[],
+    change: (
+      addons: unknown[],
+      namespace: string,
+      context: string,
+    ) => Promise<unknown[]>,
+  ): Promise<{
+    resourceVersion: string;
+    generation: number;
+    namespace: string;
+    context: string;
+  }> {
+    const context = await this.pipelinesService.getContext(
+      pipelineName,
+      phaseName,
+      userGroups,
+    );
+    if (!context) {
+      throw new NotFoundException('Pipeline o fase no encontrados');
+    }
+    const namespace = pipelineName + '-' + phaseName;
+
+    for (let attempt = 1; ; attempt++) {
+      const current = await this.kubectl.getApp(
+        pipelineName,
+        phaseName,
+        appName,
+        context,
+      );
+      if (!current?.metadata?.name) {
+        throw new NotFoundException(`La app "${appName}" no existe`);
+      }
+      const addons = Array.isArray(current.spec?.addons)
+        ? (current.spec.addons as unknown[])
+        : [];
+      const next = await change(addons, namespace, context);
+      try {
+        const updated = await this.kubectl.replaceAppObject(
+          namespace,
+          appName,
+          { ...current, spec: { ...current.spec, addons: next } } as any,
+          context,
+        );
+        return {
+          resourceVersion: updated?.metadata?.resourceVersion as string,
+          generation: updated?.metadata?.generation as number,
+          namespace,
+          context,
+        };
+      } catch (error) {
+        if (
+          error instanceof ConflictException &&
+          attempt < AppsService.ADDON_CHANGE_ATTEMPTS
+        ) {
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+
+  // true si los volúmenes de esos addons desaparecieron antes del plazo
+  private async waitForAddonVolumesGone(
+    namespace: string,
+    addonNames: string[],
+    context: string,
+  ): Promise<boolean> {
+    const names = addonNames.filter((name) => DNS_LABEL.test(name));
+    const deadline = Date.now() + AppsService.VOLUME_WAIT_MS;
+    for (;;) {
+      let pending = false;
+      for (const name of names) {
+        try {
+          const volumes = await this.kubectl.getAddonVolumes(
+            namespace,
+            name,
+            context,
+          );
+          pending ||= volumes.length > 0;
+        } catch {
+          // no se pudo consultar: se informa como pendiente
+          pending = true;
+        }
+      }
+      if (!pending) return true;
+      if (Date.now() >= deadline) return false;
+      await new Promise((r) => setTimeout(r, AppsService.VOLUME_POLL_MS));
+    }
+  }
+
+  private notifyAddonChange(
+    pipelineName: string,
+    phaseName: string,
+    appName: string,
+    user: IUser,
+    message: string,
+  ) {
+    const m = {
+      name: 'updateApp',
+      user: user.id,
+      resource: 'app',
+      action: 'update',
+      severity: 'normal',
+      message: message + ' in ' + pipelineName + ' phase: ' + phaseName,
+      pipelineName,
+      phaseName,
+      appName,
+      data: {},
+    } as INotification;
+    void this.NotificationsService.send(m);
   }
 
   public async getPods(
@@ -914,6 +1156,8 @@ export class AppsService {
             restartCount: pod.status?.containerStatuses?.[i]?.restartCount,
             ready: pod.status?.containerStatuses?.[i]?.ready,
             started: pod.status?.containerStatuses?.[i]?.started,
+            waitingReason:
+              pod.status?.containerStatuses?.[i]?.state?.waiting?.reason,
           } as WorkloadContainer);
         }
 

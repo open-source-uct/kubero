@@ -1,5 +1,11 @@
 import * as YAML from 'yaml';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   IKubectlPipelineList,
   IKubectlPipeline,
@@ -40,6 +46,26 @@ import {
 import { WebSocket } from 'ws';
 import stream from 'stream';
 import internal from 'stream';
+
+// Traduce el error de Kubernetes al guardar una app a uno que el cliente
+// pueda mostrar
+function appWriteError(error: any): Error {
+  const status = error?.statusCode ?? error?.response?.statusCode;
+  if (status === 409) {
+    return new ConflictException(
+      'La app cambió desde que se cargó el formulario. Recarga la página y vuelve a aplicar tus cambios.',
+    );
+  }
+  if (status === 404) {
+    return new NotFoundException('La app no existe');
+  }
+  if (status === 400 || status === 422) {
+    return new BadRequestException(
+      error?.body?.message ?? 'Kubernetes rechazó los datos de la app',
+    );
+  }
+  return error instanceof Error ? error : new Error(String(error));
+}
 
 @Injectable()
 export class KubernetesService {
@@ -459,9 +485,37 @@ export class KubernetesService {
         app.name,
         appl,
       )
-      .catch(() => {
-        // this.logger.debug(error);
+      .catch((error) => {
+        // antes se descartaba cualquier error: Kubernetes rechazaba el cambio
+        // (por ejemplo, por una versión vieja de la app) y la API respondía
+        // como si se hubiera guardado
+        throw appWriteError(error);
       });
+  }
+
+  // Reemplaza un KuberoApp tal como se leyó del clúster, con su
+  // resourceVersion: si alguien lo cambió entremedio, Kubernetes lo rechaza
+  // (ConflictException) en vez de pisar ese cambio.
+  public async replaceAppObject(
+    namespace: string,
+    appName: string,
+    body: IKubectlApp,
+    context: string,
+  ): Promise<IKubectlApp> {
+    const { customObjectsApi } = this.clientsForContext(context);
+    try {
+      const res = await customObjectsApi.replaceNamespacedCustomObject(
+        'application.kubero.dev',
+        'v1alpha1',
+        namespace,
+        'kuberoapps',
+        appName,
+        body,
+      );
+      return res.body as IKubectlApp;
+    } catch (error) {
+      throw appWriteError(error);
+    }
   }
 
   public async deleteApp(

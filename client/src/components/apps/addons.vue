@@ -2,12 +2,13 @@
   <v-form v-model="valid">
 
   <v-alert
-    v-if="showButtons && hasLockedAddons"
+    v-if="showButtons && persisted"
     type="info"
     variant="tonal"
     class="mt-4"
   >
-    {{ $t('app.form.addonsLocked') }}
+    {{ $t('app.form.addonsInstant') }}
+    <template v-if="hasLockedAddons"> {{ $t('app.form.addonsLocked') }}</template>
   </v-alert>
 
   <v-row class="pt-5">
@@ -44,6 +45,8 @@
               <v-btn
                 variant="text"
                 color="error"
+                :loading="removing === addonName(addon)"
+                :disabled="removing !== ''"
                 @click="deleteAddon(addon)"
               >
                 {{ $t('global.delete') }}
@@ -98,6 +101,16 @@
         <v-card-text>
           <v-container class="pt-0">
             <v-row>
+              <v-col cols="12" v-if="dialogError">
+                <v-alert type="error" variant="tonal" density="compact">
+                  {{ dialogError }}
+                </v-alert>
+              </v-col>
+              <v-col cols="12" v-if="prefilledFrom">
+                <v-alert type="info" variant="tonal" density="compact">
+                  {{ $t('app.form.postgresPrefilled', { vars: prefilledFrom }) }}
+                </v-alert>
+              </v-col>
               <v-col cols="12">
                 <v-select
                   :items="availableAddons"
@@ -199,7 +212,8 @@
           <v-spacer></v-spacer>
           <v-btn
             variant="text"
-            @click="dialog = false; selectedAddon = {} as Addon"
+            :disabled="saving"
+            @click="closeDialog"
           >
             {{ $t('global.close') }}
           </v-btn>
@@ -207,6 +221,7 @@
             color="primary"
             variant="flat"
             :disabled="!valid"
+            :loading="saving"
             @click="submitForm"
           >
             {{ $t('global.save') }}
@@ -226,6 +241,11 @@ import set from 'lodash/set';
 import get from 'lodash/get';
 import { defineComponent } from 'vue'
 import { confirmDestructiveAction } from '../../utils/destructiveConfirmation'
+import { addonPrefill, POSTGRES_ADDON_KIND, type EnvVar } from '../../utils/postgresEnv'
+// los avisos de crear o eliminar un addon los muestra este componente, con
+// su nombre; sin esto el aviso genérico de "guardado" salía repetido
+const instantAddonConfig = { feedback: { error: false, success: false } }
+import { useNotificationStore } from '../../stores/notifications'
 
 type Addon = {
     id: string,
@@ -283,6 +303,15 @@ export default defineComponent({
             type: String,
             default: ''
         },
+        // para guardar al instante los addons de una app ya creada
+        pipeline: {
+            type: String,
+            default: ''
+        },
+        phase: {
+            type: String,
+            default: ''
+        },
         showButtons: {
             type: Boolean,
             default: true
@@ -292,6 +321,16 @@ export default defineComponent({
         persisted: {
             type: Boolean,
             default: false
+        },
+        // variables de entorno de la app: un Postgres nuevo se rellena con ellas
+        envVars: {
+            type: Array<EnvVar>,
+            default: () => [] as EnvVar[],
+        },
+    },
+    watch: {
+        selectedAddon() {
+            this.onAddonSelected();
         },
     },
     computed: {
@@ -314,6 +353,16 @@ export default defineComponent({
         // addons agregados en esta sesión y todavía no guardados: esos sí se
         // pueden seguir editando, porque aún no existen en el clúster
         newInSession: [] as string[],
+        // variables de la app con que se rellenó el addon, para avisarlo
+        prefilledFrom: '',
+        // copia intacta de cada plantilla (por tipo): la ventana escribe sobre
+        // la plantilla, y sin esto un addon nuevo aparecía con los datos del
+        // anterior
+        pristineAddons: {} as Record<string, string>,
+        // guardando el addon del diálogo, o nombre del addon que se está quitando
+        saving: false,
+        removing: '',
+        dialogError: '',
         editingIndex: -1,
         baseRule: [
           (v: any) => !!v || 'Field is required',
@@ -337,9 +386,80 @@ export default defineComponent({
         canEdit(addon: Addon): boolean {
             return !this.persisted || this.newInSession.includes(this.addonName(addon));
         },
+        // Al elegir PostgreSQL al crear un addon, usuario, contraseña y base se
+        // completan con lo que la app ya usa en sus variables, para que ambos
+        // coincidan desde el principio. El estudiante puede cambiarlos igual.
+        applyPostgresPrefill() {
+            this.prefilledFrom = '';
+            if (this.mode !== 'create' || this.selectedAddon?.kind !== POSTGRES_ADDON_KIND) return;
+
+            const fields = this.selectedAddon.formfields as unknown as Record<string, FormField>;
+            const field = (path: string) => fields?.[`${POSTGRES_ADDON_KIND}.${path}`];
+            const setField = (path: string, value: string | boolean) => {
+                const f = field(path);
+                if (f) f.default = value;
+            };
+
+            const prefill = addonPrefill(this.envVars as EnvVar[], this.appname);
+            if (prefill) {
+                setField('spec.postgres.auth.username', prefill.auth.username ?? '');
+                setField('spec.postgres.auth.password', prefill.auth.password ?? '');
+                setField('spec.postgres.auth.database', prefill.auth.database ?? '');
+                if (prefill.auth.enablePostgresUser) {
+                    setField('spec.postgres.auth.enablePostgresUser', true);
+                }
+                if (prefill.auth.postgresPassword) {
+                    setField('spec.postgres.auth.postgresPassword', prefill.auth.postgresPassword);
+                }
+                if (prefill.name) {
+                    setField('metadata.name', prefill.name);
+                }
+                this.prefilledFrom = prefill.vars.join(', ');
+            }
+        },
         openNewDialog() {
             this.mode = 'create';
+            this.dialogError = '';
+            // sin addon elegido: elegir uno (aunque sea el mismo tipo de antes)
+            // parte siempre de la plantilla limpia
+            this.selectedAddon = {} as Addon;
             this.dialog = true;
+        },
+        onAddonSelected() {
+            if (this.mode === 'create' && this.selectedAddon?.kind) {
+                this.resetTemplate(this.selectedAddon);
+            }
+            this.applyPostgresPrefill();
+        },
+        resetTemplate(addon: Addon) {
+            const pristine = this.pristineAddons[addon.kind];
+            if (!pristine) return;
+            const fresh = JSON.parse(pristine) as Addon;
+            addon.formfields = fresh.formfields;
+            addon.resourceDefinitions = fresh.resourceDefinitions;
+        },
+        closeDialog() {
+            this.dialog = false;
+            this.dialogError = '';
+            this.selectedAddon = {} as Addon;
+        },
+        // Un addon de una app que ya existe se crea y se borra al instante, sin
+        // esperar a "Actualizar". Los de una app nueva van con el botón Crear.
+        savesInstantly(addon?: Addon): boolean {
+            return this.persisted && (!addon || !this.newInSession.includes(this.addonName(addon)));
+        },
+        addonsUrl(): string {
+            return `/api/apps/${this.pipeline}/${this.phase}/${this.appname}/addons`;
+        },
+        // el mensaje del server dice qué corregir (nombre inválido, volumen
+        // anterior, falta una contraseña...); otros errores, un texto general
+        apiMessage(error: any): string {
+            const status = error?.response?.status;
+            const message = error?.response?.data?.message;
+            if ([400, 404, 409].includes(status) && message) {
+                return Array.isArray(message) ? message.join('. ') : String(message);
+            }
+            return this.$t('app.form.addonSaveError') as string;
         },
         loadStorageClasses() {
             axios.get(`/api/kubernetes/storageclasses`)
@@ -369,6 +489,44 @@ export default defineComponent({
             });
             if (!confirmed) return;
 
+            if (this.savesInstantly(addon)) {
+                const name = this.addonName(addon);
+                this.removing = name;
+                try {
+                    const { data } = await axios.delete(
+                        `${this.addonsUrl()}/${encodeURIComponent(name)}`,
+                        instantAddonConfig,
+                    );
+                    this.$emit('saved', { resourceVersion: data.resourceVersion, generation: data.generation });
+                    if (data.volumesPending) {
+                        // se eliminó, pero el volumen tarda: el aviso queda más tiempo
+                        useNotificationStore().show({
+                            kind: 'success',
+                            title: this.$t('app.form.addonRemoved') as string,
+                            message: this.$t('app.form.addonVolumePending') as string,
+                            duration: 10000,
+                        });
+                    } else {
+                        useNotificationStore().success(
+                            this.$t('app.form.addonRemoved') as string,
+                            this.$t('app.form.addonRemovedMessage', { name }) as string,
+                        );
+                    }
+                } catch (error: any) {
+                    // 404: el addon ya no existe en el clúster (otra persona lo
+                    // quitó); solo falta sacarlo de la vista
+                    if (error?.response?.status !== 404) {
+                        useNotificationStore().error(
+                            this.$t('app.form.addonRemoveError') as string,
+                            this.apiMessage(error),
+                        );
+                        return;
+                    }
+                } finally {
+                    this.removing = '';
+                }
+            }
+
             // remove addon from local view and kuberoapp yaml
             const index = this.addons.indexOf(addon);
             if (index !== -1) this.addons.splice(index, 1);
@@ -377,6 +535,7 @@ export default defineComponent({
         editAddon(addon: Addon) {
             //console.log(addon);
             this.mode = 'edit';
+            this.dialogError = '';
             this.editingIndex = this.addons.indexOf(addon);
 
             // search in available addons for the selected addon
@@ -411,6 +570,7 @@ export default defineComponent({
             .then(response => {
                 for (let addon of response.data) {
                     if (addon.enabled) {
+                        this.pristineAddons[addon.kind] = JSON.stringify(addon);
                         this.availableAddons.push({
                             text: addon.displayName,
                             value: addon
@@ -422,9 +582,7 @@ export default defineComponent({
                 console.log(error);
             });
         },
-        submitForm() {
-            this.dialog = false;
-
+        async submitForm() {
             // replace the formfields with the form value
             Object.entries(this.selectedAddon.formfields as FormField[]).forEach(([field, value]) => {
 
@@ -454,6 +612,30 @@ export default defineComponent({
                 resourceDefinitions: JSON.parse(JSON.stringify(this.selectedAddon.resourceDefinitions)),
             } as Addon;
 
+            if (this.mode === 'create' && this.savesInstantly()) {
+                // la ventana queda abierta hasta que el server lo acepte, para
+                // mostrar ahí mismo qué corregir si lo rechaza
+                this.saving = true;
+                this.dialogError = '';
+                try {
+                    const { data } = await axios.post(this.addonsUrl(), addon, instantAddonConfig);
+                    this.pushAddon(addon);
+                    this.$emit('saved', { resourceVersion: data.resourceVersion, generation: data.generation });
+                    useNotificationStore().success(
+                        this.$t('app.form.addonCreated') as string,
+                        this.$t('app.form.addonCreatedMessage', { name: this.addonName(addon) }) as string,
+                    );
+                } catch (error) {
+                    this.dialogError = this.apiMessage(error);
+                    return;
+                } finally {
+                    this.saving = false;
+                }
+                this.closeDialog();
+                return;
+            }
+
+            this.dialog = false;
             if (this.mode === 'create') {
                 this.addAddon(addon);
             } else {
@@ -461,8 +643,12 @@ export default defineComponent({
             }
 
         },
-        addAddon(addon: Addon) {
+        // la lista es la misma que el formulario envía al guardar la app
+        pushAddon(addon: Addon) {
             this.addons.push(addon);
+        },
+        addAddon(addon: Addon) {
+            this.pushAddon(addon);
             this.newInSession.push(this.addonName(addon));
             this.$emit('addon-added', addon);
         },

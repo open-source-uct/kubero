@@ -207,6 +207,12 @@ export class EventsGateway implements OnGatewayConnection {
     );
   }
 
+  // true si al menos un socket sigue en la sala (por ejemplo, alguien con los
+  // logs de una app abiertos)
+  hasListeners(room: string): boolean {
+    return (this.server?.sockets?.adapter?.rooms?.get(room)?.size ?? 0) > 0;
+  }
+
   async sendLogline(room: string, logline: any) {
     await this.sendAuthorized(
       'log',

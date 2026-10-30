@@ -182,5 +182,7 @@ export interface WorkloadContainer {
   restartCount?: number;
   ready?: boolean;
   started?: boolean;
+  // motivo por el que el contenedor no está corriendo (ej. CrashLoopBackOff)
+  waitingReason?: string;
   age: Date | undefined;
 }

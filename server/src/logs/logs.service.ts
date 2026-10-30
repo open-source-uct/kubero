@@ -11,6 +11,22 @@ import { v4 as uuidv4 } from 'uuid';
 export class LogsService {
   private logger = new Logger(LogsService.name);
   private podLogStreams: string[] = [];
+  // cómo cerrar cada stream abierto, y cuándo se cortó cada uno
+  private streamAborts = new Map<string, () => void>();
+  private streamClosedAt = new Map<string, number>();
+  // apps con los logs abiertos por alguien, con su vigilante de pods
+  private roomWatchers = new Map<
+    string,
+    {
+      startedAt: number;
+      idleRounds: number;
+      busy: boolean;
+      timer: NodeJS.Timeout;
+    }
+  >();
+  static readonly WATCH_INTERVAL_MS = 5000;
+  // rondas seguidas sin nadie en la sala antes de dejar de vigilar
+  static readonly IDLE_ROUNDS = 2;
 
   constructor(
     private kubectl: KubernetesService,
@@ -57,11 +73,45 @@ export class LogsService {
     container: string,
     userGroups: string[],
   ) {
-    const logStream = new Stream.PassThrough();
+    const contextName = await this.pipelinesService.getContext(
+      pipelineName,
+      phaseName,
+      userGroups,
+    );
+    if (contextName) {
+      await this.openStream(
+        contextName,
+        pipelineName,
+        phaseName,
+        appName,
+        podName,
+        container,
+      );
+    }
+  }
 
+  // Abre el stream en vivo de un contenedor. `sinceSeconds` retoma las líneas
+  // que se escribieron mientras no había stream (reinicio o corte).
+  private async openStream(
+    contextName: string,
+    pipelineName: string,
+    phaseName: string,
+    appName: string,
+    podName: string,
+    container: string,
+    sinceSeconds?: number,
+  ) {
+    const namespace = pipelineName + '-' + phaseName;
+    // un pod puede tener varios contenedores, cada uno con su propio stream
+    const streamKey = `${contextName}/${namespace}/${podName}/${container}`;
+
+    if (this.podLogStreams.includes(streamKey)) {
+      this.logger.debug('logs already running ' + podName + ' ' + container);
+      return;
+    }
+
+    const logStream = new Stream.PassThrough();
     logStream.on('data', (chunk: any) => {
-      // use write rather than console.log to prevent double line feed
-      //process.stdout.write(chunk);
       const roomname = `${pipelineName}-${phaseName}-${appName}`;
       const logline = {
         id: uuidv4(),
@@ -78,50 +128,113 @@ export class LogsService {
       void this.EventsGateway.sendLogline(roomname, logline);
     });
 
-    const contextName = await this.pipelinesService.getContext(
-      pipelineName,
-      phaseName,
-      userGroups,
-    );
+    this.podLogStreams.push(streamKey);
+    this.streamClosedAt.delete(streamKey);
+    // si el stream se corta o falla se libera, para poder abrirlo de nuevo
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      this.podLogStreams = this.podLogStreams.filter((k) => k !== streamKey);
+      this.streamAborts.delete(streamKey);
+      // solo importa mientras alguien mira los logs (para retomar el stream);
+      // sin vigilante, guardarlo dejaría entradas que nadie limpia
+      if (this.roomWatchers.has(`${pipelineName}-${phaseName}-${appName}`)) {
+        this.streamClosedAt.set(streamKey, Date.now());
+      }
+    };
+    logStream.on('close', release);
+    logStream.on('error', release);
+
+    const options =
+      sinceSeconds !== undefined
+        ? { follow: true, sinceSeconds, pretty: false, timestamps: false }
+        : { follow: true, tailLines: 0, pretty: false, timestamps: false };
+
+    try {
+      const request: any = await this.kubectl
+        .getLog(contextName)
+        .log(namespace, podName, container, logStream, options);
+      if (!released) {
+        this.streamAborts.set(streamKey, () => {
+          request?.abort?.();
+          logStream.destroy();
+        });
+      }
+      this.logger.debug('logs started for ' + podName + ' ' + container);
+    } catch (err: any) {
+      release();
+      this.logger.error(
+        'Failed to start logs for ' + podName + ' ' + container,
+      );
+      this.logger.error(err?.body?.message ?? err?.message);
+    }
+  }
+
+  // Abre los streams de los contenedores que están corriendo. Los que se están
+  // creando o reiniciando se saltan: la siguiente ronda del vigilante los toma.
+  private async streamRunningContainers(
+    contextName: string,
+    pipelineName: string,
+    phaseName: string,
+    appName: string,
+    watchStartedAt?: number,
+  ) {
     const namespace = pipelineName + '-' + phaseName;
-
-    if (contextName) {
-      // un pod puede tener varios contenedores, cada uno con su propio stream
-      const streamKey = `${contextName}/${namespace}/${podName}/${container}`;
-
-      if (!this.podLogStreams.includes(streamKey)) {
-        this.podLogStreams.push(streamKey);
-        // si el stream se corta o falla se libera, para poder abrirlo de nuevo
-        const release = () => {
-          this.podLogStreams = this.podLogStreams.filter(
-            (k) => k !== streamKey,
-          );
-        };
-        logStream.on('close', release);
-        logStream.on('error', release);
-
-        this.kubectl
-          .getLog(contextName)
-          .log(namespace, podName, container, logStream, {
-            follow: true,
-            tailLines: 0,
-            pretty: false,
-            timestamps: false,
-          })
-          .then((_res) => {
-            this.logger.debug('logs started for ' + podName + ' ' + container);
-          })
-          .catch((err) => {
-            release();
-            this.logger.error(
-              'Failed to start logs for ' + podName + ' ' + container,
-            );
-            this.logger.error(err?.body?.message ?? err?.message);
-          });
-      } else {
-        this.logger.debug('logs already running ' + podName + ' ' + container);
+    const pods = await this.kubectl.getPods(namespace, contextName);
+    for (const pod of pods) {
+      const podName = pod.metadata?.name;
+      if (!podName?.startsWith(appName + '-kuberoapp')) {
+        continue;
+      }
+      for (const container of pod.spec?.containers || []) {
+        const status = pod.status?.containerStatuses?.find(
+          (s: any) => s.name === container.name,
+        );
+        if (status && !status.state?.running) {
+          continue;
+        }
+        const streamKey = `${contextName}/${namespace}/${podName}/${container.name}`;
+        await this.openStream(
+          contextName,
+          pipelineName,
+          phaseName,
+          appName,
+          podName,
+          container.name,
+          this.resumeSeconds(
+            streamKey,
+            status?.state?.running?.startedAt,
+            watchStartedAt,
+          ),
+        );
       }
     }
+  }
+
+  // Desde cuántos segundos atrás pedir líneas al reabrir un stream, para no
+  // perder lo que el contenedor escribió mientras no había stream.
+  private resumeSeconds(
+    streamKey: string,
+    startedAt: string | Date | undefined,
+    watchStartedAt?: number,
+  ): number | undefined {
+    if (!watchStartedAt) {
+      return undefined;
+    }
+    const now = Date.now();
+    const started = startedAt ? new Date(startedAt).getTime() : NaN;
+    // el contenedor arrancó mientras alguien miraba los logs (reinicio o pod
+    // nuevo de un despliegue): se trae todo desde que arrancó
+    if (started >= watchStartedAt) {
+      return Math.ceil((now - started) / 1000) + 1;
+    }
+    // el stream se cortó con el contenedor corriendo: se retoma desde el corte
+    const closedAt = this.streamClosedAt.get(streamKey);
+    if (closedAt && closedAt >= watchStartedAt) {
+      return Math.ceil((now - closedAt) / 1000) + 1;
+    }
+    return undefined;
   }
 
   public async startLogging(
@@ -135,28 +248,105 @@ export class LogsService {
       phaseName,
       userGroups,
     );
-    const namespace = pipelineName + '-' + phaseName;
+    if (!contextName) {
+      return;
+    }
+    await this.streamRunningContainers(
+      contextName,
+      pipelineName,
+      phaseName,
+      appName,
+    );
+    this.watchRoom(contextName, pipelineName, phaseName, appName);
+  }
 
-    if (contextName) {
-      const pods = await this.kubectl.getPods(namespace, contextName);
-      for (const pod of pods) {
-        if (pod.metadata?.name?.startsWith(appName + '-kuberoapp')) {
-          for (const container of pod.spec?.containers || []) {
-            await this.emitLogs(
-              pipelineName,
-              phaseName,
-              appName,
-              pod.metadata.name,
-              container.name,
-              userGroups,
-            );
-          }
-          /* TODO needs some improvements since it wont load web anymore
-          for (const initcontainer of pod.spec.initContainers) {
-              this.emitLogs(pipelineName, phaseName, appName, pod.metadata.name, initcontainer.name);
-          }
-          */
-        }
+  // Mientras alguien tenga los logs abiertos, revisa los pods cada pocos
+  // segundos y reabre los streams que se cortaron: reinicios del contenedor,
+  // pods que aún se estaban creando y pods nuevos de un despliegue.
+  private watchRoom(
+    contextName: string,
+    pipelineName: string,
+    phaseName: string,
+    appName: string,
+  ) {
+    const room = `${pipelineName}-${phaseName}-${appName}`;
+    if (this.roomWatchers.has(room)) {
+      return;
+    }
+    const watcher = {
+      startedAt: Date.now(),
+      idleRounds: 0,
+      busy: false,
+      timer: undefined as unknown as NodeJS.Timeout,
+    };
+    watcher.timer = setInterval(() => {
+      void this.watchTick(room, contextName, pipelineName, phaseName, appName);
+    }, LogsService.WATCH_INTERVAL_MS);
+    watcher.timer.unref?.();
+    this.roomWatchers.set(room, watcher);
+  }
+
+  private async watchTick(
+    room: string,
+    contextName: string,
+    pipelineName: string,
+    phaseName: string,
+    appName: string,
+  ) {
+    const watcher = this.roomWatchers.get(room);
+    if (!watcher || watcher.busy) {
+      return;
+    }
+    if (!this.EventsGateway.hasListeners(room)) {
+      watcher.idleRounds++;
+      if (watcher.idleRounds >= LogsService.IDLE_ROUNDS) {
+        this.stopWatching(
+          room,
+          contextName,
+          pipelineName + '-' + phaseName,
+          appName,
+        );
+      }
+      return;
+    }
+    watcher.idleRounds = 0;
+    watcher.busy = true;
+    try {
+      await this.streamRunningContainers(
+        contextName,
+        pipelineName,
+        phaseName,
+        appName,
+        watcher.startedAt,
+      );
+    } catch (err: any) {
+      this.logger.debug('logs watch failed for ' + room + ': ' + err?.message);
+    } finally {
+      watcher.busy = false;
+    }
+  }
+
+  // Nadie mira los logs de la app: se deja de vigilar y se cierran sus streams
+  private stopWatching(
+    room: string,
+    contextName: string,
+    namespace: string,
+    appName: string,
+  ) {
+    const watcher = this.roomWatchers.get(room);
+    if (watcher) {
+      clearInterval(watcher.timer);
+      this.roomWatchers.delete(room);
+    }
+    const prefix = `${contextName}/${namespace}/${appName}-kuberoapp`;
+    for (const [key, abort] of this.streamAborts) {
+      if (key.startsWith(prefix)) {
+        abort();
+      }
+    }
+    for (const key of this.streamClosedAt.keys()) {
+      if (key.startsWith(prefix)) {
+        this.streamClosedAt.delete(key);
       }
     }
   }
@@ -220,6 +410,24 @@ export class LogsService {
               contextName,
             );
             loglines = loglines.concat(ll);
+            // si el contenedor se reinició, sus últimas líneas antes de caer
+            // explican por qué; el contenedor actual puede no tener ninguna
+            const status = pod.status?.containerStatuses?.find(
+              (st: any) => st.name === c.name,
+            );
+            if ((status?.restartCount ?? 0) > 0) {
+              const previous = await this.fetchLogs(
+                namespace,
+                podName,
+                c.name,
+                pipelineName,
+                phaseName,
+                appName,
+                contextName,
+                true,
+              );
+              loglines = loglines.concat(previous);
+            }
           }
         } else if (
           (container == 'builder' || container == 'fetcher') &&
@@ -268,6 +476,7 @@ export class LogsService {
     phaseName: string,
     appName: string,
     contextName?: string,
+    previous = false,
   ): Promise<ILoglines[]> {
     const loglines: ILoglines[] = [];
 
@@ -283,9 +492,10 @@ export class LogsService {
         .getLog(contextName)
         .log(namespace, podName, containerName, logStream, {
           follow: false,
-          tailLines: 80,
+          tailLines: previous ? 40 : 80,
           pretty: false,
           timestamps: true,
+          previous,
         });
     } catch {
       console.log('error getting logs for ' + podName + ' ' + containerName);
@@ -315,6 +525,7 @@ export class LogsService {
           container: containerName,
           color: this.logcolor(podName),
           log: loglineText,
+          ...(previous && { previous: true }),
         });
       }
     }

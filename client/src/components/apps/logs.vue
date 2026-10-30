@@ -36,6 +36,15 @@
                 {{ $t('global.copy') }}
             </v-btn>
         </div>
+        <v-alert
+            v-if="crashing && currentTab == 'web'"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="crash-alert"
+        >
+            {{ $t('app.actions.crashing') }}
+        </v-alert>
         <div class="console" id="console" ref="consoleEl" @scroll="onConsoleScroll">
             <div v-for="line in displayLines" :key="line.id">
             {{ new Date(line.time).toLocaleDateString() }} {{ new Date(line.time).toLocaleTimeString()}} <span :style="'color:' +line.color">[{{ lineLabel(line) }}]</span>
@@ -63,6 +72,8 @@ type LogLine = {
     podID: string;
     time: number;
     color: string;
+    // línea del contenedor anterior, que terminó antes de un reinicio
+    previous?: boolean;
 }
 
 type AddonInstance = {
@@ -124,6 +135,9 @@ export default defineComponent({
         // true durante 1.5 s después de copiar, para cambiar el icono
         const copied = ref(false);
 
+        // la app se está reiniciando en bucle (CrashLoopBackOff)
+        const crashing = ref(false);
+
         // la lista llega con lo más nuevo primero; se muestra al revés (lo nuevo abajo)
         const displayLines = computed((): LogLine[] => [...visibleLines.value].reverse());
 
@@ -149,6 +163,7 @@ export default defineComponent({
             currentTab,
             socket,
             copied,
+            crashing,
             displayLines,
             consoleEl,
             onConsoleScroll,
@@ -174,9 +189,21 @@ export default defineComponent({
             this.socketJoin()
             this.startLogs()
             socket.on('connect', this.onSocketConnect)
+            if (this.logType == 'runlogs') {
+                this.checkPods()
+                this.podsTimer = window.setInterval(this.checkPods, 10000)
+            }
+        }
+    },
+    data() {
+        return {
+            podsTimer: undefined as number | undefined,
+            // reinicios ya vistos, para recargar el historial con cada reinicio nuevo
+            seenRestarts: -1,
         }
     },
     unmounted() {
+        window.clearInterval(this.podsTimer)
         socket.off('connect', this.onSocketConnect)
         this.socketLeave()
         this.loglines = []
@@ -253,6 +280,9 @@ export default defineComponent({
             ];
         },
         lineLabel(line: LogLine) {
+            if (line.previous) {
+                return `${line.podID}/${line.container.replace('kuberoapp-', '')} · ${this.$t('app.actions.previousContainer')}`;
+            }
             const addon = this.addonForPod(line.pod);
             if (addon) {
                 return `${addon.displayName}/${line.container}`;
@@ -279,6 +309,21 @@ export default defineComponent({
             this.socketJoin();
             this.startLogs();
             this.getLogHistory(this.currentTab);
+        },
+        // Revisa si la app se está reiniciando. Con cada reinicio nuevo se recarga
+        // el historial, que trae las últimas líneas del contenedor que se cayó.
+        checkPods() {
+            axios.get(`/api/apps/${this.pipeline}/${this.phase}/${this.app}/pods`).then((response) => {
+                const containers = (response.data || []).flatMap((pod: any) => pod.containers || []);
+                this.crashing = containers.some((c: any) => c.waitingReason == 'CrashLoopBackOff');
+                const restarts = containers.reduce((sum: number, c: any) => sum + (c.restartCount || 0), 0);
+                if (this.seenRestarts >= 0 && restarts > this.seenRestarts && this.currentTab == 'web') {
+                    this.getLogHistory('web');
+                }
+                this.seenRestarts = restarts;
+            }).catch(() => {
+                // sin permiso para ver los pods no se muestra el aviso
+            });
         },
         startLogs() {
             axios.get(`/api/logs/${this.pipeline}/${this.phase}/${this.app}`).then(() => {
@@ -355,6 +400,12 @@ a:link { text-decoration: none;}
 .console-toolbar .addon-select {
     max-width: 260px;
     margin-right: 8px;
+}
+
+/* entre la barra y la consola, sin romper el borde continuo de la terminal */
+.crash-alert {
+    flex-shrink: 0;
+    border-radius: 0 !important;
 }
 
 .console {
