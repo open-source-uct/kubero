@@ -21,13 +21,14 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/strategies/jwt.guard';
 import { OKDTO } from '../common/dto/ok.dto';
-import { User, UsersService } from './users.service';
+import { User, UsersService, teammateView } from './users.service';
 import { GetAllUsersDTO } from './dto/users.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { ReadonlyGuard } from '../common/guards/readonly.guard';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdatePasswordDto, UpdateMyPasswordDto } from './dto/password.dto';
 
@@ -51,10 +52,23 @@ export class UsersController {
   })
   @ApiOperation({ summary: 'Get all Users' })
   async getPipelines(@Request() req: any) {
-    return this.usersService.findAll(
+    const users = await this.usersService.findAll(
       req.user.userGroups,
       req.user.scopeToOwnTeam,
     );
+    return users.map((u) => this.visibleTo(req.user, u));
+  }
+
+  // Quien administra usuarios (user:write) los ve completos; el resto ve a
+  // sus compañeros sin correo, IP, datos del proveedor ni tokens. Los datos
+  // propios se ven siempre completos.
+  private visibleTo<T extends { id?: string } | null | undefined>(
+    caller: { userId?: string; permissions?: string[] },
+    user: T,
+  ): T {
+    if (!user || caller?.permissions?.includes('user:write')) return user;
+    if (user.id !== undefined && user.id === caller?.userId) return user;
+    return teammateView(user);
   }
 
   @Get('/username/:username')
@@ -76,10 +90,13 @@ export class UsersController {
     @Param('username') username: string,
     @Request() req: any,
   ) {
-    return this.usersService.findByUsername(
-      username,
-      req.user.userGroups,
-      req.user.scopeToOwnTeam,
+    return this.visibleTo(
+      req.user,
+      await this.usersService.findByUsername(
+        username,
+        req.user.userGroups,
+        req.user.scopeToOwnTeam,
+      ),
     );
   }
 
@@ -99,10 +116,13 @@ export class UsersController {
   })
   @ApiOperation({ summary: 'Get User by ID' })
   async getUserById(@Param('id') id: string, @Request() req: any) {
-    return this.usersService.findById(
-      id,
-      req.user.userGroups,
-      req.user.scopeToOwnTeam,
+    return this.visibleTo(
+      req.user,
+      await this.usersService.findById(
+        id,
+        req.user.userGroups,
+        req.user.scopeToOwnTeam,
+      ),
     );
   }
 
@@ -303,7 +323,7 @@ export class UsersController {
     isArray: false,
   })
   @ApiOperation({ summary: 'Update current User profile' })
-  async updateProfile(@Request() req: any, @Body() body: UpdateUserDto) {
+  async updateProfile(@Request() req: any, @Body() body: UpdateProfileDto) {
     const user = req.user;
     if (!body || Object.keys(body).length === 0) {
       throw new HttpException(
@@ -311,12 +331,7 @@ export class UsersController {
         HttpStatus.BAD_REQUEST,
       );
     }
-    const data: Partial<User> = {};
-    data.firstName = body.firstName;
-    data.lastName = body.lastName;
-    data.email = body.email;
-
-    return this.usersService.update(user.userId, data);
+    return this.usersService.updateMyProfile(user.userId, body);
   }
 
   @Post('/profile/avatar')

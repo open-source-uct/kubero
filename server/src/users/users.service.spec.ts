@@ -1,4 +1,9 @@
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { User as PrismaUser } from '@prisma/client';
 import { HttpException } from '@nestjs/common';
@@ -10,6 +15,7 @@ import { safeHttpAgent, safeHttpsAgent } from '../common/utils/ssrf.util';
 
 const mailServiceMock = {
   sendPasswordChangedEmail: jest.fn(),
+  sendEmailChangedEmail: jest.fn(),
 } as unknown as MailService;
 
 // Mock bcrypt
@@ -40,6 +46,8 @@ describe('UsersService', () => {
       findFirst: jest.Mock;
       findMany: jest.Mock;
     };
+    passwordResetToken: { deleteMany: jest.Mock };
+    $queryRaw: jest.Mock;
   };
 
   beforeEach(() => {
@@ -63,6 +71,9 @@ describe('UsersService', () => {
         findFirst: jest.fn(),
         findMany: jest.fn(),
       },
+      passwordResetToken: { deleteMany: jest.fn().mockResolvedValue({}) },
+      // ninguna otra cuenta usa el correo, salvo que la prueba diga otra cosa
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
 
     // Mock bcrypt methods
@@ -208,6 +219,160 @@ describe('UsersService', () => {
     prismaMock.user.update.mockRejectedValueOnce(new Error('Not found'));
     const user = await service.update('1', { password: 'fail' });
     expect(user).toBeUndefined();
+  });
+
+  describe('correo único y cambios de correo (H-01)', () => {
+    const anterior = {
+      email: 'ana@uct.cl',
+      username: 'ana',
+      firstName: 'Ana',
+      lastName: 'Lopez',
+    };
+
+    it('rejects an email used by another account even with different capitals, before writing', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(anterior);
+      prismaMock.$queryRaw.mockResolvedValueOnce([{ id: 'profe' }]);
+      await expect(
+        service.update('1', { email: 'ILincolao@UCT.cl' }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prismaMock.user.update).not.toHaveBeenCalled();
+    });
+
+    it('reports a duplicate rejected by the database instead of answering as if it saved', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(anterior);
+      prismaMock.user.update.mockRejectedValueOnce({ code: 'P2002' });
+      await expect(
+        service.update('1', { email: 'otra@uct.cl' }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('reports a missing user as 404', async () => {
+      prismaMock.user.update.mockRejectedValueOnce({ code: 'P2025' });
+      await expect(
+        service.update('nadie', { firstName: 'X' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('stores the email in lowercase, warns the old address and voids pending reset links', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(anterior);
+      prismaMock.user.update.mockResolvedValueOnce({ id: '1' });
+      await service.update('1', { email: '  Ana.Nueva@UCT.cl ' });
+      expect(prismaMock.user.update.mock.calls[0][0].data.email).toBe(
+        'ana.nueva@uct.cl',
+      );
+      expect(prismaMock.passwordResetToken.deleteMany).toHaveBeenCalledWith({
+        where: { userId: '1', usedAt: null },
+      });
+      expect(mailServiceMock.sendEmailChangedEmail).toHaveBeenCalledWith(
+        'ana@uct.cl',
+        'Ana Lopez',
+        'ana.nueva@uct.cl',
+      );
+    });
+
+    it('does not warn anyone when the email did not really change', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(anterior);
+      prismaMock.user.update.mockResolvedValueOnce({ id: '1' });
+      await service.update('1', { email: 'ANA@uct.cl' });
+      expect(mailServiceMock.sendEmailChangedEmail).not.toHaveBeenCalled();
+      expect(prismaMock.passwordResetToken.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('stores new users with a lowercase email and rejects a taken one', async () => {
+      prismaMock.user.create.mockResolvedValueOnce({ id: '9' });
+      await service.create({
+        username: 'nuevo',
+        email: 'Nuevo@UCT.cl',
+        password: 'secreto123',
+      });
+      expect(prismaMock.user.create.mock.calls[0][0].data.email).toBe(
+        'nuevo@uct.cl',
+      );
+
+      prismaMock.$queryRaw.mockResolvedValueOnce([{ id: 'otro' }]);
+      await expect(
+        service.create({
+          username: 'copia',
+          email: 'NUEVO@uct.cl',
+          password: 'secreto123',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    describe('updateMyProfile', () => {
+      const actual = {
+        email: 'ana@uct.cl',
+        password: 'hash',
+        provider: 'local',
+      };
+
+      it('changes the name without asking for the password', async () => {
+        prismaMock.user.update.mockResolvedValueOnce({ id: '1' });
+        await service.updateMyProfile('1', { firstName: 'Ana María' });
+        expect(prismaMock.user.update.mock.calls[0][0].data).toEqual({
+          firstName: 'Ana María',
+        });
+      });
+
+      it('asks for the current password to change the email', async () => {
+        prismaMock.user.findUnique.mockResolvedValueOnce(actual);
+        await expect(
+          service.updateMyProfile('1', { email: 'robo@uct.cl' }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(prismaMock.user.update).not.toHaveBeenCalled();
+      });
+
+      it('rejects a wrong current password', async () => {
+        prismaMock.user.findUnique.mockResolvedValueOnce(actual);
+        (mockedBcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
+        await expect(
+          service.updateMyProfile('1', {
+            email: 'robo@uct.cl',
+            currentPassword: 'adivinada',
+          }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(prismaMock.user.update).not.toHaveBeenCalled();
+      });
+
+      it('changes the email with the right password', async () => {
+        prismaMock.user.findUnique
+          .mockResolvedValueOnce(actual) // updateMyProfile
+          .mockResolvedValueOnce(anterior); // update
+        prismaMock.user.update.mockResolvedValueOnce({ id: '1' });
+        await service.updateMyProfile('1', {
+          email: 'Ana.Nueva@uct.cl',
+          currentPassword: 'correcta',
+        });
+        expect(prismaMock.user.update.mock.calls[0][0].data.email).toBe(
+          'ana.nueva@uct.cl',
+        );
+      });
+
+      it('does not ask for the password when the email is the same', async () => {
+        prismaMock.user.findUnique.mockResolvedValueOnce(actual);
+        prismaMock.user.update.mockResolvedValueOnce({ id: '1' });
+        await service.updateMyProfile('1', {
+          email: 'ANA@uct.cl',
+          firstName: 'Ana',
+        });
+        expect(prismaMock.user.update.mock.calls[0][0].data).toEqual({
+          firstName: 'Ana',
+        });
+      });
+
+      it('leaves the email of an OAuth account to its provider', async () => {
+        prismaMock.user.findUnique.mockResolvedValueOnce({
+          ...actual,
+          provider: 'github',
+        });
+        await expect(
+          service.updateMyProfile('1', {
+            email: 'otra@uct.cl',
+            currentPassword: 'x',
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+    });
   });
 
   it('should update password', async () => {
@@ -1312,6 +1477,8 @@ describe('UsersService safeguards', () => {
       },
       role: { findUnique: jest.fn(), findFirst: jest.fn() },
       userGroup: { findFirst: jest.fn() },
+      passwordResetToken: { deleteMany: jest.fn().mockResolvedValue({}) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     service = new UsersService(mailServiceMock);
     // @ts-expect-error prisma es privado; se reemplaza por un mock

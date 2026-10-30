@@ -1,5 +1,7 @@
 import { join } from 'path';
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { UserRateLimitInterceptor } from './common/interceptors/user-rate-limit.interceptor';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { EventsModule } from './events/events.module';
@@ -51,6 +53,11 @@ import { CliModule } from './cli/cli.module';
     CliModule,
   ],
   controllers: [AppController, TemplatesController],
-  providers: [AppService, TemplatesService],
+  providers: [
+    AppService,
+    TemplatesService,
+    // límite de solicitudes por usuario autenticado, para toda la API
+    { provide: APP_INTERCEPTOR, useClass: UserRateLimitInterceptor },
+  ],
 })
 export class AppModule {}

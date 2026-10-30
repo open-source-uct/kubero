@@ -507,6 +507,7 @@ const messages = {
         changePassword: 'Change Password',
         changePasswordFor: 'Change Password for {user}',
         currentPassword: 'Current Password',
+        emailChangeNeedsPassword: 'To change your email enter your current password. We will notify your previous address.',
         newPassword: 'New Password',
         confirmPassword: 'Confirm Password',
         forgotPassword: 'Forgot your password?',

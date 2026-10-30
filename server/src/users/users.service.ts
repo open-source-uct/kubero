@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaClient, User as PrismaUser } from '@prisma/client';
 import * as dotenv from 'dotenv';
@@ -19,6 +21,41 @@ import { displayNameOf } from '../common/utils/display-name.util';
 // This should be a real class/interface representing a user entity
 export type User = any;
 export type PartialPrismaUser = Partial<PrismaUser>; // Partial type for Prisma User to remove sensitive fields
+
+// Datos que no ve de sus compañeros de equipo quien no administra usuarios
+// (sin user:write, como un estudiante). Antes la lista de usuarios le daba a
+// cualquier rol con user:read el correo, la última IP, los datos del
+// proveedor y los tokens de cada compañero, incluido el profesor: con ese
+// correo se pidió restablecer la contraseña de un docente.
+const PRIVATE_USER_FIELDS = [
+  'email',
+  'emailVerified',
+  'lastIp',
+  'lastLogin',
+  'provider',
+  'providerId',
+  'providerData',
+  'tokens',
+  'sessionVersion',
+  'twoFaEnabled',
+];
+
+// Los correos se guardan sin espacios y en minúsculas. El índice único de la
+// base distingue mayúsculas: sin esto, "Ana@uct.cl" y "ana@uct.cl" podían ser
+// dos cuentas con el mismo buzón, y "olvidé mi contraseña" (que busca en
+// minúsculas) no encontraba a la segunda.
+export function normalizeEmail<T>(email: T): T {
+  return (typeof email === 'string' ? email.trim().toLowerCase() : email) as T;
+}
+
+export function teammateView<T>(user: T): T {
+  if (!user || typeof user !== 'object') return user;
+  const visible: Record<string, unknown> = { ...(user as any) };
+  for (const field of PRIVATE_USER_FIELDS) {
+    delete visible[field];
+  }
+  return visible as T;
+}
 
 @Injectable()
 export class UsersService {
@@ -492,24 +529,31 @@ export class UsersService {
       throw new Error('Password is required for user creation.');
     }
 
-    return this.prisma.user.create({
-      omit: {
-        password: true,
-        twoFaSecret: true,
-      },
-      data: {
-        ...cleanedData,
-        role: role && role ? { connect: { id: role } } : undefined,
-        userGroups:
-          resolvedUserGroups && Array.isArray(resolvedUserGroups)
-            ? {
-                connect: resolvedUserGroups.map((g: any) => ({
-                  id: g.id || g,
-                })),
-              }
-            : undefined,
-      },
-    });
+    if (cleanedData.email !== undefined) {
+      cleanedData.email = normalizeEmail(cleanedData.email);
+      await this.assertEmailAvailable(cleanedData.email);
+    }
+
+    return this.prisma.user
+      .create({
+        omit: {
+          password: true,
+          twoFaSecret: true,
+        },
+        data: {
+          ...cleanedData,
+          role: role && role ? { connect: { id: role } } : undefined,
+          userGroups:
+            resolvedUserGroups && Array.isArray(resolvedUserGroups)
+              ? {
+                  connect: resolvedUserGroups.map((g: any) => ({
+                    id: g.id || g,
+                  })),
+                }
+              : undefined,
+        },
+      })
+      .catch((error) => this.throwWriteError(error));
   }
 
   async update(
@@ -595,20 +639,126 @@ export class UsersService {
       return undefined;
     }
 
-    try {
-      return await this.prisma.user.update({
+    // Un cambio de correo cambia por dónde se recupera la cuenta: se comprueba
+    // que no lo use otra cuenta, y al final se avisa al correo anterior.
+    let previous: {
+      email: string;
+      username: string;
+      firstName: string | null;
+      lastName: string | null;
+    } | null = null;
+    if (data.email !== undefined) {
+      data.email = normalizeEmail(data.email);
+      previous = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          email: true,
+          username: true,
+          firstName: true,
+          lastName: true,
+        },
+      });
+      if (previous && previous.email === data.email) {
+        previous = null; // no cambió
+      } else {
+        await this.assertEmailAvailable(data.email, userId);
+      }
+    }
+
+    // Antes cualquier error de la base (correo o usuario repetido, usuario
+    // inexistente) se escondía y la API respondía 200 sin haber guardado.
+    const updated = await this.prisma.user
+      .update({
         omit: {
           password: true,
           twoFaSecret: true,
         },
         where: { id: userId },
         data,
+      })
+      .catch((error) => this.throwWriteError(error));
+
+    if (previous) {
+      // los enlaces de restablecimiento pendientes iban al correo anterior
+      await this.prisma.passwordResetToken.deleteMany({
+        where: { userId, usedAt: null },
       });
-    } catch (error) {
-      this.logger.warn(`User with ID ${userId} not updated.`);
-      this.logger.debug(error);
-      return undefined;
+      void this.mailService.sendEmailChangedEmail(
+        previous.email,
+        displayNameOf(previous),
+        data.email,
+      );
     }
+    return updated;
+  }
+
+  // Cambio de los datos propios desde el perfil. Cambiar el correo exige la
+  // contraseña actual: con una sesión robada se podía cambiar el correo de
+  // recuperación y quedarse con la cuenta.
+  async updateMyProfile(
+    userId: string,
+    profile: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      currentPassword?: string;
+    },
+  ): Promise<PartialPrismaUser | undefined> {
+    const data: Record<string, unknown> = {};
+    if (profile.firstName !== undefined) data.firstName = profile.firstName;
+    if (profile.lastName !== undefined) data.lastName = profile.lastName;
+
+    if (profile.email !== undefined) {
+      const email = normalizeEmail(profile.email);
+      const current = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, password: true, provider: true },
+      });
+      if (!current) {
+        throw new NotFoundException('El usuario no existe');
+      }
+      if (current.email !== email) {
+        if (current.provider !== 'local') {
+          throw new BadRequestException(
+            'El correo de una cuenta de GitHub u OAuth2 se cambia en ese proveedor',
+          );
+        }
+        const valid =
+          typeof profile.currentPassword === 'string' &&
+          profile.currentPassword.length > 0 &&
+          (await bcrypt.compare(profile.currentPassword, current.password));
+        if (!valid) {
+          throw new ForbiddenException(
+            'Para cambiar el correo escribe tu contraseña actual',
+          );
+        }
+        data.email = email;
+      }
+    }
+    return this.update(userId, data);
+  }
+
+  // El índice único distingue mayúsculas; se compara sin distinguirlas para
+  // cubrir también cuentas guardadas antes de normalizar los correos.
+  private async assertEmailAvailable(email: string, exceptUserId?: string) {
+    if (typeof email !== 'string' || email.length === 0) return;
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "User" WHERE lower(trim(email)) = ${email}`;
+    if (rows.some((row) => row.id !== exceptUserId)) {
+      throw new ConflictException('Ya existe una cuenta con ese correo');
+    }
+  }
+
+  private throwWriteError(error: any): never {
+    if (error?.code === 'P2002') {
+      throw new ConflictException(
+        'Ya existe una cuenta con ese correo o nombre de usuario',
+      );
+    }
+    if (error?.code === 'P2025') {
+      throw new NotFoundException('El usuario no existe');
+    }
+    throw error;
   }
 
   async updatePassword(
