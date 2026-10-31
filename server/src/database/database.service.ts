@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { runpacks } from './runpacks.seed'; // Assuming runpacks.seed.ts exports a Runpack type
 import { podsizes } from './podsizes.seed'; // Assuming podsizes.seed.ts exports a PodSize type
 import * as yaml from 'yaml'; // Import yaml for parsing runpacks
+import { ensurePersonalTeam, SUPERVISED_ROLES } from '../groups/personal-team';
 
 @Injectable()
 export class DatabaseService {
@@ -31,6 +32,7 @@ export class DatabaseService {
     await this.CreateSystemUser();
     await this.CreateAdminUser();
     await this.MigrateLegacyUsers();
+    await this.EnsurePersonalTeams();
     await this.SeedRunpacks();
     await this.SeedPodSizes();
   }
@@ -440,9 +442,9 @@ export class DatabaseService {
         Logger.log('Role "guest" seeded successfully.', 'DatabaseService');
       });
 
-    // Estos tres roles son fijos para esta app: siempre deben existir, sin
-    // tener que configurarlos a mano cada vez. Jerarquía de prioridad:
-    // admin (100) > webmaster (60) > profesor (50) > student (10). Los tres
+    // Estos roles son fijos para esta app: siempre deben existir, sin tener
+    // que configurarlos a mano cada vez. Jerarquía de prioridad: admin (100) >
+    // webmaster (60) > profesor (50) > ayudante (30) > estudiante (10). Todos
     // quedan acotados a su propio equipo — solo admin ve/gestiona todo.
     await prisma.role
       .upsert({
@@ -498,6 +500,38 @@ export class DatabaseService {
       })
       .then(() => {
         Logger.log('Role "profesor" seeded successfully.', 'DatabaseService');
+      });
+
+    // Estudiante que ayuda al profesor con su curso: trabaja en pipelines
+    // como un estudiante y además gestiona usuarios y equipos propios, pero
+    // por prioridad solo asigna estudiantes y ayudantes, y no puede tocar al
+    // profesor ni a nadie de rol superior.
+    await prisma.role
+      .upsert({
+        where: { name: 'ayudante' },
+        update: { scopeToOwnTeam: true, priority: 30 },
+        create: {
+          name: 'ayudante',
+          description: 'Teaching assistant role, scoped to its own teams',
+          scopeToOwnTeam: true,
+          priority: 30,
+          permissions: {
+            create: [
+              { action: 'write', resource: 'app' },
+              { action: 'write', resource: 'pipeline' },
+              { action: 'write', resource: 'user' },
+              { action: 'read', resource: 'config' },
+              { action: 'ok', resource: 'console' },
+              { action: 'ok', resource: 'logs' },
+              { action: 'ok', resource: 'reboot' },
+              { action: 'ok', resource: 'audit' },
+              { action: 'ok', resource: 'token' },
+            ],
+          },
+        },
+      })
+      .then(() => {
+        Logger.log('Role "ayudante" seeded successfully.', 'DatabaseService');
       });
 
     await prisma.role
@@ -560,6 +594,35 @@ export class DatabaseService {
       });
 
     Logger.log('Default data seeded successfully.', 'DatabaseService');
+  }
+
+  // Equipo personal para las cuentas creadas antes de que existiera, o aquí
+  // mismo sin pasar por UsersService (admin, usuarios legados). El usuario de
+  // sistema no crea pipelines, y estudiantes y ayudantes no tienen uno.
+  private static async EnsurePersonalTeams() {
+    const prisma = new PrismaClient();
+    const owners = await prisma.userGroup.findMany({
+      where: { ownerId: { not: null } },
+      select: { ownerId: true },
+    });
+    const withTeam = new Set(owners.map((g) => g.ownerId));
+    const users = await prisma.user.findMany({
+      where: {
+        id: { not: '1' },
+        role: { name: { notIn: SUPERVISED_ROLES } },
+      },
+      select: { id: true, username: true },
+    });
+    const missing = users.filter((u) => !withTeam.has(u.id));
+    for (const user of missing) {
+      await ensurePersonalTeam(prisma, user);
+    }
+    if (missing.length > 0) {
+      Logger.log(
+        `Personal teams created for ${missing.length} users.`,
+        'DatabaseService',
+      );
+    }
   }
 
   private static async SeedRunpacks() {

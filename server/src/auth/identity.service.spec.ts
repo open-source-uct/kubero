@@ -67,6 +67,27 @@ describe('IdentityService.resolve', () => {
     expect(user.permissions).toEqual(['app:read']);
   });
 
+  it('reports the personal team, except for roles that work under a profesor', async () => {
+    const groups = [
+      { name: 'Taller1', ownerId: null },
+      { name: 'personal-ana', ownerId: 'u1' },
+    ];
+    const session = { userId: 'u1', strategy: 'local', sessionVersion: 0 };
+    usersService.findById.mockResolvedValue({
+      ...dbUser,
+      role: { id: 'r-p', name: 'profesor' },
+      userGroups: groups,
+    });
+    expect((await strategy.resolve(session)).personalTeam).toBe('personal-ana');
+
+    usersService.findById.mockResolvedValue({
+      ...dbUser,
+      role: { id: 'r-e', name: 'estudiante' },
+      userGroups: groups,
+    });
+    expect((await strategy.resolve(session)).personalTeam).toBeUndefined();
+  });
+
   it('reflects a removal from a team immediately', async () => {
     usersService.findById.mockResolvedValue({ ...dbUser, userGroups: [] });
     const user = await strategy.resolve({

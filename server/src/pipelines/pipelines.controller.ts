@@ -15,6 +15,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { PipelinesService } from './pipelines.service';
+import { isReservedTeamName, isSupervisedRole } from '../groups/personal-team';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
@@ -220,9 +221,11 @@ export class PipelinesController {
   // Además, un usuario que no es admin solo puede asignar SUS equipos (y
   // conservar los que el pipeline ya tenía): antes podía crear un pipeline para
   // el equipo de otro y que le apareciera en su listado, o dejarse sin acceso.
+  // Un estudiante o ayudante tampoco puede dejarlo solo en equipos
+  // personales: su profesor no lo vería.
   private assertTeamAccess(
     pl: CreatePipelineDTO,
-    user: { userGroups?: string[] },
+    user: { userGroups?: string[]; role?: string },
     existingTeams: string[] = [],
   ) {
     const userGroups = user.userGroups ?? [];
@@ -245,6 +248,14 @@ export class PipelinesController {
     if (!teams.some((team) => userGroups.includes(team))) {
       throw new BadRequestException([
         'access.teams must include at least one of your teams',
+      ]);
+    }
+    if (
+      isSupervisedRole(user.role) &&
+      teams.every((team) => isReservedTeamName(team))
+    ) {
+      throw new BadRequestException([
+        'access.teams must include a team of your course, so your teacher can see the pipeline',
       ]);
     }
   }

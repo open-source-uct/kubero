@@ -46,6 +46,7 @@ export class GroupsController {
     return this.groupsService.findAll(
       req.user.userGroups,
       req.user.scopeToOwnTeam,
+      req.user.userId,
     );
   }
 
@@ -70,6 +71,7 @@ export class GroupsController {
       groupData.description,
       req.user.userId,
       req.user.scopeToOwnTeam,
+      req.user.role,
     );
   }
 
@@ -96,6 +98,7 @@ export class GroupsController {
       id,
       req.user.userGroups,
       req.user.scopeToOwnTeam,
+      req.user.priority,
     );
   }
 
@@ -124,6 +127,7 @@ export class GroupsController {
       groupData,
       req.user.userGroups,
       req.user.scopeToOwnTeam,
+      req.user.priority,
     );
   }
 }
