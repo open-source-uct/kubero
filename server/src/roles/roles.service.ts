@@ -88,14 +88,15 @@ export class RolesService {
     { resource: 'config', action: 'write' },
   ];
 
-  // Los cuatro roles fijos de la app: ni se borran ni se renombran, para que
-  // el seed siempre los encuentre por su nombre exacto (si se renombrara
-  // "profesor", el próximo reinicio el seed crearía otro "profesor" desde
-  // cero, dejando dos roles parecidos dando vueltas).
+  // Los roles fijos de la app: ni se borran ni se renombran, para que el seed
+  // siempre los encuentre por su nombre exacto (si se renombrara "profesor",
+  // el próximo reinicio el seed crearía otro "profesor" desde cero, dejando
+  // dos roles parecidos dando vueltas).
   private static readonly FIXED_ROLES = [
     'admin',
     'webmaster',
     'profesor',
+    'ayudante',
     'estudiante',
   ];
 

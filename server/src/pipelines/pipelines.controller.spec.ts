@@ -241,6 +241,53 @@ describe('PipelinesController', () => {
         ).rejects.toThrow(BadRequestException);
         expect(service.updatePipeline).not.toHaveBeenCalled();
       });
+
+      it.each(['estudiante', 'ayudante'])(
+        'should reject a %s leaving the pipeline only in a personal team (the teacher would not see it)',
+        async (role) => {
+          const user = {
+            ...mockJWT,
+            role,
+            userGroups: ['everyone', 'group1', 'personal-ana'],
+          };
+          const dto: any = {
+            ...validDockerPipeline,
+            access: { teams: ['personal-ana'] },
+          };
+          await expect(
+            controller.createPipeline('new', dto, { user }),
+          ).rejects.toThrow(BadRequestException);
+          expect(service.createPipeline).not.toHaveBeenCalled();
+        },
+      );
+
+      it('should let a student add their personal team next to the course team', async () => {
+        const user = {
+          ...mockJWT,
+          role: 'estudiante',
+          userGroups: ['everyone', 'group1', 'personal-ana'],
+        };
+        const dto: any = {
+          ...validDockerPipeline,
+          access: { teams: ['group1', 'personal-ana'] },
+        };
+        await controller.createPipeline('new', dto, { user });
+        expect(service.createPipeline).toHaveBeenCalled();
+      });
+
+      it('should let a profesor keep a pipeline only in their personal team', async () => {
+        const user = {
+          ...mockJWT,
+          role: 'profesor',
+          userGroups: ['everyone', 'group1', 'personal-profe'],
+        };
+        const dto: any = {
+          ...validDockerPipeline,
+          access: { teams: ['personal-profe'] },
+        };
+        await controller.createPipeline('new', dto, { user });
+        expect(service.createPipeline).toHaveBeenCalled();
+      });
     });
 
     it('should let an admin create a pipeline without teams', async () => {
@@ -257,6 +304,39 @@ describe('PipelinesController', () => {
       );
       expect(errors).toHaveLength(0);
     });
+
+    it.each([
+      'MiPipeline',
+      '-pipeline',
+      'mi_pipeline',
+      'mi pipeline',
+      'new',
+      'a'.repeat(61),
+    ])(
+      'should reject the pipeline name %p (Kubernetes only accepts lowercase names)',
+      async (pipelineName) => {
+        const errors = await validate(
+          plainToInstance(CreatePipelineDTO, {
+            ...validDockerPipeline,
+            pipelineName,
+          }),
+        );
+        expect(errors.map((e) => e.property)).toContain('pipelineName');
+      },
+    );
+
+    it.each(['mi-pipeline', 'grupo10', '2026-taller', 'a'.repeat(60)])(
+      'should accept the pipeline name %p',
+      async (pipelineName) => {
+        const errors = await validate(
+          plainToInstance(CreatePipelineDTO, {
+            ...validDockerPipeline,
+            pipelineName,
+          }),
+        );
+        expect(errors).toHaveLength(0);
+      },
+    );
 
     it('should still reject an empty buildpack when one is sent', async () => {
       const errors = await validate(

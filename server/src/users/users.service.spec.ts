@@ -45,9 +45,13 @@ describe('UsersService', () => {
     userGroup: {
       findFirst: jest.Mock;
       findMany: jest.Mock;
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      updateMany: jest.Mock;
     };
     passwordResetToken: { deleteMany: jest.Mock };
     $queryRaw: jest.Mock;
+    $transaction: jest.Mock;
   };
 
   beforeEach(() => {
@@ -70,10 +74,14 @@ describe('UsersService', () => {
       userGroup: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        updateMany: jest.fn(),
       },
       passwordResetToken: { deleteMany: jest.fn().mockResolvedValue({}) },
       // ninguna otra cuenta usa el correo, salvo que la prueba diga otra cosa
       $queryRaw: jest.fn().mockResolvedValue([]),
+      $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
     };
 
     // Mock bcrypt methods
@@ -137,6 +145,7 @@ describe('UsersService', () => {
             id: true,
             name: true,
             description: true,
+            ownerId: true,
           },
         },
       },
@@ -630,6 +639,7 @@ describe('UsersService', () => {
               id: true,
               name: true,
               description: true,
+              ownerId: true,
             },
           },
         },
@@ -1476,9 +1486,15 @@ describe('UsersService safeguards', () => {
         update: jest.fn().mockResolvedValue({}),
       },
       role: { findUnique: jest.fn(), findFirst: jest.fn() },
-      userGroup: { findFirst: jest.fn() },
+      userGroup: {
+        findFirst: jest.fn(),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        updateMany: jest.fn(),
+      },
       passwordResetToken: { deleteMany: jest.fn().mockResolvedValue({}) },
       $queryRaw: jest.fn().mockResolvedValue([]),
+      $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
     };
     service = new UsersService(mailServiceMock);
     // @ts-expect-error prisma es privado; se reemplaza por un mock
@@ -1669,5 +1685,263 @@ describe('UsersService safeguards', () => {
         }),
       );
     });
+  });
+});
+
+describe('UsersService equipos personales y responsables', () => {
+  let service: UsersService;
+  let prisma: any;
+
+  // roles de la semilla, con lo que estas reglas leen de cada uno
+  const write = [{ resource: 'user', action: 'write' }];
+  const profesor = { priority: 50, scopeToOwnTeam: true, permissions: write };
+  const ayudante = { priority: 30, scopeToOwnTeam: true, permissions: write };
+  const estudiante = { priority: 10, scopeToOwnTeam: true, permissions: [] };
+
+  beforeEach(() => {
+    (bcrypt.hashSync as jest.Mock).mockImplementation(() => 'hashedPassword');
+    prisma = {
+      user: {
+        findUnique: jest.fn(),
+        create: jest.fn().mockResolvedValue({ id: 'u-new', username: 'ana' }),
+        update: jest.fn().mockResolvedValue({ id: 'u1' }),
+        delete: jest.fn().mockResolvedValue({}),
+        count: jest.fn().mockResolvedValue(1),
+      },
+      role: { findUnique: jest.fn() },
+      userGroup: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({}),
+      },
+      passwordResetToken: { deleteMany: jest.fn().mockResolvedValue({}) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
+    };
+    service = new UsersService(mailServiceMock);
+    // @ts-expect-error prisma es privado; se reemplaza por un mock
+    service['prisma'] = prisma;
+  });
+
+  it('creates the personal team of a new profesor, with only that user in it', async () => {
+    prisma.role.findUnique.mockResolvedValue({ name: 'profesor' });
+    await service.create({ username: 'ana', password: 'pass', role: 'r-p' });
+    expect(prisma.userGroup.create).toHaveBeenCalledWith({
+      data: {
+        name: 'personal-ana',
+        description: 'Equipo personal de ana',
+        ownerId: 'u-new',
+        users: { connect: { id: 'u-new' } },
+      },
+    });
+  });
+
+  it('does not reuse the name of a personal team that still exists (from a deleted account)', async () => {
+    prisma.role.findUnique.mockResolvedValue({ name: 'profesor' });
+    prisma.userGroup.findUnique
+      .mockResolvedValueOnce(null) // ana no tiene equipo personal
+      .mockResolvedValueOnce({ id: 'old', name: 'personal-ana' })
+      .mockResolvedValueOnce(null);
+    await service.create({ username: 'ana', password: 'pass', role: 'r-p' });
+    expect(prisma.userGroup.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ name: 'personal-ana-2' }),
+      }),
+    );
+  });
+
+  it.each(['estudiante', 'ayudante'])(
+    'a new %s gets no personal team: everything they create stays in a course team',
+    async (name) => {
+      prisma.role.findUnique.mockResolvedValue({ name });
+      await service.create({ username: 'ana', password: 'pass', role: 'r' });
+      expect(prisma.user.create).toHaveBeenCalled();
+      expect(prisma.userGroup.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('an estudiante promoted to profesor gets their personal team', async () => {
+    prisma.role.findUnique.mockResolvedValue({ name: 'profesor' });
+    prisma.user.update.mockResolvedValueOnce({ id: 'u1', username: 'ana' });
+    await service.update('u1', { role: 'r-profesor' });
+    expect(prisma.userGroup.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ name: 'personal-ana', ownerId: 'u1' }),
+      }),
+    );
+  });
+
+  it('refuses to put anyone in the personal team of someone else', async () => {
+    prisma.userGroup.findFirst.mockResolvedValue({ id: 'p-profe' });
+    await expect(
+      service.create({
+        username: 'ana',
+        password: 'pass',
+        userGroups: ['p-profe'],
+      }),
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      service.update('u1', { userGroups: ['p-profe'] }),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('an admin replacing the teams of a user keeps their personal team', async () => {
+    prisma.userGroup.findUnique.mockResolvedValue({ id: 'p-ana' });
+    await service.update('u1', { userGroups: ['g-taller1', 'p-ana'] });
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          userGroups: {
+            set: [],
+            connect: [{ id: 'g-taller1' }, { id: 'p-ana' }],
+          },
+        },
+      }),
+    );
+  });
+
+  it('nobody scoped can remove themselves from a team', async () => {
+    prisma.user.findUnique.mockResolvedValueOnce({
+      roleId: 'r-profesor',
+      userGroups: [{ name: 'Taller1' }],
+    });
+    prisma.role.findUnique.mockResolvedValueOnce(profesor);
+    prisma.userGroup.findMany.mockResolvedValueOnce([{ id: 'g-taller1' }]);
+    await expect(
+      service.update(
+        'u-profe',
+        { userGroups: [] },
+        ['Taller1'],
+        true,
+        50,
+        'u-profe',
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('an ayudante cannot edit or delete the profesor of their team', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      roleId: 'r-profesor',
+      userGroups: [{ name: 'Taller1' }],
+    });
+    prisma.role.findUnique.mockResolvedValue(profesor);
+    await expect(
+      service.update('u-profe', { firstName: 'x' }, ['Taller1'], true, 30),
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      service.delete('u-profe', 'u-ayud', ['Taller1'], true, 30),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(prisma.user.delete).not.toHaveBeenCalled();
+  });
+
+  it('an ayudante can still manage the students of their team', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      roleId: 'r-estudiante',
+      userGroups: [{ name: 'Taller1' }],
+    });
+    prisma.role.findUnique.mockResolvedValue(estudiante);
+    await service.update('u-est', { firstName: 'x' }, ['Taller1'], true, 30);
+    expect(prisma.user.update).toHaveBeenCalled();
+  });
+
+  it('does not leave a team without its last profesor (delete by another profesor)', async () => {
+    prisma.user.findUnique
+      .mockResolvedValueOnce({
+        roleId: 'r-profesor',
+        userGroups: [{ name: 'Profes' }],
+      })
+      .mockResolvedValueOnce({
+        isActive: true,
+        role: profesor,
+        userGroups: [{ id: 'g-taller2', name: 'Taller2' }],
+      });
+    prisma.role.findUnique.mockResolvedValue(profesor);
+    prisma.user.count.mockResolvedValueOnce(0); // nadie más administra Taller2
+    await expect(
+      service.delete('u-profe2', 'u-profe1', ['Profes'], true, 50),
+    ).rejects.toThrow(ConflictException);
+    expect(prisma.user.count).toHaveBeenCalledWith({
+      where: {
+        id: { not: 'u-profe2' },
+        isActive: true,
+        userGroups: { some: { id: 'g-taller2' } },
+        role: {
+          priority: { gte: 50 },
+          permissions: { some: { resource: 'user', action: 'write' } },
+        },
+      },
+    });
+    expect(prisma.user.delete).not.toHaveBeenCalled();
+  });
+
+  it('does not let a profesor demote themselves to estudiante if they are the last one', async () => {
+    prisma.user.findUnique
+      .mockResolvedValueOnce({
+        roleId: 'r-profesor',
+        userGroups: [{ name: 'Taller1' }],
+      })
+      .mockResolvedValueOnce({ isActive: true, role: { name: 'profesor' } })
+      .mockResolvedValueOnce({
+        isActive: true,
+        role: profesor,
+        userGroups: [{ id: 'g-taller1', name: 'Taller1' }],
+      });
+    prisma.role.findUnique
+      .mockResolvedValueOnce(profesor) // assertManageableUser
+      .mockResolvedValueOnce({ name: 'estudiante' }) // assertAnotherAdminRemains
+      .mockResolvedValueOnce(estudiante) // assertAssignableRole
+      .mockResolvedValueOnce(estudiante); // rol nuevo
+    prisma.user.count.mockResolvedValueOnce(0);
+    await expect(
+      service.update(
+        'u-profe',
+        { role: 'r-estudiante' },
+        ['Taller1'],
+        true,
+        50,
+        'u-profe',
+      ),
+    ).rejects.toThrow(ConflictException);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('an ayudante does not count as a replacement for the profesor, but a profesor counts for the ayudante', async () => {
+    // quitar al ayudante: basta con que quede alguien de prioridad >= 30
+    prisma.user.findUnique
+      .mockResolvedValueOnce({
+        roleId: 'r-ayudante',
+        userGroups: [{ name: 'Taller1' }],
+      })
+      .mockResolvedValueOnce({
+        isActive: true,
+        role: ayudante,
+        userGroups: [{ id: 'g-taller1', name: 'Taller1' }],
+      });
+    prisma.role.findUnique.mockResolvedValue(ayudante);
+    prisma.user.count.mockResolvedValue(1);
+    await service.delete('u-ayud', 'u-profe', ['Taller1'], true, 50);
+    expect(prisma.user.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          role: expect.objectContaining({ priority: { gte: 30 } }),
+        }),
+      }),
+    );
+    expect(prisma.user.delete).toHaveBeenCalled();
+  });
+
+  it('keeps the personal team of a deleted user, without an owner', async () => {
+    await service.delete('u1');
+    expect(prisma.userGroup.updateMany).toHaveBeenCalledWith({
+      where: { ownerId: 'u1' },
+      data: { ownerId: null },
+    });
+    expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'u1' } });
   });
 });

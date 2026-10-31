@@ -278,6 +278,11 @@ const messages = {
       },
       validation: {
         teamRequired: 'Selecciona al menos un equipo. Sin equipos, solo los administradores podrían ver este pipeline.',
+        courseTeamRequired: 'Agrega el equipo de tu grupo o curso: así tu profesor puede ver este pipeline.',
+      },
+      hint: {
+        teamAccess: 'Equipos que pueden ver y administrar este pipeline.',
+        personalTeam: 'Con tu equipo personal ({team}) solo lo ves tú. Agrega el equipo de tu grupo o curso para compartirlo.',
       },
       title: {
         create: 'Crear un nuevo pipeline',
@@ -596,6 +601,8 @@ const messages = {
       name: 'Nombre del equipo',
       description: 'Descripción',
     },
+    personal: 'Personal',
+    personalHint: 'Tu equipo personal: solo lo integras tú y no se puede renombrar ni borrar.',
   },
   roles: {
     name: 'Roles',

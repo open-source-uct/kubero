@@ -276,7 +276,7 @@ export default defineComponent({
     }
     // Mismo listado que RolesService.FIXED_ROLES en el servidor: ninguno de
     // estos se puede crear, borrar ni renombrar — solo editar sus permisos.
-    const FIXED_ROLES = ['admin', 'webmaster', 'profesor', 'estudiante']
+    const FIXED_ROLES = ['admin', 'webmaster', 'profesor', 'ayudante', 'estudiante']
     const isFixedRole = (name: string) => FIXED_ROLES.includes(name)
     const roles = ref<Role[]>([])
     const roleTable = ref<{ $el?: HTMLElement } | null>(null)

@@ -171,6 +171,7 @@ export class UsersController {
       req.user.userGroups,
       req.user.scopeToOwnTeam,
       req.user.priority,
+      req.user.userId,
     );
   }
 
@@ -195,6 +196,7 @@ export class UsersController {
       req.user.userId,
       req.user.userGroups,
       req.user.scopeToOwnTeam,
+      req.user.priority,
     );
   }
 

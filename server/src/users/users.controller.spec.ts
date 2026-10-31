@@ -38,7 +38,12 @@ describe('UsersController', () => {
   });
 
   const req = {
-    user: { userId: 'u1', userGroups: ['everyone'], scopeToOwnTeam: false },
+    user: {
+      userId: 'u1',
+      userGroups: ['everyone'],
+      scopeToOwnTeam: false,
+      priority: 100,
+    },
   };
 
   describe('createUser', () => {
@@ -70,6 +75,7 @@ describe('UsersController', () => {
         'u1',
         ['everyone'],
         false,
+        100,
       );
     });
   });

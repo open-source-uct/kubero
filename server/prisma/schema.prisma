@@ -122,6 +122,10 @@ model UserGroup {
   id          String  @id @default(uuid())
   name        String  @unique
   description String?
+  // id del usuario dueño si es su equipo personal (solo lo integra él); sin
+  // relación para no reconstruir la tabla en SQLite. UsersService lo limpia
+  // al borrar al usuario.
+  ownerId     String? @unique
 
   users User[]
 
