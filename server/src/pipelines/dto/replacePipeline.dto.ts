@@ -7,6 +7,9 @@ import {
   IsOptional,
   IsArray,
   IsObject,
+  IsNotIn,
+  Matches,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
@@ -88,9 +91,22 @@ class PipelinePhaseDto {
 }
 
 export class CreatePipelineDTO {
+  // Misma regla que el formulario: Kubernetes solo acepta minúsculas en los
+  // nombres (RFC 1123), y sin esto quien llamaba a la API directamente recibía
+  // el error técnico de Kubernetes en vez de un mensaje claro.
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @MaxLength(60, {
+    message: 'El nombre del pipeline no puede tener más de 60 caracteres',
+  })
+  @Matches(/^[a-z0-9][a-z0-9-]*$/, {
+    message:
+      'El nombre del pipeline solo puede tener minúsculas, números y guiones, y debe empezar con una letra o un número',
+  })
+  @IsNotIn(['new'], {
+    message: 'El nombre del pipeline no puede ser "new"',
+  })
   pipelineName: string;
 
   @ApiProperty()

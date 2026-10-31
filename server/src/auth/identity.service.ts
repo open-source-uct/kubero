@@ -1,12 +1,15 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { RolesService } from '../roles/roles.service';
+import { hasPersonalTeam } from '../groups/personal-team';
 
 export interface AuthenticatedUser {
   userId: string;
   username: string;
   role: string;
   userGroups: string[];
+  // equipo personal del usuario (el formulario de pipelines lo marca por defecto)
+  personalTeam?: string;
   permissions: string[];
   scopeToOwnTeam: boolean;
   priority: number;
@@ -102,6 +105,9 @@ export class IdentityService {
       username: user.username,
       role: user.role?.name ?? 'none',
       userGroups: (user.userGroups ?? []).map((g: any) => g.name),
+      personalTeam: hasPersonalTeam(user.role?.name)
+        ? (user.userGroups ?? []).find((g: any) => g.ownerId === user.id)?.name
+        : undefined,
       permissions,
       scopeToOwnTeam,
       priority,

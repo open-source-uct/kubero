@@ -38,7 +38,15 @@
         </div>
       </template>
       <template v-slot:[`item.name`]="{ item }">
-        <div class="account-identity"><v-icon icon="mdi-account-group-outline" color="primary" size="20" aria-hidden="true" /><strong>{{ item.name }}</strong></div>
+        <div class="account-identity">
+          <v-icon :icon="item.ownerId ? 'mdi-account-lock-outline' : 'mdi-account-group-outline'" color="primary" size="20" aria-hidden="true" />
+          <strong>{{ item.name }}</strong>
+          <v-tooltip v-if="item.ownerId" :text="$t('teams.personalHint')" location="top">
+            <template #activator="{ props }">
+              <v-chip v-bind="props" size="x-small" color="primary" variant="tonal" label tabindex="0" :aria-label="$t('teams.personalHint')">{{ $t('teams.personal') }}</v-chip>
+            </template>
+          </v-tooltip>
+        </div>
       </template>
       <template v-slot:[`item.description`]="{ item }">
         <span v-if="item.description">{{ item.description }}</span>
@@ -47,7 +55,7 @@
       <template v-slot:[`item.actions`]="{ item }">
         <div class="account-actions">
           <v-tooltip :text="$t('global.edit')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-pencil-outline" variant="text" size="small" :aria-label="`${$t('global.edit')} ${item.name}`" :disabled="!writeUserPermission" @click="openEditTeamDialog(item)" /></template></v-tooltip>
-          <v-tooltip :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" :disabled="!writeUserPermission" @click="deleteTeam(item)" /></template></v-tooltip>
+          <v-tooltip :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" :disabled="!writeUserPermission || !!item.ownerId" @click="deleteTeam(item)" /></template></v-tooltip>
         </div>
       </template>
       <template #bottom>
@@ -66,7 +74,7 @@
         color="primary"
         style="margin-right: 6px;"
         @click="openCreateDialog"
-        :disabled="!writeUserPermission"
+        :disabled="!canCreateTeam"
       >
         <v-icon>mdi-plus</v-icon>
         <span class="sr-only">{{ $t('teams.actions.create') }}</span>
@@ -78,7 +86,13 @@
       <v-card color="cardBackground" class="uct-card">
         <v-card-title class="text-h6 font-weight-bold">{{ $t('teams.actions.edit') }}</v-card-title>
         <v-card-text>
-          <v-text-field v-model="editedTeam.name" :label="$t('teams.form.name')"></v-text-field>
+          <v-text-field
+            v-model="editedTeam.name"
+            :label="$t('teams.form.name')"
+            :readonly="!!editedTeam.ownerId"
+            :hint="editedTeam.ownerId ? $t('teams.personalHint') : undefined"
+            :persistent-hint="!!editedTeam.ownerId"
+          ></v-text-field>
           <v-text-field
             v-model="editedTeam.description"
             :label="$t('teams.form.description')"
@@ -137,6 +151,8 @@ export default defineComponent({
       id?: string;
       name: string;
       description?: string;
+      // solo en el equipo personal del usuario actual
+      ownerId?: string | null;
     }
     const teams = ref<Team[]>([])
     const teamTable = ref<{ $el?: HTMLElement } | null>(null)
@@ -153,6 +169,8 @@ export default defineComponent({
 
     const authStore = useAuthStore();
     const writeUserPermission = authStore.hasPermission('user:write')
+    // un ayudante gestiona los equipos de su profesor, pero no crea otros
+    const canCreateTeam = writeUserPermission && !authStore.isSupervised
 
     const headers = [
       { title: t('teams.name'), value: 'name' },
@@ -278,6 +296,7 @@ export default defineComponent({
       openCreateDialog,
       saveCreate,
       writeUserPermission,
+      canCreateTeam,
     }
   },
 })

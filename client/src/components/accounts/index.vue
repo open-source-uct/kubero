@@ -78,7 +78,7 @@ const activeSection = computed(() => {
       description: t('accounts.descriptions.roles'),
       icon: 'mdi-shield-account-outline',
       component: Roles,
-      // los roles son fijos (admin/webmaster/profesor/student): no se crean
+      // los roles son fijos (admin/webmaster/profesor/ayudante/estudiante): no se crean
       // roles nuevos, así que esta sección no necesita botón de crear
       createLabel: '',
     },
@@ -94,9 +94,16 @@ const activeSection = computed(() => {
   return sections[currentSection.value]
 })
 
-const canWrite = computed(() => currentSection.value === 'tokens'
-  ? authStore.hasPermission('token:ok') || authStore.hasPermission('token:write')
-  : authStore.hasPermission('user:write'))
+const canWrite = computed(() => {
+  if (currentSection.value === 'tokens') {
+    return authStore.hasPermission('token:ok') || authStore.hasPermission('token:write')
+  }
+  // un ayudante gestiona los equipos de su profesor, pero no crea otros
+  if (currentSection.value === 'teams' && authStore.isSupervised) {
+    return false
+  }
+  return authStore.hasPermission('user:write')
+})
 function openCreateDialog() {
   sectionComponent.value?.openCreateDialog?.()
 }

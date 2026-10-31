@@ -43,7 +43,8 @@
                   chips
                   multiple
                   :label="$t('pipeline.form.label.teamAccess')"
-                  hint="Select teams that have access to this pipeline"
+                  :hint="teamAccessHint"
+                  persistent-hint
                   :items="isAdmin ? allTeams : authStore.userGroups"
                   :rules="teamRules"
                   variant="outlined"
@@ -316,11 +317,23 @@ export default defineComponent({
       isAdmin(): boolean {
         return this.authStore.role === 'admin';
       },
-      // 'everyone' no se preselecciona: haría el pipeline visible para todos los usuarios
+      // Solo el equipo personal: con todos los equipos del usuario, quien
+      // comparte un equipo con otros (dos webmasters, un profesor con varios
+      // cursos) les mostraba sin querer todo lo que creaba. 'everyone' nunca
+      // se preselecciona: haría el pipeline visible para todos los usuarios.
       defaultTeams(): string[] {
+        if (this.authStore.personalTeam) {
+          return [this.authStore.personalTeam];
+        }
         return this.authStore.userGroups.filter(
-          (g: string) => g !== 'everyone' && g !== 'admin',
+          (g: string) => g !== 'everyone' && g !== 'admin' && !g.startsWith('personal-'),
         );
+      },
+      teamAccessHint(): string {
+        const team = this.authStore.personalTeam;
+        return this.newPipeline && team && this.access.teams.length === 1 && this.access.teams[0] === team
+          ? this.$t('pipeline.form.hint.personalTeam', { team })
+          : this.$t('pipeline.form.hint.teamAccess');
       },
       teamRules(): ((v: string[]) => boolean | string)[] {
         return [
@@ -328,6 +341,11 @@ export default defineComponent({
             this.isAdmin ||
             (Array.isArray(v) && v.length > 0) ||
             this.$t('pipeline.form.validation.teamRequired'),
+          (v: string[]) =>
+            !this.authStore.isSupervised ||
+            !Array.isArray(v) ||
+            v.some((team) => !team.startsWith('personal-')) ||
+            this.$t('pipeline.form.validation.courseTeamRequired'),
         ];
       },
     },

@@ -40,13 +40,15 @@ describe('GroupsService', () => {
   it('should find all groups', async () => {
     const mockGroups = [{ id: '1', name: 'group1' }];
     prismaMock.userGroup.findMany.mockResolvedValueOnce(mockGroups);
-    const result = await service.findAll();
+    const result = await service.findAll([], false, 'u1');
     expect(result).toBe(mockGroups);
     expect(prismaMock.userGroup.findMany).toHaveBeenCalledWith({
+      where: { OR: [{ ownerId: null }, { ownerId: 'u1' }] },
       select: {
         id: true,
         name: true,
         description: true,
+        ownerId: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -174,6 +176,7 @@ describe('GroupsService scopeToOwnTeam', () => {
         update: jest.fn().mockResolvedValue({}),
         delete: jest.fn().mockResolvedValue({}),
       },
+      user: { count: jest.fn().mockResolvedValue(0) },
     };
     service = new GroupsService();
     // @ts-expect-error prisma es privado; se reemplaza por un mock
@@ -187,10 +190,12 @@ describe('GroupsService scopeToOwnTeam', () => {
     );
   });
 
-  it('findAll does not filter when not scoped', async () => {
-    await service.findAll(['Taller1'], false);
+  it('findAll does not filter by team when not scoped, but hides the personal teams of others', async () => {
+    await service.findAll(['Taller1'], false, 'admin-id');
     expect(prisma.userGroup.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: undefined }),
+      expect.objectContaining({
+        where: { OR: [{ ownerId: null }, { ownerId: 'admin-id' }] },
+      }),
     );
   });
 
@@ -319,5 +324,118 @@ describe('GroupsService names', () => {
       BadRequestException,
     );
     expect(prisma.userGroup.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('GroupsService personal teams and hierarchy', () => {
+  let service: GroupsService;
+  let prisma: any;
+  const personal = { id: 'p', name: 'personal-ana', ownerId: 'u-ana' };
+
+  beforeEach(() => {
+    prisma = {
+      userGroup: {
+        findUnique: jest.fn(),
+        create: jest.fn().mockResolvedValue({}),
+        update: jest.fn().mockResolvedValue({}),
+        delete: jest.fn().mockResolvedValue({}),
+      },
+      user: { count: jest.fn().mockResolvedValue(0) },
+    };
+    service = new GroupsService();
+    // @ts-expect-error prisma es privado; se reemplaza por un mock
+    service['prisma'] = prisma;
+  });
+
+  it.each(['estudiante', 'ayudante'])(
+    'a %s cannot create teams (one without the profesor would hide pipelines)',
+    async (role) => {
+      await expect(
+        service.create('Secreto', 'd', 'u1', true, role),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.userGroup.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('a profesor can still create teams', async () => {
+    await service.create('Taller3', 'd', 'u1', true, 'profesor');
+    expect(prisma.userGroup.create).toHaveBeenCalled();
+  });
+
+  it('reserves the "personal-" prefix for personal teams', async () => {
+    await expect(service.create('Personal-ana', 'd')).rejects.toThrow(
+      BadRequestException,
+    );
+    prisma.userGroup.findUnique.mockResolvedValue({ id: 'g', name: 'Taller1' });
+    await expect(service.update('g', { name: 'personal-ana' })).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(prisma.userGroup.create).not.toHaveBeenCalled();
+    expect(prisma.userGroup.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses to rename or delete a personal team, even for admin', async () => {
+    prisma.userGroup.findUnique.mockResolvedValue(personal);
+    await expect(service.update('p', { name: 'otro' })).rejects.toThrow(
+      ForbiddenException,
+    );
+    await expect(service.delete('p')).rejects.toThrow(ForbiddenException);
+    expect(prisma.userGroup.update).not.toHaveBeenCalled();
+    expect(prisma.userGroup.delete).not.toHaveBeenCalled();
+  });
+
+  it('still lets the owner edit the description of their personal team', async () => {
+    prisma.userGroup.findUnique.mockResolvedValue(personal);
+    await service.update(
+      'p',
+      { name: 'personal-ana', description: 'mis pruebas' },
+      ['personal-ana'],
+      true,
+      10,
+    );
+    expect(prisma.userGroup.update).toHaveBeenCalledWith({
+      where: { id: 'p' },
+      data: { name: 'personal-ana', description: 'mis pruebas' },
+    });
+  });
+
+  it('an ayudante cannot delete or rename the team of their profesor', async () => {
+    prisma.userGroup.findUnique.mockResolvedValue({
+      id: 'g',
+      name: 'Taller1',
+      ownerId: null,
+    });
+    prisma.user.count.mockResolvedValue(1); // el profesor (50) está en Taller1
+    await expect(service.delete('g', ['Taller1'], true, 30)).rejects.toThrow(
+      ForbiddenException,
+    );
+    await expect(
+      service.update('g', { name: 'Taller9' }, ['Taller1'], true, 30),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.user.count).toHaveBeenCalledWith({
+      where: {
+        userGroups: { some: { id: 'g' } },
+        role: { scopeToOwnTeam: true, priority: { gt: 30 } },
+      },
+    });
+    expect(prisma.userGroup.delete).not.toHaveBeenCalled();
+    expect(prisma.userGroup.update).not.toHaveBeenCalled();
+  });
+
+  it('an ayudante can still edit the description of that team', async () => {
+    prisma.userGroup.findUnique.mockResolvedValue({
+      id: 'g',
+      name: 'Taller1',
+      ownerId: null,
+    });
+    prisma.user.count.mockResolvedValue(1);
+    await service.update(
+      'g',
+      { name: 'Taller1', description: 'x' },
+      ['Taller1'],
+      true,
+      30,
+    );
+    expect(prisma.userGroup.update).toHaveBeenCalled();
   });
 });

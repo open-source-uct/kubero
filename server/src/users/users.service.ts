@@ -17,6 +17,7 @@ import axios from 'axios';
 import { MailService } from '../mail/mail.service';
 import { assertSafeUrl, safeAxiosOptions } from '../common/utils/ssrf.util';
 import { displayNameOf } from '../common/utils/display-name.util';
+import { ensurePersonalTeam, hasPersonalTeam } from '../groups/personal-team';
 
 // This should be a real class/interface representing a user entity
 export type User = any;
@@ -46,6 +47,12 @@ const PRIVATE_USER_FIELDS = [
 // minúsculas) no encontraba a la segunda.
 export function normalizeEmail<T>(email: T): T {
   return (typeof email === 'string' ? email.trim().toLowerCase() : email) as T;
+}
+
+function managesUsers(
+  permissions: { resource: string; action: string }[],
+): boolean {
+  return permissions.some((p) => p.resource === 'user' && p.action === 'write');
 }
 
 export function teammateView<T>(user: T): T {
@@ -119,6 +126,7 @@ export class UsersService {
             id: true,
             name: true,
             description: true,
+            ownerId: true,
           },
         },
       },
@@ -285,6 +293,7 @@ export class UsersService {
             id: true,
             name: true,
             description: true,
+            ownerId: true,
           },
         },
       },
@@ -334,6 +343,7 @@ export class UsersService {
             id: true,
             name: true,
             description: true,
+            ownerId: true,
           },
         },
         tokens: {
@@ -381,6 +391,7 @@ export class UsersService {
             id: true,
             name: true,
             description: true,
+            ownerId: true,
           },
         },
       },
@@ -472,6 +483,128 @@ export class UsersService {
     return target;
   }
 
+  // Compartir equipo no basta para editar o borrar a alguien: un ayudante no
+  // puede tocar al profesor de su curso, ni un profesor a un webmaster.
+  private async assertManageableUser(
+    roleId: string | null,
+    callerPriority: number,
+  ): Promise<void> {
+    if (!roleId) {
+      return;
+    }
+    const role = await this.prisma.role.findUnique({
+      where: { id: roleId },
+      select: { priority: true, scopeToOwnTeam: true },
+    });
+    if (role && (!role.scopeToOwnTeam || role.priority > callerPriority)) {
+      throw new ForbiddenException(
+        'No puedes modificar a un usuario con un rol superior al tuyo',
+      );
+    }
+  }
+
+  // Los equipos personales no se asignan: cada uno lo integra solo su dueño,
+  // desde que se crea la cuenta. Devuelve los ids pedidos sin ellos.
+  private async withoutPersonalTeams(
+    groupIds: any[],
+    ownerId?: string,
+  ): Promise<string[]> {
+    const ids: string[] = (groupIds || []).map((g: any) =>
+      typeof g === 'string' ? g : g.id,
+    );
+    if (ids.length === 0) {
+      return ids;
+    }
+    const foreign = await this.prisma.userGroup.findFirst({
+      where: {
+        id: { in: ids },
+        ownerId: { not: null },
+        NOT: ownerId ? { ownerId } : undefined,
+      },
+      select: { id: true },
+    });
+    if (foreign) {
+      throw new ForbiddenException(
+        'Un equipo personal es solo de su dueño y no se puede asignar',
+      );
+    }
+    const own = ownerId ? await this.personalTeamOf(ownerId) : null;
+    return ids.filter((id) => id !== own?.id);
+  }
+
+  private personalTeamOf(userId: string) {
+    return this.prisma.userGroup.findUnique({
+      where: { ownerId: userId },
+      select: { id: true },
+    });
+  }
+
+  // Un rol acotado no puede dejar un equipo sin quien lo administre (al
+  // borrar, desactivar o bajar de rol a alguien): debe quedar otro integrante
+  // activo que gestione usuarios y tenga al menos su misma prioridad. Así un
+  // ayudante no reemplaza al último profesor del curso.
+  private async assertTeamsKeepResponsible(
+    userId: string,
+    newRoleId?: string,
+  ): Promise<void> {
+    const target = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        isActive: true,
+        role: {
+          select: {
+            priority: true,
+            permissions: { select: { resource: true, action: true } },
+          },
+        },
+        userGroups: {
+          where: { ownerId: null, name: { notIn: ['admin', 'everyone'] } },
+          select: { id: true, name: true },
+        },
+      },
+    });
+    if (!target?.role || target.isActive === false) {
+      return;
+    }
+    if (!managesUsers(target.role.permissions)) {
+      return;
+    }
+    if (newRoleId) {
+      const next = await this.prisma.role.findUnique({
+        where: { id: newRoleId },
+        select: {
+          priority: true,
+          permissions: { select: { resource: true, action: true } },
+        },
+      });
+      if (
+        next &&
+        managesUsers(next.permissions) &&
+        next.priority >= target.role.priority
+      ) {
+        return;
+      }
+    }
+    for (const team of target.userGroups) {
+      const others = await this.prisma.user.count({
+        where: {
+          id: { not: userId },
+          isActive: true,
+          userGroups: { some: { id: team.id } },
+          role: {
+            priority: { gte: target.role.priority },
+            permissions: { some: { resource: 'user', action: 'write' } },
+          },
+        },
+      });
+      if (others === 0) {
+        throw new ConflictException(
+          `Es el último responsable del equipo "${team.name}": agrega a otro antes de quitarlo`,
+        );
+      }
+    }
+  }
+
   async create(
     user: any,
     callerGroups: string[] = [],
@@ -479,7 +612,10 @@ export class UsersService {
     callerPriority = 0,
   ): Promise<PartialPrismaUser> {
     //this.logger.debug('Creating user with data:', user);
-    const { role, userGroups } = user;
+    const { role } = user;
+    const userGroups = Array.isArray(user.userGroups)
+      ? await this.withoutPersonalTeams(user.userGroups)
+      : user.userGroups;
     let resolvedUserGroups = userGroups;
     if (scopeToOwnTeam) {
       if (role) {
@@ -534,7 +670,7 @@ export class UsersService {
       await this.assertEmailAvailable(cleanedData.email);
     }
 
-    return this.prisma.user
+    const created = await this.prisma.user
       .create({
         omit: {
           password: true,
@@ -554,6 +690,8 @@ export class UsersService {
         },
       })
       .catch((error) => this.throwWriteError(error));
+    await this.ensurePersonalTeamFor(created, role);
+    return created;
   }
 
   async update(
@@ -562,11 +700,19 @@ export class UsersService {
     callerGroups: string[] = [],
     scopeToOwnTeam = false,
     callerPriority = 0,
+    actingUserId?: string,
   ): Promise<PartialPrismaUser | undefined> {
+    let target: { roleId: string | null } | undefined;
     if (scopeToOwnTeam) {
-      await this.assertSharesTeam(userId, callerGroups);
+      target = await this.assertSharesTeam(userId, callerGroups);
+      if (target) {
+        await this.assertManageableUser(target.roleId, callerPriority);
+      }
     }
-    const { role, userGroups } = user;
+    const { role } = user;
+    const userGroups = Array.isArray(user.userGroups)
+      ? await this.withoutPersonalTeams(user.userGroups, userId)
+      : undefined;
     // Lista explícita, igual que en create(): con un "...resto" del body,
     // campos como roleId llegaban directo a Prisma y un rol acotado podía
     // darse otro rol saltándose assertAssignableRole (o tocar twoFaSecret).
@@ -599,6 +745,16 @@ export class UsersService {
     if (scopeToOwnTeam && role && typeof role === 'string') {
       await this.assertAssignableRole(role, callerPriority);
     }
+    const roleChanges =
+      typeof role === 'string' &&
+      target !== undefined &&
+      role !== target.roleId;
+    if (scopeToOwnTeam && (data.isActive === false || roleChanges)) {
+      await this.assertTeamsKeepResponsible(
+        userId,
+        data.isActive === false ? undefined : role,
+      );
+    }
 
     // fix relations
     if (role && typeof role === 'string') {
@@ -615,19 +771,31 @@ export class UsersService {
         // su propio alcance, así que solo se desconectan/conectan sus
         // propios equipos, dejando el resto intacto
         const ownGroups = await this.prisma.userGroup.findMany({
-          where: { name: { in: callerGroups } },
+          where: { name: { in: callerGroups }, ownerId: null },
           select: { id: true },
         });
+        const leaving = ownGroups.filter(
+          (g) => !resolvedUserGroups.includes(g.id),
+        );
+        // quien se saca a sí mismo puede dejar el equipo sin profesor; lo
+        // hace otro responsable del equipo
+        if (actingUserId === userId && leaving.length > 0) {
+          throw new ForbiddenException(
+            'No puedes quitarte de un equipo: pídeselo a otro responsable del equipo',
+          );
+        }
         data.userGroups = {
-          disconnect: ownGroups
-            .filter((g) => !resolvedUserGroups.includes(g.id))
-            .map((g) => ({ id: g.id })),
+          disconnect: leaving.map((g) => ({ id: g.id })),
           connect: resolvedUserGroups.map((id) => ({ id })),
         };
       } else {
+        // el "set" vacía la membresía: el equipo personal se vuelve a sumar
+        const own = await this.personalTeamOf(userId);
         data.userGroups = {
           set: [],
-          connect: userGroups.map((g: any) => ({ id: g.id || g })),
+          connect: [...userGroups, ...(own ? [own.id] : [])].map((id) => ({
+            id,
+          })),
         };
       }
     }
@@ -689,7 +857,30 @@ export class UsersService {
         data.email,
       );
     }
+    // al pasar de estudiante o ayudante a profesor recibe su equipo personal
+    if (typeof role === 'string') {
+      await this.ensurePersonalTeamFor(updated, role);
+    }
     return updated;
+  }
+
+  private async ensurePersonalTeamFor(
+    user: { id?: string; username?: string },
+    roleId: unknown,
+  ): Promise<void> {
+    if (typeof roleId !== 'string' || !user?.id || !user.username) {
+      return;
+    }
+    const role = await this.prisma.role.findUnique({
+      where: { id: roleId },
+      select: { name: true },
+    });
+    if (hasPersonalTeam(role?.name)) {
+      await ensurePersonalTeam(this.prisma, {
+        id: user.id,
+        username: user.username,
+      });
+    }
   }
 
   // Cambio de los datos propios desde el perfil. Cambiar el correo exige la
@@ -912,16 +1103,29 @@ export class UsersService {
     actingUserId?: string,
     callerGroups: string[] = [],
     scopeToOwnTeam = false,
+    callerPriority = 0,
   ): Promise<void> {
     if (actingUserId && actingUserId === userId) {
       throw new ForbiddenException('You cannot delete your own account');
     }
     if (scopeToOwnTeam) {
-      await this.assertSharesTeam(userId, callerGroups);
+      const target = await this.assertSharesTeam(userId, callerGroups);
+      if (target) {
+        await this.assertManageableUser(target.roleId, callerPriority);
+        await this.assertTeamsKeepResponsible(userId);
+      }
     }
     await this.assertAnotherAdminRemains(userId);
     try {
-      await this.prisma.user.delete({ where: { id: userId } });
+      // el equipo personal se conserva sin dueño: sus pipelines siguen
+      // apuntando a ese nombre, y así no lo hereda otra cuenta
+      await this.prisma.$transaction([
+        this.prisma.userGroup.updateMany({
+          where: { ownerId: userId },
+          data: { ownerId: null },
+        }),
+        this.prisma.user.delete({ where: { id: userId } }),
+      ]);
     } catch {
       this.logger.warn(`User with ID ${userId} not found for deletion.`);
     }

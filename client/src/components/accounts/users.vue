@@ -70,7 +70,7 @@
               class="ma-2"
               color="grey"
               size="small"
-              prepend-icon="mdi-account-group"
+              :prepend-icon="team.ownerId ? 'mdi-account-lock-outline' : 'mdi-account-group'"
               closable-disabled
               @click:close="deleteGroupFromUser(team, item)"
             >
@@ -153,7 +153,7 @@
           ></v-select>
           <v-select
             v-model="editedUser.userGroups"
-            :items="teams"
+            :items="assignableTeams"
             item-title="name"
             item-value="id"
             :label="$t('user.teams')"
@@ -202,7 +202,7 @@
           ></v-select>
           <v-select
             v-model="newUser.userGroups"
-            :items="teams"
+            :items="assignableTeams"
             item-title="name"
             item-value="id"
             :label="isScopedCaller ? `${$t('user.teams')} *` : $t('user.teams')"
@@ -289,11 +289,13 @@ export default defineComponent({
       userGroups?: {
         id: number;
         name: string;
+        ownerId?: string | null;
       }[];
     }
     interface Team {
       id: string | number;
       name: string;
+      ownerId?: string | null;
     }
     interface Role {
       id: string | number;
@@ -357,6 +359,9 @@ export default defineComponent({
     }
 
     const teams = ref<Team[]>([])
+    // el equipo personal no se asigna: lo integra solo su dueño y el servidor
+    // lo conserva aunque no venga en la lista
+    const assignableTeams = computed(() => teams.value.filter((team) => !team.ownerId))
     const roles = ref<Role[]>([])
     const authStore = useAuthStore();
     const writeUserPermission = authStore.hasPermission('user:write')
@@ -475,7 +480,10 @@ export default defineComponent({
     }
 
     const openEditUserDialog = async (user: User) => {
-      editedUser.value = { ...user }
+      editedUser.value = {
+        ...user,
+        userGroups: (user.userGroups ?? []).filter((team) => !team.ownerId),
+      }
       // los equipos y roles se pueden haber creado o borrado en otra pestaña
       // desde que se cargó esta pantalla: se recargan al abrir el formulario
       await Promise.all([loadTeams(), loadRoles()])
@@ -626,6 +634,7 @@ export default defineComponent({
       hasActiveFilters,
       resetFilters,
       openEditUserDialog,
+      assignableTeams,
       deleteUser,
       editDialog,
       editedUser,

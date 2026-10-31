@@ -11,6 +11,8 @@ export const useAuthStore = defineStore('auth', {
     username: '',
     role: '',
     userGroups: [] as string[],
+    // equipo que solo integra este usuario (lo crea el servidor)
+    personalTeam: '',
     scopeToOwnTeam: false,
     priority: 0,
   }),
@@ -21,6 +23,7 @@ export const useAuthStore = defineStore('auth', {
       this.role = user.role
       this.permissions = user.permissions ?? []
       this.userGroups = user.userGroups ?? []
+      this.personalTeam = user.personalTeam ?? ''
       this.scopeToOwnTeam = user.scopeToOwnTeam ?? false
       this.priority = user.priority ?? 0
       this.sessionLoaded = true
@@ -48,5 +51,8 @@ export const useAuthStore = defineStore('auth', {
   },
   getters: {
     hasPermission: (state) => (perm: string) => state.permissions.includes(perm),
+    // mismo listado que SUPERVISED_ROLES en el servidor: trabajan bajo un
+    // profesor, así que sus pipelines van en un equipo del curso y no crean equipos
+    isSupervised: (state) => ['estudiante', 'ayudante'].includes(state.role),
   },
 })
