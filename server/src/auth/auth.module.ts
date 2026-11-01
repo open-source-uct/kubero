@@ -8,7 +8,7 @@ import { GithubStrategy } from './strategies/github.strategy';
 import { Oauth2Strategy } from './strategies/oauth2.strategy';
 import { AuthController } from './auth.controller';
 import { AuditModule } from '../audit/audit.module';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '../config/config.service';
 import { ConfigModule } from '../config/config.module';
 import * as dotenv from 'dotenv';
@@ -48,7 +48,10 @@ if (ConfigService.getGithubEnabled()) {
     JwtModule.register({
       secret: getJwtSecret(),
       signOptions: {
-        expiresIn: process.env.JWT_EXPIRESIN || '36000s',
+        // jsonwebtoken tipa el texto ("36000s", "10h"); la variable de entorno
+        // se usa tal cual, como antes
+        expiresIn: (process.env.JWT_EXPIRESIN ||
+          '36000s') as JwtSignOptions['expiresIn'],
       },
     }),
   ],

@@ -7,3 +7,14 @@ allowBuilds:
   bcrypt: true
   prisma: true
   sqlite3: true
+
+# Versiones corregidas de dependencias que otras librerías fijan en una versión
+# vulnerable. Cada override se queda dentro de la misma versión mayor.
+overrides:
+  'multer@>=2 <2.5.0': ^2.5.0 # lo fija @nestjs/platform-express
+  'js-yaml@>=5 <5.4.1': ^5.4.1 # lo fija @nestjs/swagger
+  'ws@>=8 <8.21.0': ^8.21.0 # lo fija socket.io-adapter
+  'form-data@>=2 <2.5.6': ^2.5.6 # lo trae request (@kubernetes/client-node)
+  'qs@>=6 <6.16.0': ^6.16.0 # lo trae request: arma las URLs hacia la API de Kubernetes
+  # salto mayor: Prisma solo usa la función deepmerge, que no cambió en la 8
+  'deepmerge-ts@<8.0.0': ^8.0.2 # lo fija @prisma/config

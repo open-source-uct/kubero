@@ -2254,12 +2254,17 @@ export default defineComponent({
           );
         }
 
+        // tipado amplio: axios infiere el tipo de params y choca con el de
+        // handledApiErrorConfig
+        const params: Record<string, string> | undefined = this.generation
+          ? { generation: this.generation }
+          : undefined;
         await axios.put(
           `/api/apps/${this.pipeline}/${this.phase}/${this.app}/${this.resourceVersion}`,
           postdata,
           {
             ...handledApiErrorConfig,
-            params: this.generation ? { generation: this.generation } : undefined,
+            params,
           }
         );
         this.$router.push(`/pipeline/${this.pipeline}/apps`);

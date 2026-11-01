@@ -1082,6 +1082,11 @@ describe('UsersService', () => {
           options!.beforeRedirect!(
             { protocol: 'http:', hostname, path: '/image.jpg' },
             { headers: {}, statusCode: 302 },
+            {
+              headers: {},
+              url: 'https://example.com/image.jpg',
+              method: 'GET',
+            },
           );
           throw new Error('An unsafe redirect was accepted');
         });
