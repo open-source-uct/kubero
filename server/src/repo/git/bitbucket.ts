@@ -14,28 +14,22 @@ import { Repo } from './repo';
 import * as gitUrlParse from 'git-url-parse';
 debug('app:kubero:bitbucket:api');
 
-import { Bitbucket, APIClient } from 'bitbucket';
-import { RequestError } from '@octokit/types';
+import { BitbucketClient, BitbucketRequestError } from './bitbucket-client';
 import { Logger } from '@nestjs/common';
 
 export class BitbucketApi extends Repo {
-  private bitbucket: APIClient;
+  private bitbucket: BitbucketClient;
 
   constructor(username: string, appPassword: string) {
     super('bitbucket');
-    const clientOptions = {
-      notice: false,
-      auth: {
-        username: username,
-        password: appPassword,
-      },
-    };
-
     if (process.env.BITBUCKET_USERNAME && process.env.BITBUCKET_APP_PASSWORD) {
       Logger.log('✅  BitBucket enabled', 'Feature');
-      this.bitbucket = new Bitbucket(clientOptions);
+      this.bitbucket = new BitbucketClient({
+        username: username,
+        password: appPassword,
+      });
     } else {
-      this.bitbucket = new Bitbucket();
+      this.bitbucket = new BitbucketClient();
       Logger.log(
         '☑️ BitBucket disabled: No BITBUCKET_USERNAME or BITBUCKET_APP_PASSWORD set',
         'Feature',
@@ -61,11 +55,8 @@ export class BitbucketApi extends Repo {
 
     //console.log(owner, repo);
     try {
-      // https://bitbucketjs.netlify.app/#api-repositories-repositories_get
-      const res = await this.bitbucket.repositories.get({
-        repo_slug: repo,
-        workspace: owner,
-      });
+      // https://developer.atlassian.com/cloud/bitbucket/rest/api-group-repositories/#api-repositories-workspace-repo-slug-get
+      const res = await this.bitbucket.getRepository(owner, repo);
       //console.log(res.data);
 
       ret = {
@@ -91,7 +82,7 @@ export class BitbucketApi extends Repo {
         },
       };
     } catch (e) {
-      const res = e as RequestError;
+      const res = e as BitbucketRequestError;
       this.logger.log('Repository not found: ' + gitrepo);
       ret = {
         status: res.status,
@@ -108,7 +99,7 @@ export class BitbucketApi extends Repo {
   }
 
   public async getRepositories() {
-    const res = await this.bitbucket.request('GET /user/repos', {});
+    const res = await this.bitbucket.get('/user/repos');
     return res.data;
   }
 
@@ -131,24 +122,17 @@ export class BitbucketApi extends Repo {
       },
     };
 
-    const webhooksList = await this.bitbucket.repositories.listWebhooks({
-      repo_slug: repo,
-      workspace: owner,
-    });
+    const webhooksList = await this.bitbucket.listWebhooks(owner, repo);
 
     const webhook = webhooksList.data.values?.find((w: any) => w.url === url);
     if (webhook == undefined) {
       try {
-        const res = await this.bitbucket.repositories.createWebhook({
-          repo_slug: repo,
-          workspace: owner,
-          _body: {
-            description: 'Kubero webhook',
-            url: url,
-            active: true,
-            //skip_cert_verification: false,
-            events: ['pullrequest:created', 'repo:push'],
-          },
+        const res = await this.bitbucket.createWebhook(owner, repo, {
+          description: 'Kubero webhook',
+          url: url,
+          active: true,
+          //skip_cert_verification: false,
+          events: ['pullrequest:created', 'repo:push'],
         });
         ret = {
           status: 201,
@@ -207,13 +191,13 @@ export class BitbucketApi extends Repo {
     };
 
     try {
-      // https://bitbucketjs.netlify.app/#api-repositories-repositories_createDeployKey
-      const res = await this.bitbucket.repositories.createDeployKey({
-        label: 'bot@kubero',
-        key: keyPair.pubKey,
-        repo_slug: repo,
-        workspace: owner,
-      });
+      // https://developer.atlassian.com/cloud/bitbucket/rest/api-group-repositories/#api-repositories-workspace-repo-slug-deploy-keys-post
+      const res = await this.bitbucket.createDeployKey(
+        owner,
+        repo,
+        'bot@kubero',
+        keyPair.pubKey,
+      );
 
       //console.log(res);
 
@@ -306,10 +290,7 @@ export class BitbucketApi extends Repo {
   public async listRepos(): Promise<string[]> {
     const ret: string[] = [];
     try {
-      // https://bitbucketjs.netlify.app/#api-repositories-repositories_listGlobal
-      const repos = await this.bitbucket.repositories.listGlobal({
-        role: 'member',
-      });
+      const repos = await this.bitbucket.listRepositories('member');
 
       if (repos.data.values != undefined) {
         for (const repo of repos.data.values) {
@@ -325,16 +306,10 @@ export class BitbucketApi extends Repo {
   }
 
   public async getBranches(gitrepo: string): Promise<string[]> {
-    //https://bitbucketjs.netlify.app/#api-repositories-repositories_listBranches
-
     const { repo, owner } = this.parseRepo(gitrepo);
 
     try {
-      const branches = await this.bitbucket.repositories.listBranches({
-        repo_slug: repo,
-        workspace: owner,
-        sort: '-name',
-      });
+      const branches = await this.bitbucket.listBranches(owner, repo, '-name');
       if (branches.data.values != undefined) {
         return branches.data.values.map((branch: any) => branch.name);
       }
@@ -351,11 +326,7 @@ export class BitbucketApi extends Repo {
     const { repo, owner } = this.parseRepo(gitrepo);
 
     try {
-      const branches = await this.bitbucket.repositories.listBranches({
-        repo_slug: repo,
-        workspace: owner,
-        sort: '-name',
-      });
+      const branches = await this.bitbucket.listBranches(owner, repo, '-name');
       if (branches.data.values != undefined) {
         ret = branches.data.values.map((branch: any) => branch.name);
       }
@@ -364,11 +335,7 @@ export class BitbucketApi extends Repo {
     }
 
     try {
-      const tags = await this.bitbucket.repositories.listTags({
-        repo_slug: repo,
-        workspace: owner,
-        sort: '-name',
-      });
+      const tags = await this.bitbucket.listTags(owner, repo, '-name');
       if (tags.data.values != undefined) {
         ret = ret.concat(tags.data.values.map((tag: any) => tag.name));
       }
@@ -377,11 +344,7 @@ export class BitbucketApi extends Repo {
     }
 
     try {
-      const commits = await this.bitbucket.repositories.listCommits({
-        repo_slug: repo,
-        workspace: owner,
-        sort: '-date',
-      });
+      const commits = await this.bitbucket.listCommits(owner, repo, '-date');
       if (commits.data.values != undefined) {
         ret = ret.concat(commits.data.values.map((commit: any) => commit.hash));
       }
