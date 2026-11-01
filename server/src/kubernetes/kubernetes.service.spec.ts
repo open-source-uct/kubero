@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
+import { Writable } from 'stream';
 import { KubernetesService } from './kubernetes.service';
 
 jest.mock('@kubernetes/client-node', () => {
@@ -16,39 +17,29 @@ jest.mock('@kubernetes/client-node', () => {
         .fn()
         .mockReturnValue([{ name: 'default' }, { name: 'ctx' }]),
       makeApiClient: jest.fn(() => ({
-        getCode: jest
-          .fn()
-          .mockResolvedValue({ body: { gitVersion: 'v1.20.0' } }),
-        listNamespace: jest.fn().mockResolvedValue({ body: { items: [] } }),
-        listNamespacedCustomObject: jest
-          .fn()
-          .mockResolvedValue({ body: { items: [] } }),
+        getCode: jest.fn().mockResolvedValue({ gitVersion: 'v1.20.0' }),
+        listNamespace: jest.fn().mockResolvedValue({ items: [] }),
+        listNamespacedCustomObject: jest.fn().mockResolvedValue({ items: [] }),
         createNamespacedCustomObject: jest.fn().mockResolvedValue({}),
         replaceNamespacedCustomObject: jest.fn().mockResolvedValue({}),
         deleteNamespacedCustomObject: jest.fn().mockResolvedValue({}),
-        getNamespacedCustomObject: jest.fn().mockResolvedValue({ body: {} }),
-        listClusterCustomObject: jest
-          .fn()
-          .mockResolvedValue({ body: { items: [] } }),
-        listNamespacedPod: jest.fn().mockResolvedValue({ body: { items: [] } }),
-        readNamespacedPod: jest.fn().mockResolvedValue({ body: {} }),
+        getNamespacedCustomObject: jest.fn().mockResolvedValue({}),
+        listClusterCustomObject: jest.fn().mockResolvedValue({ items: [] }),
+        listNamespacedPod: jest.fn().mockResolvedValue({ items: [] }),
+        readNamespacedPod: jest.fn().mockResolvedValue({}),
         createNamespace: jest.fn().mockResolvedValue({}),
         patchNamespacedCustomObject: jest.fn().mockResolvedValue({}),
         patchNamespacedSecret: jest.fn().mockResolvedValue({}),
-        readNamespacedSecret: jest.fn().mockResolvedValue({ body: {} }),
+        readNamespacedSecret: jest.fn().mockResolvedValue({}),
         createNamespacedSecret: jest.fn().mockResolvedValue({}),
         createNamespacedJob: jest.fn().mockResolvedValue({}),
         deleteNamespacedJob: jest.fn().mockResolvedValue({}),
-        readNamespacedJob: jest.fn().mockResolvedValue({ body: {} }),
-        listNamespacedJob: jest.fn().mockResolvedValue({ body: { items: [] } }),
-        listIngressClass: jest.fn().mockResolvedValue({ body: { items: [] } }),
-        listIngressForAllNamespaces: jest
-          .fn()
-          .mockResolvedValue({ body: { items: [] } }),
-        listStorageClass: jest.fn().mockResolvedValue({ body: { items: [] } }),
-        listNamespacedEvent: jest
-          .fn()
-          .mockResolvedValue({ body: { items: [] } }),
+        readNamespacedJob: jest.fn().mockResolvedValue({}),
+        listNamespacedJob: jest.fn().mockResolvedValue({ items: [] }),
+        listIngressClass: jest.fn().mockResolvedValue({ items: [] }),
+        listIngressForAllNamespaces: jest.fn().mockResolvedValue({ items: [] }),
+        listStorageClass: jest.fn().mockResolvedValue({ items: [] }),
+        listNamespacedEvent: jest.fn().mockResolvedValue({ items: [] }),
         createNamespacedEvent: jest.fn().mockResolvedValue({}),
       })),
     })),
@@ -59,7 +50,6 @@ jest.mock('@kubernetes/client-node', () => {
     StorageV1Api: jest.fn(),
     BatchV1Api: jest.fn(),
     NetworkingV1Api: jest.fn(),
-    PatchUtils: jest.fn(),
     Log: jest.fn().mockImplementation(() => ({})),
     Metrics: jest.fn().mockImplementation(() => ({
       getPodMetrics: jest.fn().mockResolvedValue({ items: [] }),
@@ -149,8 +139,9 @@ describe('KubernetesService', () => {
 
   it('reports a rejected app update instead of answering as if it was saved', async () => {
     const api = (service as any).customObjectsApi;
+    // ApiException de @kubernetes/client-node 1.x: el estado viene en `code`
     api.replaceNamespacedCustomObject.mockRejectedValueOnce({
-      statusCode: 409,
+      code: 409,
     });
     await expect(
       service.updateApp(
@@ -161,7 +152,7 @@ describe('KubernetesService', () => {
     ).rejects.toThrow(ConflictException);
 
     api.replaceNamespacedCustomObject.mockRejectedValueOnce({
-      statusCode: 422,
+      code: 422,
       body: { message: 'spec.addons: invalid' },
     });
     await expect(
@@ -176,7 +167,7 @@ describe('KubernetesService', () => {
   it('replaces an app object keeping its resourceVersion and returns the new one', async () => {
     const api = (service as any).customObjectsApi;
     api.replaceNamespacedCustomObject.mockResolvedValueOnce({
-      body: { metadata: { resourceVersion: '8' } },
+      metadata: { resourceVersion: '8' },
     });
     const body = { metadata: { name: 'app', resourceVersion: '7' } } as any;
     const updated = await service.replaceAppObject(
@@ -185,18 +176,18 @@ describe('KubernetesService', () => {
       body,
       'default',
     );
-    expect(api.replaceNamespacedCustomObject).toHaveBeenLastCalledWith(
-      'application.kubero.dev',
-      'v1alpha1',
-      'p-ph',
-      'kuberoapps',
-      'app',
+    expect(api.replaceNamespacedCustomObject).toHaveBeenLastCalledWith({
+      group: 'application.kubero.dev',
+      version: 'v1alpha1',
+      namespace: 'p-ph',
+      plural: 'kuberoapps',
+      name: 'app',
       body,
-    );
+    });
     expect(updated.metadata.resourceVersion).toBe('8');
 
     api.replaceNamespacedCustomObject.mockRejectedValueOnce({
-      statusCode: 409,
+      code: 409,
     });
     await expect(
       service.replaceAppObject('p-ph', 'app', body, 'default'),
@@ -260,6 +251,34 @@ describe('KubernetesService', () => {
     ).resolves.toBeUndefined();
   });
 
+  it('restarts and deploys apps with a JSON Patch, as before the 1.x client', async () => {
+    const { PatchStrategy } = jest.requireActual('@kubernetes/client-node');
+    const api = (service as any).customObjectsApi;
+    api.patchNamespacedCustomObject.mockClear();
+    await service.restartApp('p', 'ph', 'app', 'web', 'default');
+    service.deployApp('p-ph', 'app', 'v2', 'default');
+    const calls = api.patchNamespacedCustomObject.mock.calls;
+    expect(calls[0][0]).toMatchObject({
+      namespace: 'p-ph',
+      plural: 'kuberoapps',
+      name: 'app',
+      body: [expect.objectContaining({ op: 'add', path: '/spec/restartedAt' })],
+    });
+    expect(calls[1][0]).toMatchObject({
+      name: 'app',
+      body: [{ op: 'replace', path: '/spec/image/tag', value: 'v2' }],
+    });
+    // el segundo argumento es un middleware que fija el Content-Type
+    for (const [, options] of calls) {
+      const request = { setHeaderParam: jest.fn() };
+      options.middleware.forEach((m: any) => m.pre(request));
+      expect(request.setHeaderParam).toHaveBeenCalledWith(
+        'Content-Type',
+        PatchStrategy.JsonPatch,
+      );
+    }
+  });
+
   it('should getOperators', async () => {
     await expect(service.getOperators()).resolves.toBeDefined();
   });
@@ -316,9 +335,7 @@ describe('KubernetesService', () => {
     const list = (service: any) =>
       service.customObjectsApi.listNamespacedCustomObject;
     const body = (...pipelines: any[]) => ({
-      body: {
-        items: pipelines.map((p) => ({ spec: p })),
-      },
+      items: pipelines.map((p) => ({ spec: p })),
     });
 
     it('reads Kubernetes once for calls made within a few seconds', async () => {
@@ -418,25 +435,23 @@ describe('KubernetesService', () => {
 
   it('should getPodUptimes', async () => {
     const mockPods = {
-      body: {
-        items: [
-          {
-            metadata: { name: 'pod1' },
-            status: { startTime: new Date(Date.now() - 60000) }, // 1 minute ago
-          },
-          {
-            metadata: { name: 'pod2' },
-            status: { startTime: new Date(Date.now() - 3600000) }, // 1 hour ago
-          },
-          {
-            metadata: { name: 'pod3' },
-            status: {}, // no startTime
-          },
-          {
-            metadata: {}, // no name
-          },
-        ],
-      },
+      items: [
+        {
+          metadata: { name: 'pod1' },
+          status: { startTime: new Date(Date.now() - 60000) }, // 1 minute ago
+        },
+        {
+          metadata: { name: 'pod2' },
+          status: { startTime: new Date(Date.now() - 3600000) }, // 1 hour ago
+        },
+        {
+          metadata: { name: 'pod3' },
+          status: {}, // no startTime
+        },
+        {
+          metadata: {}, // no name
+        },
+      ],
     };
 
     // Access the mocked coreV1Api through the service
@@ -445,9 +460,9 @@ describe('KubernetesService', () => {
 
     const result = await service.getPodUptimes('test-namespace');
 
-    expect(coreV1ApiMock.listNamespacedPod).toHaveBeenCalledWith(
-      'test-namespace',
-    );
+    expect(coreV1ApiMock.listNamespacedPod).toHaveBeenCalledWith({
+      namespace: 'test-namespace',
+    });
     expect(result).toBeDefined();
     expect(result['pod1']).toBeDefined();
     expect(result['pod1'].ms).toBeGreaterThan(50000); // roughly 1 minute in ms
@@ -556,6 +571,17 @@ describe('KubernetesService', () => {
       {} as any,
     );
     expect(result).toBe(ws);
+    // la salida de la consola se pide (si no, Kubernetes no la envía) pero no
+    // se copia a los logs de Kubero
+    const [, , , , stdout, stderr, stdin, tty] = (service['exec'] as any).exec
+      .mock.calls[0];
+    for (const out of [stdout, stderr]) {
+      expect(out).toBeInstanceOf(Writable);
+      expect(out).not.toBe(process.stdout);
+      expect(out).not.toBe(process.stderr);
+    }
+    expect(stdin).toEqual({});
+    expect(tty).toBe(true);
   });
 
   it('should getKuberoConfig', async () => {
@@ -597,7 +623,7 @@ describe('KubernetesService', () => {
     it('returns the secret name without copying when it already exists in the target namespace', async () => {
       process.env.KUBERO_SHARED_TLS_SECRET_NAME = 'inf-uct-cl-tls';
       const coreV1ApiMock = (service as any).coreV1Api;
-      coreV1ApiMock.readNamespacedSecret.mockResolvedValueOnce({ body: {} });
+      coreV1ApiMock.readNamespacedSecret.mockResolvedValueOnce({});
 
       const result = await service.ensureSharedTlsSecret(
         'ramtun-production',
@@ -615,11 +641,9 @@ describe('KubernetesService', () => {
       coreV1ApiMock.readNamespacedSecret
         .mockRejectedValueOnce(new Error('not found in target'))
         .mockResolvedValueOnce({
-          body: {
-            type: 'kubernetes.io/tls',
-            data: { 'tls.crt': 'ZmFrZQ==', 'tls.key': 'ZmFrZQ==' },
-            metadata: { name: 'inf-uct-cl-tls', namespace: 'kubero' },
-          },
+          type: 'kubernetes.io/tls',
+          data: { 'tls.crt': 'ZmFrZQ==', 'tls.key': 'ZmFrZQ==' },
+          metadata: { name: 'inf-uct-cl-tls', namespace: 'kubero' },
         });
 
       const result = await service.ensureSharedTlsSecret(
@@ -628,13 +652,13 @@ describe('KubernetesService', () => {
       );
 
       expect(result).toBe('inf-uct-cl-tls');
-      expect(coreV1ApiMock.createNamespacedSecret).toHaveBeenCalledWith(
-        'ramtun-production',
-        expect.objectContaining({
+      expect(coreV1ApiMock.createNamespacedSecret).toHaveBeenCalledWith({
+        namespace: 'ramtun-production',
+        body: expect.objectContaining({
           metadata: { name: 'inf-uct-cl-tls', namespace: 'ramtun-production' },
           data: { 'tls.crt': 'ZmFrZQ==', 'tls.key': 'ZmFrZQ==' },
         }),
-      );
+      });
     });
 
     it('returns null without throwing when the source secret cannot be read', async () => {
