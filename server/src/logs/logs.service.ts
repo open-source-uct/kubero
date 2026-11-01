@@ -7,6 +7,22 @@ import { EventsGateway } from '../events/events.gateway';
 import { Stream } from 'stream';
 import { v4 as uuidv4 } from 'uuid';
 
+// Opciones del stream en vivo. Sin `sinceSeconds` se piden solo las líneas
+// nuevas (tailLines 0). @kubernetes/client-node 1.x descarta tailLines cuando
+// vale el número 0 (`if (options.tailLines)`) y entonces Kubernetes devuelve el
+// log completo del contenedor: al abrir los logs de una app con días corriendo
+// llegaban miles de líneas de golpe. Como texto la librería sí lo envía.
+export function liveLogOptions(sinceSeconds?: number) {
+  return sinceSeconds !== undefined
+    ? { follow: true, sinceSeconds, pretty: false, timestamps: false }
+    : {
+        follow: true,
+        tailLines: '0' as unknown as number,
+        pretty: false,
+        timestamps: false,
+      };
+}
+
 @Injectable()
 export class LogsService {
   private logger = new Logger(LogsService.name);
@@ -146,10 +162,7 @@ export class LogsService {
     logStream.on('close', release);
     logStream.on('error', release);
 
-    const options =
-      sinceSeconds !== undefined
-        ? { follow: true, sinceSeconds, pretty: false, timestamps: false }
-        : { follow: true, tailLines: 0, pretty: false, timestamps: false };
+    const options = liveLogOptions(sinceSeconds);
 
     try {
       const request: any = await this.kubectl
