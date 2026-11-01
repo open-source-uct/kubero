@@ -1208,7 +1208,11 @@ export class UsersService {
     if (response.status !== 200) {
       throw new Error(`Failed to fetch image from URL: ${imageUrl}`);
     }
-    const mimetype = response.headers['content-type'] || 'image/jpeg'; // Default to jpeg if not specified
+    const contentType: unknown = response.headers['content-type'];
+    const mimetype =
+      typeof contentType === 'string' && contentType
+        ? contentType
+        : 'image/jpeg'; // Default to jpeg if not specified
     if (!mimetype.startsWith('image/')) {
       throw new Error(`Invalid image MIME type: ${mimetype}`);
     }

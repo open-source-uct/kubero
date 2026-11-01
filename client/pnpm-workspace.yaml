@@ -2,3 +2,8 @@ allowBuilds:
   '@parcel/watcher': true
   esbuild: true
   vue-demi: true
+
+# Versión corregida de una dependencia que otra librería fija en una versión
+# vulnerable, dentro de la misma versión mayor.
+overrides:
+  'ws@>=8 <8.21.0': ^8.21.0 # lo fija engine.io-client (socket.io-client)
