@@ -191,7 +191,9 @@ describe('LogsService', () => {
         'app-kuberoapp-123',
         'web',
       ]);
-      expect(logOptions(0)).toMatchObject({ follow: true, tailLines: 0 });
+      expect(logOptions(0)).toMatchObject({ follow: true });
+      // solo líneas nuevas (ver liveLogOptions)
+      expect(String(logOptions(0).tailLines)).toBe('0');
     });
 
     it('waits for a container that is still being created and streams it once it runs', async () => {
