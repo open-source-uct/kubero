@@ -14,6 +14,9 @@ import {
   RuleGroup,
 } from 'prometheus-query';
 
+// nombre de namespace válido: va dentro de un regex de PromQL
+const DNS_LABEL = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+
 @Injectable()
 export class MetricsService {
   private prom: PrometheusDriver;
@@ -80,44 +83,88 @@ export class MetricsService {
     }
   }
 
-  // Suma el uso real de CPU/memoria de todas las apps de Kubero del cluster
-  // entero (sin filtrar por namespace/pipeline) — el contenedor
-  // kuberoapp-web/kuberoapp-worker es el único que el operador le pone a las
-  // apps desplegadas por Kubero, así que alcanza para separarlas del resto de
-  // los servicios del cluster (gitlab, wazuh, sonarqube, etc. no lo usan).
+  // Uso real de CPU/memoria de Kubero en el cluster entero, separado en:
+  // - apps: el contenedor kuberoapp-web/kuberoapp-worker, el único que el
+  //   operador les pone a las apps (gitlab, wazuh, etc. no lo usan)
+  // - addons: el resto de los contenedores de los namespaces de los pipelines
+  //   (bases de datos de los addons, builds)
+  // - plataforma: el panel y el operador de Kubero
+  // La memoria es el working set, la misma que muestra `kubectl top` y con la
+  // que Kubernetes decide qué desalojar.
   public async getClusterWideUsage(): Promise<IClusterUsage> {
-    const cpuQuery =
-      'sum(rate(container_cpu_usage_seconds_total{container=~"kuberoapp-web|kuberoapp-worker"}[5m]))';
-    const memoryQuery =
-      'sum(container_memory_rss{container=~"kuberoapp-web|kuberoapp-worker"})';
-    // capacidad total del cluster (todos los nodos) — para mostrar qué
-    // porcentaje de eso están usando las apps de Kubero, en vez de un "total"
-    // inventado
-    const cpuCapacityQuery =
-      'sum(kube_node_status_allocatable{resource="cpu"})';
-    const memoryCapacityQuery =
-      'sum(kube_node_status_allocatable{resource="memory"})';
-    let cpuCores = 0;
-    let memoryBytes = 0;
-    let cpuCapacityCores = 0;
-    let memoryCapacityBytes = 0;
+    const appContainers = 'container=~"kuberoapp-web|kuberoapp-worker"';
+    // sin la serie del pod completo (container="") ni la del contenedor pausa
+    const realContainers = 'container!="",container!="POD"';
+    const cpu = (selector: string) =>
+      `sum(rate(container_cpu_usage_seconds_total{${selector}}[5m]))`;
+    const memory = (selector: string) =>
+      `sum(container_memory_working_set_bytes{${selector}})`;
+
+    const platformNamespaces = [
+      process.env.KUBERO_NAMESPACE || 'kubero',
+      process.env.KUBERO_OPERATOR_NAMESPACE || 'kubero-operator-system',
+    ].filter((ns) => DNS_LABEL.test(ns));
+    let pipelineNamespaces: string[] = [];
     try {
-      const [cpuResult, memoryResult, cpuCapacityResult, memoryCapacityResult] =
-        await Promise.all([
-          this.prom.instantQuery(cpuQuery),
-          this.prom.instantQuery(memoryQuery),
-          this.prom.instantQuery(cpuCapacityQuery),
-          this.prom.instantQuery(memoryCapacityQuery),
-        ]);
-      cpuCores = cpuResult.result[0]?.value?.value ?? 0;
-      memoryBytes = memoryResult.result[0]?.value?.value ?? 0;
-      cpuCapacityCores = cpuCapacityResult.result[0]?.value?.value ?? 0;
-      memoryCapacityBytes = memoryCapacityResult.result[0]?.value?.value ?? 0;
-    } catch (error) {
-      console.log('error fetching cluster-wide usage');
-      console.log(error);
+      pipelineNamespaces = (await this.kubectl.getPipelineNamespaces()).filter(
+        (ns) => DNS_LABEL.test(ns),
+      );
+    } catch {
+      // sin la lista de pipelines se muestra lo demás, sin los addons
+      Logger.warn('cluster-wide usage: could not list pipeline namespaces');
     }
-    return { cpuCores, memoryBytes, cpuCapacityCores, memoryCapacityBytes };
+    const addons = `namespace=~"${pipelineNamespaces.join('|')}",${realContainers},container!~"kuberoapp-web|kuberoapp-worker"`;
+    const platform = `namespace=~"${platformNamespaces.join('|')}",${realContainers}`;
+
+    // Capacidad de todos los nodos, para mostrar qué parte usa Kubero. Sale de
+    // kube-state-metrics y, si Prometheus no lo recolecta (como en la UCT),
+    // de cAdvisor, que reporta los cores y la memoria de cada máquina.
+    const cpuCapacityQuery =
+      'sum(kube_node_status_allocatable{resource="cpu"}) or sum(machine_cpu_cores)';
+    const memoryCapacityQuery =
+      'sum(kube_node_status_allocatable{resource="memory"}) or sum(machine_memory_bytes)';
+
+    const queries: Record<string, string | undefined> = {
+      appsCpu: cpu(appContainers),
+      appsMemory: memory(appContainers),
+      addonsCpu: pipelineNamespaces.length ? cpu(addons) : undefined,
+      addonsMemory: pipelineNamespaces.length ? memory(addons) : undefined,
+      platformCpu: platformNamespaces.length ? cpu(platform) : undefined,
+      platformMemory: platformNamespaces.length ? memory(platform) : undefined,
+      cpuCapacity: cpuCapacityQuery,
+      memoryCapacity: memoryCapacityQuery,
+    };
+    const values: Record<string, number> = {};
+    try {
+      const entries = Object.entries(queries);
+      const results = await Promise.all(
+        entries.map(([, query]) =>
+          query ? this.prom.instantQuery(query) : undefined,
+        ),
+      );
+      entries.forEach(([key], i) => {
+        values[key] = Number(results[i]?.result[0]?.value?.value) || 0;
+      });
+    } catch (error) {
+      Logger.warn('error fetching cluster-wide usage: ' + error);
+    }
+    const usage = (prefix: string) => ({
+      cpuCores: values[prefix + 'Cpu'] ?? 0,
+      memoryBytes: values[prefix + 'Memory'] ?? 0,
+    });
+    const breakdown = {
+      apps: usage('apps'),
+      addons: usage('addons'),
+      platform: usage('platform'),
+    };
+    const parts = Object.values(breakdown);
+    return {
+      cpuCores: parts.reduce((sum, part) => sum + part.cpuCores, 0),
+      memoryBytes: parts.reduce((sum, part) => sum + part.memoryBytes, 0),
+      cpuCapacityCores: values.cpuCapacity ?? 0,
+      memoryCapacityBytes: values.memoryCapacity ?? 0,
+      breakdown,
+    };
   }
 
   public async getLongTermMetrics(

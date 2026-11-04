@@ -85,6 +85,11 @@ describe('MetricsController', () => {
       memoryBytes: 4096,
       cpuCapacityCores: 16,
       memoryCapacityBytes: 32000000000,
+      breakdown: {
+        apps: { cpuCores: 0.2, memoryBytes: 2048 },
+        addons: { cpuCores: 0.5, memoryBytes: 1024 },
+        platform: { cpuCores: 0.5, memoryBytes: 1024 },
+      },
     };
     service.getClusterWideUsage.mockResolvedValue(usage);
     const result = await controller.getClusterUsage();
