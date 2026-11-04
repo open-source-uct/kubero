@@ -343,6 +343,20 @@ export class KubernetesService {
     return data;
   }
 
+  // Namespaces de las fases habilitadas de todos los pipelines, sin filtrar
+  // por equipo: ahí viven las apps de Kubero y sus addons
+  public async getPipelineNamespaces(): Promise<string[]> {
+    const pipelines = await this.fetchPipelines();
+    const namespaces = new Set<string>();
+    for (const pipeline of pipelines.items ?? []) {
+      for (const phase of pipeline.spec?.phases ?? []) {
+        if (phase.enabled)
+          namespaces.add(`${pipeline.spec.name}-${phase.name}`);
+      }
+    }
+    return [...namespaces];
+  }
+
   public async getPipelinesList(
     userGroups: string[] = [],
   ): Promise<IKubectlPipelineList> {

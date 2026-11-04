@@ -77,37 +77,103 @@ describe('MetricsService', () => {
   });
 
   describe('getClusterWideUsage', () => {
-    it('sums cpu and memory usage and cluster capacity via aggregate queries', async () => {
-      const prom = service['prom'] as any;
-      prom.instantQuery
-        .mockResolvedValueOnce({ result: [{ value: { value: 1.5 } }] })
-        .mockResolvedValueOnce({ result: [{ value: { value: 2048 } }] })
-        .mockResolvedValueOnce({ result: [{ value: { value: 16 } }] })
-        .mockResolvedValueOnce({ result: [{ value: { value: 32000000000 } }] });
+    // responde según la consulta, para no depender del orden
+    const answer = (query: string) => {
+      const value = (v: number) => ({ result: [{ value: { value: v } }] });
+      const isCpu = query.includes('container_cpu_usage_seconds_total');
+      if (query.includes('allocatable{resource="cpu"}')) return value(126);
+      if (query.includes('allocatable{resource="memory"}')) return value(1e11);
+      if (query.includes('namespace=~"ramtun-production|uct-map-production"'))
+        return value(isCpu ? 1.2 : 800);
+      if (query.includes('namespace=~"kubero|kubero-operator-system"'))
+        return value(isCpu ? 0.5 : 700);
+      return value(isCpu ? 0.02 : 1300); // contenedores de las apps
+    };
+
+    beforeEach(() => {
+      kubectl.getPipelineNamespaces = jest
+        .fn()
+        .mockResolvedValue(['ramtun-production', 'uct-map-production']);
+      (service['prom'] as any).instantQuery.mockImplementation(
+        (query: string) => Promise.resolve(answer(query)),
+      );
+    });
+
+    it('splits Kubero usage into apps, addons and platform, and sums the total', async () => {
       const result = await service.getClusterWideUsage();
-      expect(prom.instantQuery).toHaveBeenCalledWith(
-        expect.stringContaining('container=~"kuberoapp-web|kuberoapp-worker"'),
-      );
-      expect(prom.instantQuery).toHaveBeenCalledWith(
-        expect.stringContaining('kube_node_status_allocatable{resource="cpu"}'),
-      );
-      expect(result).toEqual({
-        cpuCores: 1.5,
-        memoryBytes: 2048,
-        cpuCapacityCores: 16,
-        memoryCapacityBytes: 32000000000,
+      expect(result.breakdown).toEqual({
+        apps: { cpuCores: 0.02, memoryBytes: 1300 },
+        addons: { cpuCores: 1.2, memoryBytes: 800 },
+        platform: { cpuCores: 0.5, memoryBytes: 700 },
       });
+      expect(result.cpuCores).toBeCloseTo(1.72);
+      expect(result.memoryBytes).toBe(2800);
+      expect(result.cpuCapacityCores).toBe(126);
+      expect(result.memoryCapacityBytes).toBe(1e11);
+    });
+
+    it('counts the addons without the app containers or the pod-level series', async () => {
+      await service.getClusterWideUsage();
+      const queries: string[] = (
+        service['prom'] as any
+      ).instantQuery.mock.calls.map((call: string[]) => call[0]);
+      const addonQueries = queries.filter((q) =>
+        q.includes('ramtun-production'),
+      );
+      expect(addonQueries).toHaveLength(2);
+      for (const q of addonQueries) {
+        expect(q).toContain('container!~"kuberoapp-web|kuberoapp-worker"');
+        expect(q).toContain('container!="",container!="POD"');
+      }
+    });
+
+    it('falls back to cAdvisor capacity when kube-state-metrics is not scraped', async () => {
+      await service.getClusterWideUsage();
+      expect((service['prom'] as any).instantQuery).toHaveBeenCalledWith(
+        'sum(kube_node_status_allocatable{resource="cpu"}) or sum(machine_cpu_cores)',
+      );
+      expect((service['prom'] as any).instantQuery).toHaveBeenCalledWith(
+        'sum(kube_node_status_allocatable{resource="memory"}) or sum(machine_memory_bytes)',
+      );
+    });
+
+    it('keeps apps and platform when the pipelines cannot be listed', async () => {
+      kubectl.getPipelineNamespaces.mockRejectedValue(new Error('forbidden'));
+      const result = await service.getClusterWideUsage();
+      expect(result.breakdown.addons).toEqual({ cpuCores: 0, memoryBytes: 0 });
+      expect(result.breakdown.apps.memoryBytes).toBe(1300);
+    });
+
+    it('ignores namespace names that could break the PromQL regex', async () => {
+      kubectl.getPipelineNamespaces.mockResolvedValue([
+        'bad"}|x',
+        'ok-production',
+      ]);
+      await service.getClusterWideUsage();
+      const queries: string[] = (
+        service['prom'] as any
+      ).instantQuery.mock.calls.map((call: string[]) => call[0]);
+      expect(queries.some((q) => q.includes('bad"'))).toBe(false);
+      expect(
+        queries.some((q) => q.includes('namespace=~"ok-production"')),
+      ).toBe(true);
     });
 
     it('returns zeros instead of throwing when Prometheus is unreachable', async () => {
-      const prom = service['prom'] as any;
-      prom.instantQuery.mockRejectedValueOnce(new Error('unreachable'));
+      (service['prom'] as any).instantQuery.mockRejectedValue(
+        new Error('unreachable'),
+      );
       const result = await service.getClusterWideUsage();
       expect(result).toEqual({
         cpuCores: 0,
         memoryBytes: 0,
         cpuCapacityCores: 0,
         memoryCapacityBytes: 0,
+        breakdown: {
+          apps: { cpuCores: 0, memoryBytes: 0 },
+          addons: { cpuCores: 0, memoryBytes: 0 },
+          platform: { cpuCores: 0, memoryBytes: 0 },
+        },
       });
     });
   });
