@@ -5,7 +5,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { AppsService, addonsByName } from './apps.service';
+import { AppsService, addonsByName, podSizeResources } from './apps.service';
 import { PipelinesService } from '../pipelines/pipelines.service';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -121,6 +121,7 @@ describe('AppsService', () => {
   let kubectl: jest.Mocked<KubernetesService>;
   let pipelinesService: jest.Mocked<PipelinesService>;
   let notificationsService: jest.Mocked<NotificationsService>;
+  let configService: jest.Mocked<ConfigService>;
   const user: IUser = { id: '1', username: 'testuser' } as IUser;
 
   beforeEach(async () => {
@@ -163,6 +164,7 @@ describe('AppsService', () => {
     kubectl = module.get(KubernetesService);
     pipelinesService = module.get(PipelinesService);
     notificationsService = module.get(NotificationsService);
+    configService = module.get(ConfigService);
   });
 
   it('should be defined', () => {
@@ -806,6 +808,116 @@ describe('AppsService', () => {
       ]);
       expect([...map.keys()]).toEqual(['a']);
       expect(addonsByName(undefined).size).toBe(0);
+    });
+  });
+
+  describe('tamaño de pod (#226)', () => {
+    const small = {
+      id: '1',
+      name: 'small',
+      description: 'Small',
+      resources: {
+        requests: { cpu: '250m', memory: '0.5Gi' },
+        limits: { cpu: '500m', memory: '1Gi' },
+      },
+    };
+    const medium = {
+      id: '2',
+      name: 'medium',
+      description: 'Medium',
+      resources: {
+        requests: { cpu: '1000m', memory: '2Gi' },
+        limits: { cpu: '2000m', memory: '4Gi' },
+      },
+    };
+    let getPodSizes: jest.Mock;
+    const sentToCluster = (mock: jest.Mock) => mock.mock.calls[0][0] as App;
+
+    beforeEach(() => {
+      process.env.KUBERO_READONLY = 'false';
+      (pipelinesService.getContext as jest.Mock).mockResolvedValue('ctx');
+      getPodSizes = configService.getPodSizes as jest.Mock;
+      getPodSizes.mockResolvedValue([small, medium]);
+    });
+
+    it('creates the app with the requests and limits of the chosen size', async () => {
+      const app = new App({
+        ...mockApp,
+        podsize: { ...podsize, name: 'medium' },
+      });
+      await service.createApp(app, { username: 'u' } as any, mockUSerGroups);
+      expect(sentToCluster(kubectl.createApp as jest.Mock).resources).toEqual(
+        medium.resources,
+      );
+    });
+
+    it('applies the size when an existing app is saved again', async () => {
+      const app = new App(mockApp);
+      await service.updateApp(
+        app,
+        'rv',
+        { username: 'u' } as any,
+        mockUSerGroups,
+      );
+      expect(sentToCluster(kubectl.updateApp as jest.Mock).resources).toEqual(
+        small.resources,
+      );
+    });
+
+    it('uses the resources configured in Kubero, not the ones the client sends', async () => {
+      // el body llega sin pasar por la clase App: puede traer cualquier cosa
+      const app = {
+        ...new App(mockApp),
+        podsize: {
+          name: 'small',
+          resources: { limits: { cpu: '64', memory: '512Gi' } },
+        },
+        resources: { limits: { cpu: '64', memory: '512Gi' } },
+      } as unknown as App;
+      await service.createApp(app, { username: 'u' } as any, mockUSerGroups);
+      const sent = sentToCluster(kubectl.createApp as jest.Mock);
+      expect(sent.resources).toEqual(small.resources);
+      expect(sent.podsize.resources).toEqual(small.resources);
+    });
+
+    it('rejects a size that does not exist, without touching the cluster', async () => {
+      const app = new App({ ...mockApp, podsize: { ...podsize, name: 'xxl' } });
+      await expect(
+        service.createApp(app, { username: 'u' } as any, mockUSerGroups),
+      ).rejects.toThrow(BadRequestException);
+      expect(kubectl.createApp).not.toHaveBeenCalled();
+    });
+
+    it('uses the first size when the app does not choose one', async () => {
+      const app = { ...new App(mockApp), podsize: undefined } as unknown as App;
+      await service.createApp(app, { username: 'u' } as any, mockUSerGroups);
+      expect(sentToCluster(kubectl.createApp as jest.Mock).resources).toEqual(
+        small.resources,
+      );
+    });
+
+    it('leaves the container without resources when Kubero has no sizes', async () => {
+      getPodSizes.mockResolvedValue([]);
+      const app = {
+        ...new App(mockApp),
+        resources: { limits: { cpu: '64' } },
+      } as unknown as App;
+      await service.createApp(app, { username: 'u' } as any, mockUSerGroups);
+      expect(sentToCluster(kubectl.createApp as jest.Mock).resources).toEqual(
+        {},
+      );
+    });
+
+    it('podSizeResources drops empty values that Kubernetes would reject', () => {
+      expect(
+        podSizeResources({
+          resources: {
+            requests: { cpu: '', memory: '128Mi' },
+            limits: { cpu: '', memory: '' },
+          },
+        }),
+      ).toEqual({ requests: { memory: '128Mi' } });
+      expect(podSizeResources(undefined)).toEqual({});
     });
   });
 

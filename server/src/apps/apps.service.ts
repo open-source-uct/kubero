@@ -38,6 +38,28 @@ export function addonsByName(addons: unknown): Map<string, unknown> {
   return byName;
 }
 
+// requests y limits del contenedor según un tamaño de pod, sin los valores
+// vacíos: Kubernetes rechaza una cantidad "" y un tamaño puede dejar alguno
+// sin definir
+export function podSizeResources(podsize?: {
+  resources?: Record<string, unknown>;
+}): Record<string, Record<string, string>> {
+  const resources: Record<string, Record<string, string>> = {};
+  for (const kind of ['requests', 'limits']) {
+    const given = podsize?.resources?.[kind];
+    if (!given || typeof given !== 'object') continue;
+    const values: Record<string, string> = {};
+    for (const key of ['cpu', 'memory']) {
+      const value = (given as Record<string, unknown>)[key];
+      if (typeof value === 'string' && value.trim() !== '') {
+        values[key] = value.trim();
+      }
+    }
+    if (Object.keys(values).length > 0) resources[kind] = values;
+  }
+  return resources;
+}
+
 // JSON con las claves ordenadas, para comparar definiciones sin depender del
 // orden en que el cliente las serializa
 function canonical(value: unknown): string {
@@ -111,6 +133,32 @@ export class AppsService {
     }
   }
 
+  // El operador crea los contenedores con app.resources, pero el formulario
+  // solo manda el tamaño elegido (app.podsize): sin esto los pods quedaban sin
+  // requests ni limits (#226). Los recursos salen del tamaño configurado en
+  // Kubero, buscado por nombre, y no de lo que mande el cliente: así nadie
+  // pide más CPU o memoria que los tamaños definidos.
+  private async applyPodSize(app: App): Promise<void> {
+    const sizes = (await this.configService.getPodSizes()) ?? [];
+    // nunca los recursos que mande el cliente
+    app.resources = {};
+    if (sizes.length === 0) {
+      // sin tamaños configurados no hay límites que aplicar
+      return;
+    }
+    const name = app.podsize?.name;
+    // sin tamaño elegido, el primero (como las apps de revisión de PR)
+    const size = name ? sizes.find((s) => s.name === name) : sizes[0];
+    if (!size) {
+      throw new BadRequestException(
+        `El tamaño de pod "${name}" no existe. Tamaños disponibles: ` +
+          sizes.map((s) => s.name).join(', '),
+      );
+    }
+    app.podsize = size;
+    app.resources = podSizeResources(size);
+  }
+
   public async createApp(app: App, user: IUser, userGroups: string[]) {
     this.logger.debug(
       'create App: ' +
@@ -129,6 +177,8 @@ export class AppsService {
       );
       return;
     }
+
+    await this.applyPodSize(app);
 
     const contextName = await this.pipelinesService.getContext(
       app.pipeline,
@@ -804,6 +854,8 @@ export class AppsService {
       );
       return;
     }
+
+    await this.applyPodSize(app);
 
     const contextName = await this.pipelinesService.getContext(
       app.pipeline,

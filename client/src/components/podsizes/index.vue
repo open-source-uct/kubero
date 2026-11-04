@@ -144,10 +144,7 @@
         <v-card-text v-if="editedPodsize">
           <v-text-field v-model="editedPodsize.name" :label="$t('podsizes.form.name')"></v-text-field>
           <v-text-field v-model="editedPodsize.description" :label="$t('podsizes.form.description')"></v-text-field>
-          <v-text-field v-model="editedPodsize.resources.requests.cpu" :label="$t('podsizes.form.cpuRequest')"></v-text-field>
-          <v-text-field v-model="editedPodsize.resources.requests.memory" :label="$t('podsizes.form.memoryRequest')"></v-text-field>
-          <v-text-field v-model="editedPodsize.resources.limits.cpu" :label="$t('podsizes.form.cpuLimit')"></v-text-field>
-          <v-text-field v-model="editedPodsize.resources.limits.memory" :label="$t('podsizes.form.memoryLimit')"></v-text-field>
+          <PodsizeResourceFields v-model="editedPodsize.resources" />
         </v-card-text>
         <v-card-text v-else>
           <v-alert type="error" dismissible>
@@ -157,7 +154,7 @@
         <v-card-actions>
           <v-spacer />
           <v-btn text @click="editDialog = false">{{ $t('global.abort') }}</v-btn>
-          <v-btn color="primary" @click="saveEdit">{{ $t('global.save') }}</v-btn>
+          <v-btn color="primary" :disabled="!editedPodsize || !canSave(editedPodsize)" @click="saveEdit">{{ $t('global.save') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -167,15 +164,12 @@
         <v-card-text>
           <v-text-field v-model="newPodsize.name" :label="$t('podsizes.form.name')"></v-text-field>
           <v-text-field v-model="newPodsize.description" :label="$t('podsizes.form.description')"></v-text-field>
-          <v-text-field v-model="newPodsize.resources.requests.cpu" :label="$t('podsizes.form.cpuRequest')"></v-text-field>
-          <v-text-field v-model="newPodsize.resources.requests.memory" :label="$t('podsizes.form.memoryRequest')"></v-text-field>
-          <v-text-field v-model="newPodsize.resources.limits.cpu" :label="$t('podsizes.form.cpuLimit')"></v-text-field>
-          <v-text-field v-model="newPodsize.resources.limits.memory" :label="$t('podsizes.form.memoryLimit')"></v-text-field>
+          <PodsizeResourceFields v-model="newPodsize.resources" />
         </v-card-text>
         <v-card-actions>
           <v-spacer />
           <v-btn text @click="createDialog = false">{{ $t('global.abort') }}</v-btn>
-          <v-btn color="primary" @click="saveCreate">{{ $t('global.create') }}</v-btn>
+          <v-btn color="primary" :disabled="!canSave(newPodsize)" @click="saveCreate">{{ $t('global.create') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -188,16 +182,20 @@ import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import { handledApiErrorConfig, notifyApiError } from '../../utils/apiFeedback'
 import { confirmDestructiveAction } from '../../utils/destructiveConfirmation'
+import {
+  canonicalResources,
+  PodsizeResources,
+  requestAboveLimit,
+  resourcesComplete,
+} from '../../utils/podsizeOptions'
+import PodsizeResourceFields from './ResourceFields.vue'
 
 
 export default defineComponent({
   name: 'PodsizeList',
+  components: { PodsizeResourceFields },
   setup() {
-    const { t } = useI18n() 
-    type PodsizeResources = {
-      requests: { cpu: string; memory: string }
-      limits: { cpu: string; memory: string }
-    }
+    const { t } = useI18n()
     type Podsize = {
       id?: string
       name: string
@@ -235,8 +233,15 @@ export default defineComponent({
       loading.value = false
     }
     const openEditDialog = (podsize: any) => {
-      editedPodsize.value = JSON.parse(JSON.stringify(podsize))
+      const copy: Podsize = JSON.parse(JSON.stringify(podsize))
+      // "0.5Gi" se muestra como la opción "512Mi", que es lo mismo
+      copy.resources = canonicalResources(copy.resources)
+      editedPodsize.value = copy
       editDialog.value = true
+    }
+    const canSave = (podsize: Podsize) => {
+      const above = requestAboveLimit(podsize.resources)
+      return !!podsize.name.trim() && resourcesComplete(podsize.resources) && !above.cpu && !above.memory
     }
     const saveEdit = async () => {
       try {
@@ -294,6 +299,7 @@ export default defineComponent({
       loading,
       search,
       openEditDialog,
+      canSave,
       deletePodsize,
       editDialog,
       editedPodsize,
