@@ -70,7 +70,12 @@ const messages = {
     },
     usage: {
       title: 'Uso de recursos',
-      description: 'Uso real de CPU y memoria de todas las apps desplegadas por Kubero en el cluster, en vivo.',
+      description: 'Uso real de CPU y memoria de Kubero en el cluster, en vivo, sobre la capacidad total de los nodos.',
+      parts: {
+        apps: 'Apps',
+        addons: 'Bases de datos y servicios',
+        platform: 'Plataforma Kubero',
+      },
     },
     charts: {
       appsByPipeline: 'Aplicaciones por pipeline',
@@ -681,10 +686,11 @@ const messages = {
       search: 'Buscar tamaños de Pod',
       name: 'Nombre del tamaño de Pod',
       description: 'Descripción',
-      cpuRequest: 'CPU solicitada (m)',
-      cpuLimit: 'Límite de CPU (m)',
-      memoryRequest: 'Memoria solicitada (Gi)',
-      memoryLimit: 'Límite de memoria (Gi)',
+      cpuRequest: 'CPU reservada',
+      cpuLimit: 'Límite de CPU',
+      memoryRequest: 'Memoria reservada',
+      memoryLimit: 'Límite de memoria',
+      resourcesHint: 'La reserva es lo que el nodo aparta para cada pod de la app; el límite, lo máximo que puede usar. Si una app supera el límite de memoria, Kubernetes la reinicia.',
       cpu: 'CPU',
       memory: 'Memoria',
     },
@@ -694,6 +700,8 @@ const messages = {
     },
     errors: {
       loadingPodsize: 'Error al cargar tamaños de Pod',
+      required: 'Elige un valor',
+      requestAboveLimit: 'El límite no puede ser menor que la reserva',
     },
   },
   runpacks: {
