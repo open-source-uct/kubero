@@ -24,7 +24,11 @@ import { ReadonlyGuard } from '../common/guards/readonly.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { PodSize } from './podsize/podsize';
-import { CreatePodSizeDto, UpdatePodSizeDto } from './podsize/podsize.dto';
+import {
+  assertRequestsWithinLimits,
+  CreatePodSizeDto,
+  UpdatePodSizeDto,
+} from './podsize/podsize.dto';
 import { CreateRunpackDto } from './dto/runpack.dto';
 import { ValidateKubeconfigDto } from './dto/validate-kubeconfig.dto';
 import { UpdateRunningConfigDto } from './dto/update-running-config.dto';
@@ -304,6 +308,7 @@ export class ConfigController {
     },
   })
   async addPodSize(@Body() body: CreatePodSizeDto) {
+    assertRequestsWithinLimits(body.resources);
     const podsize = new PodSize({
       name: body.name,
       description: body.description,
@@ -383,6 +388,7 @@ export class ConfigController {
     },
   })
   async updatePodSize(@Param('id') id: string, @Body() body: UpdatePodSizeDto) {
+    assertRequestsWithinLimits(body.resources);
     const podsize = new PodSize({
       name: body.name,
       description: body.description,

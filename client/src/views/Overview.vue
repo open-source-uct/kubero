@@ -49,13 +49,21 @@
             :width="6"
             color="primary"
           >
-            <span class="resource-usage__gauge-label">{{ cpuPercent.toFixed(1) }}%</span>
+            <span class="resource-usage__gauge-label">{{ cpuPercentLabel }}</span>
           </v-progress-circular>
           <v-skeleton-loader v-else type="avatar" width="72" height="72" />
-          <div>
+          <div class="resource-usage__detail">
             <span>{{ $t('overview.metrics.cpuUsage') }}</span>
             <v-skeleton-loader v-if="loading" type="text" width="80" />
-            <strong v-else>{{ cpuUsageLabel }} <small>/ {{ cpuCapacityCores }} cores</small></strong>
+            <template v-else>
+              <strong>{{ cpuUsageLabel }} <small v-if="cpuCapacityCores > 0">/ {{ formatCores(cpuCapacityCores) }} cores</small></strong>
+              <dl class="resource-usage__breakdown">
+                <div v-for="part in usageParts" :key="part.key">
+                  <dt>{{ $t(`overview.usage.parts.${part.key}`) }}</dt>
+                  <dd>{{ formatCores(part.cpuCores) }} cores</dd>
+                </div>
+              </dl>
+            </template>
           </div>
         </div>
         <div class="resource-usage__tile">
@@ -66,13 +74,21 @@
             :width="6"
             color="primary"
           >
-            <span class="resource-usage__gauge-label">{{ memoryPercent.toFixed(1) }}%</span>
+            <span class="resource-usage__gauge-label">{{ memoryPercentLabel }}</span>
           </v-progress-circular>
           <v-skeleton-loader v-else type="avatar" width="72" height="72" />
-          <div>
+          <div class="resource-usage__detail">
             <span>{{ $t('overview.metrics.memoryUsage') }}</span>
             <v-skeleton-loader v-if="loading" type="text" width="80" />
-            <strong v-else>{{ memoryUsageValue }} <small>{{ memoryUsageUnit }}</small></strong>
+            <template v-else>
+              <strong>{{ memoryUsageValue }} <small>{{ memoryUsageUnit }}<template v-if="memoryCapacityBytes > 0"> / {{ formatMemory(memoryCapacityBytes) }}</template></small></strong>
+              <dl class="resource-usage__breakdown">
+                <div v-for="part in usageParts" :key="part.key">
+                  <dt>{{ $t(`overview.usage.parts.${part.key}`) }}</dt>
+                  <dd>{{ formatMemory(part.memoryBytes) }}</dd>
+                </div>
+              </dl>
+            </template>
           </div>
         </div>
       </div>
@@ -228,6 +244,14 @@ const cpuCores = ref(0)
 const memoryBytes = ref(0)
 const cpuCapacityCores = ref(0)
 const memoryCapacityBytes = ref(0)
+type Usage = { cpuCores: number, memoryBytes: number }
+type UsagePart = 'apps' | 'addons' | 'platform'
+const emptyUsage = (): Usage => ({ cpuCores: 0, memoryBytes: 0 })
+const usageBreakdown = ref<Record<UsagePart, Usage>>({
+  apps: emptyUsage(),
+  addons: emptyUsage(),
+  platform: emptyUsage(),
+})
 const lastUpdated = ref<Date | null>(null)
 const doughnutCenter = ref({ left: '50%', top: '50%' })
 const doughnutCenterPlugin: Plugin<'doughnut'> = {
@@ -256,18 +280,33 @@ const cpuUsageLabel = computed(() => `${cpuCores.value.toFixed(4)}`)
 // total de unas pocas decenas de MB redondeaba a 0.02 GiB, dando la misma
 // sensación de "no hay actividad" que tenía la CPU. Se muestra en MiB
 // mientras el total no llegue a 1 GiB, y en GiB una vez que sí lo supera.
-const memoryUsageGiB = computed(() => memoryBytes.value / 1024 ** 3)
-const memoryUsageValue = computed(() => (
-  memoryUsageGiB.value >= 1
-    ? memoryUsageGiB.value.toFixed(2)
-    : (memoryBytes.value / 1024 ** 2).toFixed(2)
-))
-const memoryUsageUnit = computed(() => (memoryUsageGiB.value >= 1 ? 'GiB' : 'MiB'))
+const memoryParts = (bytes: number) => (
+  bytes >= 1024 ** 3
+    ? { value: (bytes / 1024 ** 3).toFixed(2), unit: 'GiB' }
+    : { value: (bytes / 1024 ** 2).toFixed(2), unit: 'MiB' }
+)
+const memoryUsageValue = computed(() => memoryParts(memoryBytes.value).value)
+const memoryUsageUnit = computed(() => memoryParts(memoryBytes.value).unit)
+const formatMemory = (bytes: number) => {
+  const { value, unit } = memoryParts(bytes)
+  return `${value} ${unit}`
+}
+// un núcleo entero con 2 decimales; menos de uno, con 3 para que el uso en
+// reposo de las apps (milésimas) no se vea como cero
+const formatCores = (cores: number) => cores.toFixed(cores >= 1 ? 2 : 3)
+const usageParts = computed(() => (['apps', 'addons', 'platform'] as UsagePart[]).map((key) => ({
+  key,
+  ...usageBreakdown.value[key],
+})))
 // % contra la capacidad real del cluster (kube_node_status_allocatable), no
 // un total inventado — así el número significa algo aunque el cluster sea
 // chico (de prueba) o grande (producción)
 const cpuPercent = computed(() => (cpuCapacityCores.value > 0 ? (cpuCores.value / cpuCapacityCores.value) * 100 : 0))
 const memoryPercent = computed(() => (memoryCapacityBytes.value > 0 ? (memoryBytes.value / memoryCapacityBytes.value) * 100 : 0))
+// sin la capacidad del cluster no hay porcentaje que mostrar: "—" y no un 0%
+// que parece una medición
+const cpuPercentLabel = computed(() => (cpuCapacityCores.value > 0 ? `${cpuPercent.value.toFixed(1)}%` : '—'))
+const memoryPercentLabel = computed(() => (memoryCapacityBytes.value > 0 ? `${memoryPercent.value.toFixed(1)}%` : '—'))
 
 const metrics = computed(() => [
   { label: t('overview.metrics.pipelines'), value: pipelines.value.length },
@@ -389,6 +428,16 @@ async function loadOverview() {
     memoryBytes.value = Number(usageResult.value.data?.memoryBytes) || 0
     cpuCapacityCores.value = Number(usageResult.value.data?.cpuCapacityCores) || 0
     memoryCapacityBytes.value = Number(usageResult.value.data?.memoryCapacityBytes) || 0
+    const breakdown = usageResult.value.data?.breakdown ?? {}
+    const toUsage = (part: Partial<Usage> | undefined): Usage => ({
+      cpuCores: Number(part?.cpuCores) || 0,
+      memoryBytes: Number(part?.memoryBytes) || 0,
+    })
+    usageBreakdown.value = {
+      apps: toUsage(breakdown.apps),
+      addons: toUsage(breakdown.addons),
+      platform: toUsage(breakdown.platform),
+    }
   }
   // sin loadError acá: a diferencia de pipelines/usuarios/equipos, las
   // métricas son opcionales (Prometheus puede no estar configurado) y no
@@ -428,6 +477,11 @@ onMounted(() => {
 .resource-usage__tile strong { display: block; margin-top: 2px; color: rgb(var(--v-theme-on-cardBackground)); font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
 .resource-usage__tile strong small { font-size: .75rem; font-weight: 500; opacity: .6; }
 .resource-usage__gauge-label { color: rgb(var(--v-theme-on-cardBackground)); font-size: .8125rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.resource-usage__detail { min-width: 0; flex: 1; }
+.resource-usage__breakdown { display: grid; gap: 2px; margin: 8px 0 0; padding-top: 8px; border-top: 1px solid rgba(var(--v-theme-on-cardBackground), .1); }
+.resource-usage__breakdown > div { display: flex; justify-content: space-between; gap: 12px; font-size: .75rem; line-height: 1.5; }
+.resource-usage__breakdown dt { color: rgb(var(--v-theme-on-cardBackground)); opacity: .62; }
+.resource-usage__breakdown dd { margin: 0; color: rgb(var(--v-theme-on-cardBackground)); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .chart-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(320px, .85fr); gap: 24px; margin-bottom: 24px; }
 .dashboard-panel { min-width: 0; padding: 24px; background: rgb(var(--v-theme-cardBackground)); }
 .panel-heading { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; margin-bottom: 20px; }

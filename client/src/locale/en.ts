@@ -70,7 +70,12 @@ const messages = {
         },
         usage: {
           title: 'Resource usage',
-          description: 'Live CPU and memory usage across all apps deployed by Kubero in the cluster.',
+          description: 'Live CPU and memory used by Kubero in the cluster, against the total capacity of the nodes.',
+          parts: {
+            apps: 'Apps',
+            addons: 'Databases and services',
+            platform: 'Kubero platform',
+          },
         },
         charts: {
           appsByPipeline: 'Applications by pipeline',
@@ -681,10 +686,11 @@ const messages = {
           search: 'Search pod sizes',
           name: 'Pod Size Name',
           description: 'Description',
-          cpuRequest: 'CPU Request (m)',
-          cpuLimit: 'CPU Limit (m)',
-          memoryRequest: 'Memory Request (Gi)',
-          memoryLimit: 'Memory Limit (Gi)',
+          cpuRequest: 'CPU request',
+          cpuLimit: 'CPU limit',
+          memoryRequest: 'Memory request',
+          memoryLimit: 'Memory limit',
+          resourcesHint: 'The request is what the node sets aside for each pod of the app; the limit is the most it can use. If an app goes over its memory limit, Kubernetes restarts it.',
           cpu: 'CPU',
           memory: 'Memory',
         },
@@ -694,6 +700,8 @@ const messages = {
         },
         errors: {
           loadingPodsize: 'Error loading Pod Sizes',
+          required: 'Choose a value',
+          requestAboveLimit: 'The limit cannot be lower than the request',
         },
       },
       runpacks: {
