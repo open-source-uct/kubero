@@ -471,6 +471,9 @@ describe('ConfigService', () => {
       expect(result[0].description).toBe('Small pod size');
       expect(result[0].resources.requests?.memory).toBe('128Mi');
       expect(result[0].resources.limits?.memory).toBe('256Mi');
+      // la reserva de CPU es la suya, no el límite
+      expect(result[0].resources.requests?.cpu).toBe('100m');
+      expect(result[0].resources.limits?.cpu).toBe('200m');
       expect(result[1].name).toBe('medium');
     });
 

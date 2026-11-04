@@ -676,7 +676,8 @@ export class ConfigService {
           resources: {
             requests: {
               memory: ps.memoryRequest || '',
-              cpu: ps.cpuLimit || '',
+              // antes se leía cpuLimit: la reserva de CPU quedaba igual al límite
+              cpu: ps.cpuRequest || '',
             },
             limits: {
               memory: ps.memoryLimit || '',
