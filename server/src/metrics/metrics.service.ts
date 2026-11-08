@@ -17,6 +17,34 @@ import {
 // nombre de namespace válido: va dentro de un regex de PromQL
 const DNS_LABEL = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 
+// Sin timeout, un Prometheus lento o caído deja colgadas las peticiones de
+// métricas (y la vista que las espera). En la U cada consulta tarda ~150 ms.
+const PROMETHEUS_TIMEOUT_MS = 5000;
+
+// prometheus-query rechaza con un objeto plano ({ errorType, error, original })
+// que como texto queda en "[object Object]". Solo se registran el tipo y el
+// mensaje: `original` es el error de axios con toda su configuración. Si la
+// URL del endpoint llevara usuario:contraseña@, se ocultan antes de registrar.
+export function describePrometheusError(error: unknown): string {
+  // también con una sola barra (http:/user:pass@host), como el error de axios
+  // al recibir una URL mal escrita
+  const redact = (text: string) =>
+    text.replace(/([a-z][a-z0-9+.-]*:\/{1,2})[^/\s@]+@/gi, '$1***@');
+  if (error instanceof Error) return redact(error.message);
+  if (error && typeof error === 'object') {
+    const { errorType, error: message } = error as {
+      errorType?: unknown;
+      error?: unknown;
+    };
+    if (typeof message === 'string') {
+      return redact(
+        typeof errorType === 'string' ? `${errorType}: ${message}` : message,
+      );
+    }
+  }
+  return typeof error === 'string' ? redact(error) : 'unknown error';
+}
+
 @Injectable()
 export class MetricsService {
   private prom: PrometheusDriver;
@@ -38,6 +66,7 @@ export class MetricsService {
       endpoint: options.endpoint,
       preferPost: false,
       withCredentials: false,
+      timeout: PROMETHEUS_TIMEOUT_MS,
     });
 
     if (!options.enabled) {
@@ -146,7 +175,9 @@ export class MetricsService {
         values[key] = Number(results[i]?.result[0]?.value?.value) || 0;
       });
     } catch (error) {
-      Logger.warn('error fetching cluster-wide usage: ' + error);
+      Logger.warn(
+        'error fetching cluster-wide usage: ' + describePrometheusError(error),
+      );
     }
     const usage = (prefix: string) => ({
       cpuCores: values[prefix + 'Cpu'] ?? 0,

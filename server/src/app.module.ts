@@ -26,11 +26,13 @@ import { GroupModule } from './groups/groups.module';
 import { RolesModule } from './roles/roles.module';
 import { TokenModule } from './token/token.module';
 import { CliModule } from './cli/cli.module';
+import { setStaticCacheHeaders } from './static-cache';
 
 @Module({
   imports: [
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, 'public'),
+      serveStaticOptions: { setHeaders: setStaticCacheHeaders },
     }),
     EventsModule,
     AuthModule,

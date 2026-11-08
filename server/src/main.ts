@@ -8,6 +8,10 @@ import { AppModule } from './app.module';
 import { DatabaseService } from './database/database.service';
 
 import helmet from 'helmet';
+// sin esModuleInterop: `import compression from` compila a `.default`, que
+// este paquete (CommonJS) no tiene, y el servidor no arrancaría
+import * as compression from 'compression';
+import { shouldCompress } from './static-cache';
 
 import * as dotenv from 'dotenv';
 dotenv.config();
@@ -38,6 +42,13 @@ async function bootstrap() {
   app.useGlobalPipes(createValidationPipe());
 
   await DatabaseService.DBinit();
+
+  // Comprime (gzip/brotli) la web estática: el JS y el CSS pasan de ~1,3 MB a
+  // ~300 KB. La API queda fuera a propósito: sus respuestas llevan secretos
+  // (token de login, variables de entorno, contraseñas de addons) junto a
+  // datos que escribe el usuario, y comprimir eso sobre HTTPS abre la puerta
+  // a BREACH. socket.io (logs, consola) no pasa por Express.
+  app.use(compression({ filter: shouldCompress }));
 
   app.use(
     helmet({
