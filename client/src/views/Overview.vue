@@ -24,7 +24,7 @@
       </div>
       <div v-for="metric in metrics" :key="metric.label" class="operations-band__metric">
         <span>{{ metric.label }}</span>
-        <v-skeleton-loader v-if="loading" type="text" width="48" />
+        <v-skeleton-loader v-if="metric.loading" type="text" width="48" />
         <strong v-else>{{ metric.value }}</strong>
       </div>
       <div class="operations-band__updated">
@@ -43,7 +43,7 @@
       <div class="resource-usage__tiles">
         <div class="resource-usage__tile">
           <v-progress-circular
-            v-if="!loading"
+            v-if="!usageLoading"
             :model-value="Math.min(cpuPercent, 100)"
             :size="72"
             :width="6"
@@ -54,7 +54,7 @@
           <v-skeleton-loader v-else type="avatar" width="72" height="72" />
           <div class="resource-usage__detail">
             <span>{{ $t('overview.metrics.cpuUsage') }}</span>
-            <v-skeleton-loader v-if="loading" type="text" width="80" />
+            <v-skeleton-loader v-if="usageLoading" type="text" width="80" />
             <template v-else>
               <strong>{{ cpuUsageLabel }} <small v-if="cpuCapacityCores > 0">/ {{ formatCores(cpuCapacityCores) }} cores</small></strong>
               <dl class="resource-usage__breakdown">
@@ -68,7 +68,7 @@
         </div>
         <div class="resource-usage__tile">
           <v-progress-circular
-            v-if="!loading"
+            v-if="!usageLoading"
             :model-value="Math.min(memoryPercent, 100)"
             :size="72"
             :width="6"
@@ -79,7 +79,7 @@
           <v-skeleton-loader v-else type="avatar" width="72" height="72" />
           <div class="resource-usage__detail">
             <span>{{ $t('overview.metrics.memoryUsage') }}</span>
-            <v-skeleton-loader v-if="loading" type="text" width="80" />
+            <v-skeleton-loader v-if="usageLoading" type="text" width="80" />
             <template v-else>
               <strong>{{ memoryUsageValue }} <small>{{ memoryUsageUnit }}<template v-if="memoryCapacityBytes > 0"> / {{ formatMemory(memoryCapacityBytes) }}</template></small></strong>
               <dl class="resource-usage__breakdown">
@@ -105,7 +105,7 @@
             {{ $t('overview.charts.topPipelines', { count: visiblePipelineRows.length }) }}
           </v-chip>
         </div>
-        <div v-if="loading" class="chart-loading"><v-progress-circular indeterminate color="primary" /></div>
+        <div v-if="pipelinesLoading && !hasPipelineData" class="chart-loading"><v-progress-circular indeterminate color="primary" /></div>
         <div v-else-if="hasPipelineData" class="bar-chart" :style="barChartStyle">
           <Bar :data="appsByPipelineData" :options="barOptions" :aria-label="$t('overview.charts.appsByPipeline')" />
         </div>
@@ -119,7 +119,7 @@
             <p>{{ $t('overview.charts.appsByPhaseDescription') }}</p>
           </div>
         </div>
-        <div v-if="loading" class="chart-loading"><v-progress-circular indeterminate color="primary" /></div>
+        <div v-if="pipelinesLoading && totalApps === 0" class="chart-loading"><v-progress-circular indeterminate color="primary" /></div>
         <div v-else-if="totalApps > 0" class="doughnut-chart">
           <Doughnut :data="appsByPhaseData" :options="doughnutOptions" :plugins="[doughnutCenterPlugin]" :aria-label="$t('overview.charts.appsByPhase')" />
           <div class="doughnut-total" :style="doughnutCenter" aria-hidden="true"><strong>{{ totalApps }}</strong><span>{{ $t('overview.metrics.apps') }}</span></div>
@@ -175,9 +175,9 @@
                 <v-btn :to="`/pipeline/${encodeURIComponent(pipeline.name)}/apps`" icon="mdi-arrow-right" variant="text" color="primary" size="small" :aria-label="$t('overview.inventory.openPipeline', { name: pipeline.name })" />
               </td>
             </tr>
-            <tr v-if="!loading && pipelineRows.length === 0"><td colspan="6"><div class="table-empty"><v-icon icon="mdi-source-branch" size="28" /><span>{{ $t('overview.inventory.empty') }}</span></div></td></tr>
-            <template v-if="loading">
-              <tr v-for="index in 3" :key="`skeleton-${index}`"><td colspan="6"><v-skeleton-loader type="list-item" /></td></tr>
+            <tr v-if="!pipelinesLoading && pipelineRows.length === 0"><td colspan="6"><div class="table-empty"><v-icon icon="mdi-source-branch" size="28" /><span>{{ $t('overview.inventory.empty') }}</span></div></td></tr>
+            <template v-if="pipelinesLoading">
+              <tr v-for="index in skeletonRows" :key="`skeleton-${index}`"><td colspan="6"><v-skeleton-loader type="list-item" /></td></tr>
             </template>
           </tbody>
         </v-table>
@@ -235,7 +235,15 @@ const authStore = useAuthStore()
 const kuberoStore = useKuberoStore()
 const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
-const loading = ref(false)
+// Cada bloque tiene su propio estado de carga: así lo que llega primero se
+// muestra sin esperar al resto (antes todo esperaba a la petición más lenta).
+const pipelineListLoading = ref(false)
+const pipelinesLoading = ref(false)
+const pendingPipelines = ref(0)
+const usersLoading = ref(false)
+const teamsLoading = ref(false)
+const usageLoading = ref(false)
+const loading = computed(() => pipelinesLoading.value || usersLoading.value || teamsLoading.value || usageLoading.value)
 const loadError = ref(false)
 const pipelines = ref<PipelineRow[]>([])
 const userCount = ref(0)
@@ -271,6 +279,7 @@ const totalApps = computed(() => pipelines.value.reduce((sum, pipeline) => sum +
 const enabledPhaseCount = computed(() => pipelines.value.reduce((sum, pipeline) => sum + pipeline.phases.filter((phase) => phase.enabled).length, 0))
 const hasPipelineData = computed(() => visiblePipelineRows.value.length > 0)
 const lastUpdatedLabel = computed(() => lastUpdated.value ? new Intl.DateTimeFormat(locale.value, { hour: '2-digit', minute: '2-digit' }).format(lastUpdated.value) : '—')
+const skeletonRows = computed(() => (pipelineListLoading.value ? 3 : Math.min(3, pendingPipelines.value)))
 const barChartStyle = computed(() => ({ height: `${Math.max(260, visiblePipelineRows.value.length * 42)}px` }))
 
 // 4 decimales: con apps en reposo el uso real (ej. 0.002 cores) redondeaba a
@@ -309,11 +318,12 @@ const cpuPercentLabel = computed(() => (cpuCapacityCores.value > 0 ? `${cpuPerce
 const memoryPercentLabel = computed(() => (memoryCapacityBytes.value > 0 ? `${memoryPercent.value.toFixed(1)}%` : '—'))
 
 const metrics = computed(() => [
-  { label: t('overview.metrics.pipelines'), value: pipelines.value.length },
-  { label: t('overview.metrics.apps'), value: totalApps.value },
-  { label: t('overview.metrics.activePhases'), value: enabledPhaseCount.value },
-  { label: t('overview.metrics.teams'), value: teamCount.value },
-  { label: t('overview.metrics.users'), value: userCount.value },
+  { label: t('overview.metrics.pipelines'), value: pipelines.value.length, loading: pipelinesLoading.value },
+  // un total parcial confundiría: estos dos esperan a que lleguen todos los pipelines
+  { label: t('overview.metrics.apps'), value: totalApps.value, loading: pipelinesLoading.value },
+  { label: t('overview.metrics.activePhases'), value: enabledPhaseCount.value, loading: pipelinesLoading.value },
+  { label: t('overview.metrics.teams'), value: teamCount.value, loading: teamsLoading.value },
+  { label: t('overview.metrics.users'), value: userCount.value, loading: usersLoading.value },
 ])
 
 const capabilities = computed(() => [
@@ -381,8 +391,15 @@ function summarizePipeline(pipeline: ApiPipeline): PipelineRow {
   }
 }
 
+// Pide el detalle de cada pipeline (4 a la vez) y publica cada fila apenas
+// llega, para que la tabla y los gráficos se vayan llenando. Al refrescar se
+// mantienen las filas anteriores hasta que llega su versión nueva.
 async function loadPipelineDetails(source: ApiPipeline[]) {
-  const rows = new Array<PipelineRow>(source.length)
+  const previous = new Map(pipelines.value.map((row) => [row.name, row]))
+  const rows: Array<PipelineRow | undefined> = source.map((pipeline) => previous.get(pipeline.name))
+  const publish = () => { pipelines.value = rows.filter((row): row is PipelineRow => row !== undefined) }
+  publish()
+  pendingPipelines.value = source.length
   let cursor = 0
   async function worker() {
     while (cursor < source.length) {
@@ -395,40 +412,62 @@ async function loadPipelineDetails(source: ApiPipeline[]) {
         rows[index] = summarizePipeline(pipeline)
         loadError.value = true
       }
+      pendingPipelines.value--
+      publish()
     }
   }
   await Promise.all(Array.from({ length: Math.min(4, source.length) }, () => worker()))
-  return rows
 }
 
-async function loadOverview() {
-  loading.value = true
-  loadError.value = false
-
-  const [pipelinesResult, usersResult, groupsResult, usageResult] = await Promise.allSettled([
-    axios.get('/api/pipelines'),
-    axios.get('/api/users/count'),
-    axios.get('/api/groups'),
-    axios.get('/api/metrics/cluster-usage'),
-  ])
-
-  if (pipelinesResult.status === 'fulfilled') {
-    const source = (pipelinesResult.value.data?.items ?? []) as ApiPipeline[]
-    pipelines.value = await loadPipelineDetails(source)
-  } else {
+async function loadPipelines() {
+  pipelinesLoading.value = true
+  pipelineListLoading.value = true
+  try {
+    const response = await axios.get('/api/pipelines')
+    pipelineListLoading.value = false
+    await loadPipelineDetails((response.data?.items ?? []) as ApiPipeline[])
+  } catch {
     pipelines.value = []
     loadError.value = true
+  } finally {
+    pipelineListLoading.value = false
+    pendingPipelines.value = 0
+    pipelinesLoading.value = false
   }
-  if (usersResult.status === 'fulfilled') userCount.value = Number(usersResult.value.data) || 0
-  else loadError.value = true
-  if (groupsResult.status === 'fulfilled') teamCount.value = Array.isArray(groupsResult.value.data) ? groupsResult.value.data.length : 0
-  else loadError.value = true
-  if (usageResult.status === 'fulfilled') {
-    cpuCores.value = Number(usageResult.value.data?.cpuCores) || 0
-    memoryBytes.value = Number(usageResult.value.data?.memoryBytes) || 0
-    cpuCapacityCores.value = Number(usageResult.value.data?.cpuCapacityCores) || 0
-    memoryCapacityBytes.value = Number(usageResult.value.data?.memoryCapacityBytes) || 0
-    const breakdown = usageResult.value.data?.breakdown ?? {}
+}
+
+async function loadUserCount() {
+  usersLoading.value = true
+  try {
+    userCount.value = Number((await axios.get('/api/users/count')).data) || 0
+  } catch {
+    loadError.value = true
+  } finally {
+    usersLoading.value = false
+  }
+}
+
+async function loadTeamCount() {
+  teamsLoading.value = true
+  try {
+    const { data } = await axios.get('/api/groups')
+    teamCount.value = Array.isArray(data) ? data.length : 0
+  } catch {
+    loadError.value = true
+  } finally {
+    teamsLoading.value = false
+  }
+}
+
+async function loadUsage() {
+  usageLoading.value = true
+  try {
+    const { data } = await axios.get('/api/metrics/cluster-usage')
+    cpuCores.value = Number(data?.cpuCores) || 0
+    memoryBytes.value = Number(data?.memoryBytes) || 0
+    cpuCapacityCores.value = Number(data?.cpuCapacityCores) || 0
+    memoryCapacityBytes.value = Number(data?.memoryCapacityBytes) || 0
+    const breakdown = data?.breakdown ?? {}
     const toUsage = (part: Partial<Usage> | undefined): Usage => ({
       cpuCores: Number(part?.cpuCores) || 0,
       memoryBytes: Number(part?.memoryBytes) || 0,
@@ -438,13 +477,22 @@ async function loadOverview() {
       addons: toUsage(breakdown.addons),
       platform: toUsage(breakdown.platform),
     }
+  } catch {
+    // sin loadError acá: a diferencia de pipelines/usuarios/equipos, las
+    // métricas son opcionales (Prometheus puede no estar configurado) y no
+    // deben mostrar el aviso de carga incompleta si solo falta esto
+  } finally {
+    usageLoading.value = false
   }
-  // sin loadError acá: a diferencia de pipelines/usuarios/equipos, las
-  // métricas son opcionales (Prometheus puede no estar configurado) y no
-  // deben mostrar el aviso de carga incompleta si solo falta esto
+}
 
+async function loadOverview() {
+  if (loading.value) return
+  loadError.value = false
+  // en paralelo y sin depender entre sí: la vista ya no espera a las
+  // métricas para empezar a pedir los pipelines
+  await Promise.all([loadPipelines(), loadUserCount(), loadTeamCount(), loadUsage()])
   lastUpdated.value = new Date()
-  loading.value = false
 }
 
 onMounted(() => {

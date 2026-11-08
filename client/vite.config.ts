@@ -41,6 +41,12 @@ export default defineConfig({
           },
         ],
       },
+      // Sin esto, el plugin precarga TODAS las fuentes del bundle (los 4
+      // formatos del icono MDI, ~3,4 MB) aunque el navegador use solo una.
+      custom: {
+        families: [],
+        preload: false,
+      },
     }),
   ],
   define: { 

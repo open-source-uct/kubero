@@ -1,4 +1,4 @@
-import { MetricsService } from './metrics.service';
+import { MetricsService, describePrometheusError } from './metrics.service';
 
 jest.mock('prometheus-query', () => {
   return {
@@ -421,5 +421,41 @@ describe('MetricsService', () => {
       const res = await service.getCPUMetrics(base as any);
       expect(res.map((r) => r.name).sort()).toEqual(['a', 'b']);
     });
+  });
+});
+
+describe('describePrometheusError', () => {
+  it('usa el tipo y el mensaje del objeto de prometheus-query, sin "original"', () => {
+    const text = describePrometheusError({
+      status: 'error',
+      errorType: 'network_error',
+      error: 'Invalid URL "http:/127.0.0.1:9091/api/v1/"',
+      original: { config: { headers: { Authorization: 'Bearer x' } } },
+    });
+    expect(text).toBe(
+      'network_error: Invalid URL "http:/127.0.0.1:9091/api/v1/"',
+    );
+    expect(text).not.toContain('Bearer');
+  });
+
+  it('oculta usuario y contraseña si vienen en la URL', () => {
+    const text = describePrometheusError({
+      errorType: 'network_error',
+      error:
+        'Invalid URL "http:/admin:s3cr3t@prom:9090/api/v1/" y http://u:p@x',
+    });
+    expect(text).not.toContain('s3cr3t');
+    expect(text).not.toContain('u:p@');
+    expect(text).toContain('//***@x');
+    expect(
+      describePrometheusError(new Error('connect to http://a:b@prom failed')),
+    ).toBe('connect to http://***@prom failed');
+  });
+
+  it('acepta errores normales y valores sueltos', () => {
+    expect(
+      describePrometheusError(new Error('timeout of 5000ms exceeded')),
+    ).toBe('timeout of 5000ms exceeded');
+    expect(describePrometheusError('falló')).toBe('falló');
   });
 });
