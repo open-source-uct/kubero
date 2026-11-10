@@ -170,7 +170,18 @@
                   <span v-if="pipeline.teams.length === 0">{{ $t('overview.inventory.adminOnly') }}</span>
                 </div>
               </td>
-              <td><v-chip variant="tonal" size="small" label>{{ pipeline.managedRepository ? $t('overview.inventory.managedRepository') : $t('overview.inventory.connectedRepository') }}</v-chip></td>
+              <td>
+                <ul v-if="pipeline.images.length > 0" class="image-list">
+                  <li v-for="image in pipeline.images.slice(0, MAX_IMAGES_SHOWN)" :key="image.key" class="image-source" :title="image.full">
+                    <v-chip size="x-small" variant="tonal" color="primary" label>{{ image.registry }}</v-chip>
+                    <span class="image-source__path">{{ image.path }}</span>
+                  </li>
+                  <li v-if="pipeline.images.length > MAX_IMAGES_SHOWN" class="image-source__more">
+                    {{ $t('overview.inventory.moreImages', { count: pipeline.images.length - MAX_IMAGES_SHOWN }, pipeline.images.length - MAX_IMAGES_SHOWN) }}
+                  </li>
+                </ul>
+                <span v-else class="image-source__empty">{{ $t('overview.inventory.noApps') }}</span>
+              </td>
               <td class="text-end">
                 <v-btn :to="`/pipeline/${encodeURIComponent(pipeline.name)}/apps`" icon="mdi-arrow-right" variant="text" color="primary" size="small" :aria-label="$t('overview.inventory.openPipeline', { name: pipeline.name })" />
               </td>
@@ -217,16 +228,21 @@ import { useKuberoStore } from '@/stores/kubero'
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend)
 
-interface ApiPhase { name: string; enabled: boolean; apps?: unknown[] }
+interface ApiApp { image?: { repository?: string; tag?: string } }
+interface ApiPhase { name: string; enabled: boolean; apps?: ApiApp[] }
 interface ApiPipeline {
   name: string
   domain?: string
   phases?: ApiPhase[]
   access?: { teams?: string[] }
-  git?: { repository?: { admin?: boolean } }
 }
 interface PipelinePhaseSummary { name: string; enabled: boolean; appCount: number }
-interface PipelineRow { name: string; domain: string; appCount: number; phases: PipelinePhaseSummary[]; teams: string[]; managedRepository: boolean }
+// De dónde viene lo que se despliega: Kubero solo despliega imágenes ya
+// construidas (#97), así que el origen es el registry y el repositorio de la
+// imagen de cada app, no un repositorio git.
+interface ImageSource { key: string; registry: string; path: string; full: string }
+interface PipelineRow { name: string; domain: string; appCount: number; phases: PipelinePhaseSummary[]; teams: string[]; images: ImageSource[] }
+const MAX_IMAGES_SHOWN = 3
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -380,15 +396,49 @@ function withAlpha(color: string, alpha: number) {
 }
 
 function summarizePipeline(pipeline: ApiPipeline): PipelineRow {
-  const phases = (pipeline.phases ?? []).map((phase) => ({ name: phase.name, enabled: phase.enabled, appCount: phase.apps?.length ?? 0 }))
+  // review (apps por PR) necesitaba un repo git; el formulario ya no deja
+  // activarla (#97): se oculta salvo en un pipeline antiguo que la tenga activa
+  const phases = (pipeline.phases ?? [])
+    .filter((phase) => phase.name !== 'review' || phase.enabled)
+    .map((phase) => ({ name: phase.name, enabled: phase.enabled, appCount: phase.apps?.length ?? 0 }))
   return {
     name: pipeline.name,
     domain: pipeline.domain ?? '',
     phases,
     appCount: phases.reduce((sum, phase) => sum + phase.appCount, 0),
     teams: pipeline.access?.teams ?? [],
-    managedRepository: Boolean(pipeline.git?.repository?.admin),
+    images: pipelineImages(pipeline),
   }
+}
+
+// Separa "ghcr.io/org/app" en registry y ruta, con las mismas reglas que
+// Docker: si el primer tramo no parece un host (sin punto ni puerto, y no es
+// localhost), la imagen es de Docker Hub ("nginx" o "usuario/app").
+function parseImage(repository: string): { registry: string; path: string } {
+  const [first, ...rest] = repository.split('/')
+  const isHost = rest.length > 0 && (first.includes('.') || first.includes(':') || first === 'localhost')
+  return isHost ? { registry: first, path: rest.join('/') } : { registry: 'docker.io', path: repository }
+}
+
+// Una entrada por imagen distinta (sin el tag): las apps de un mismo
+// repositorio con distinto tag, como client-latest y server-latest, se juntan.
+function pipelineImages(pipeline: ApiPipeline): ImageSource[] {
+  const images = new Map<string, ImageSource & { tags: Set<string> }>()
+  for (const phase of pipeline.phases ?? []) {
+    for (const app of phase.apps ?? []) {
+      const repository = app.image?.repository?.trim()
+      if (!repository) continue
+      const { registry, path } = parseImage(repository)
+      const key = `${registry}/${path}`
+      const image = images.get(key) ?? { key, registry, path, full: key, tags: new Set<string>() }
+      if (app.image?.tag) image.tags.add(app.image.tag)
+      images.set(key, image)
+    }
+  }
+  return [...images.values()].map(({ tags, ...image }) => ({
+    ...image,
+    full: tags.size ? `${image.key} (${[...tags].join(', ')})` : image.key,
+  }))
 }
 
 // Pide el detalle de cada pipeline (4 a la vez) y publica cada fila apenas
@@ -542,7 +592,8 @@ onMounted(() => {
 .chart-loading, .chart-empty { display: flex; min-height: 280px; flex-direction: column; gap: 10px; align-items: center; justify-content: center; color: rgb(var(--v-theme-on-cardBackground)); opacity: .62; }
 .pipeline-inventory { margin-bottom: 24px; }
 .pipeline-inventory__heading { align-items: center; }
-.pipeline-table-wrap { overflow-x: auto; border: 1px solid var(--uct-corp-gray-border); border-radius: 8px; }
+/* relative: el .sr-only del encabezado no escapa del scroll (ver resource-list.css) */
+.pipeline-table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--uct-corp-gray-border); border-radius: 8px; }
 .pipeline-table { min-width: 880px; background: transparent; }
 .pipeline-table :deep(th) { color: rgb(var(--v-theme-on-cardBackground)); font-size: .6875rem; font-weight: 600 !important; letter-spacing: .05em; text-transform: uppercase; opacity: .6; }
 .pipeline-table :deep(tbody tr:last-child td) { border-bottom: 0; }
@@ -553,6 +604,11 @@ onMounted(() => {
 .numeric-cell { font-family: var(--uct-font-mono); font-weight: 600; font-variant-numeric: tabular-nums; }
 .phase-list, .team-list { display: flex; min-width: 180px; flex-wrap: wrap; gap: 6px; }
 .team-list > span { color: rgb(var(--v-theme-on-cardBackground)); font-size: .75rem; opacity: .62; }
+.image-list { display: flex; min-width: 200px; max-width: 300px; flex-direction: column; gap: 6px; padding: 10px 0; margin: 0; list-style: none; }
+.image-source { display: flex; min-width: 0; gap: 8px; align-items: center; }
+.image-source :deep(.v-chip) { flex: 0 0 auto; font-weight: 600; }
+.image-source__path { min-width: 0; overflow: hidden; color: rgb(var(--v-theme-on-cardBackground)); font-family: var(--uct-font-mono); font-size: .75rem; text-overflow: ellipsis; white-space: nowrap; }
+.image-source__more, .image-source__empty { color: rgb(var(--v-theme-on-cardBackground)); font-size: .75rem; opacity: .62; }
 .table-empty { display: flex; min-height: 120px; flex-direction: column; gap: 8px; align-items: center; justify-content: center; color: rgb(var(--v-theme-on-cardBackground)); opacity: .6; }
 .system-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
 .status-list { margin: 0; border-top: 1px solid var(--uct-corp-gray-border); }
