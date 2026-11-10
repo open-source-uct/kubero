@@ -96,7 +96,8 @@
                                 <td>{{metric.name}}</td>
                                 <td>{{metric.cpu.usage}}{{metric.cpu.unit}}</td>
                                 <td>{{metric.memory.usage}}{{metric.memory.unit}}</td>
-                                <td>{{metric.uptime.formatted}}</td>
+                                <!-- un pod puede aparecer en las métricas antes que en los uptimes (recién creado): sin esto se cae toda la vista -->
+                                <td>{{ metric.uptime?.formatted ?? '—' }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -104,11 +105,28 @@
                 </section>
 
                 <section class="app-stats__section">
-                    <div class="app-stats__section-header">
+                    <div class="app-stats__section-header" :class="{ 'app-stats__section-header--collapsed': !envExpanded }">
                     <h2 class="app-stats__title">
-                        {{ $t('app.titles.environmentVariables') }}
+                        <button
+                            type="button"
+                            class="app-stats__toggle"
+                            :aria-expanded="envExpanded"
+                            aria-controls="app-stats-env-vars"
+                            @click="toggleEnvVars"
+                        >
+                            <v-icon
+                                icon="mdi-chevron-down"
+                                size="20"
+                                class="app-stats__chevron"
+                                :class="{ 'app-stats__chevron--open': envExpanded }"
+                                aria-hidden="true"
+                            />
+                            {{ $t('app.titles.environmentVariables') }}
+                            <span class="app-stats__count">{{ envVarCount }}</span>
+                        </button>
                     </h2>
                         <v-btn
+                            v-if="envExpanded"
                             color="primary"
                             variant="tonal"
                             size="small"
@@ -119,6 +137,8 @@
                             {{ showEnvValues ? $t('app.form.hideEnvValues') : $t('app.form.showEnvValues') }}
                         </v-btn>
                     </div>
+                    <v-expand-transition>
+                    <div v-show="envExpanded" id="app-stats-env-vars">
                     <v-table class="app-stats__table app-stats__table--code" density="comfortable">
                         <thead>
                         <tr>
@@ -138,6 +158,8 @@
                         </tr>
                         </tbody>
                     </v-table>
+                    </div>
+                    </v-expand-transition>
                 </section>
 
                 <section class="app-stats__section" v-if="appData.spec.saAnnotations?.length > 0">
@@ -478,7 +500,15 @@ export default defineComponent({
             metricsInterval: 0 as any, // can't find the right type for this
             uptimes: {} as any,
             showEnvValues: false,
+            // plegadas al entrar: hay apps con muchas variables que alargan
+            // la página; se despliegan con la flecha del título
+            envExpanded: false,
         }
+    },
+    computed: {
+        envVarCount(): number {
+            return this.appData?.spec?.envVars?.length ?? 0;
+        },
     },
     components: {
         Addons,
@@ -491,6 +521,12 @@ export default defineComponent({
         clearInterval(this.metricsInterval);
     },
     methods: {
+        toggleEnvVars() {
+            this.envExpanded = !this.envExpanded;
+            // al plegar se vuelven a ocultar los valores, para que no queden
+            // visibles la próxima vez que alguien despliegue la sección
+            if (!this.envExpanded) this.showEnvValues = false;
+        },
         loadUptimes() {
             axios.get(`/api/metrics/uptimes/${this.pipeline}/${this.phase}`)
             .then(response => {
@@ -565,6 +601,65 @@ export default defineComponent({
 
 .app-stats__section-header .app-stats__title {
   margin: 0;
+}
+
+.app-stats__section-header--collapsed {
+  margin-bottom: 0;
+}
+
+/* el título entero despliega/pliega la sección (patrón acordeón) */
+.app-stats__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 8px 0 2px;
+  margin-left: -2px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.app-stats__toggle:hover {
+  background: rgba(var(--v-theme-primary), 0.08);
+}
+
+.app-stats__toggle:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+}
+
+.app-stats__chevron {
+  transform: rotate(-90deg);
+  transition: transform 0.2s ease;
+}
+
+.app-stats__chevron--open {
+  transform: rotate(0deg);
+}
+
+.app-stats__count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  background: rgba(var(--v-theme-primary), 0.12);
+  color: rgb(var(--v-theme-primary));
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.6;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-stats__chevron {
+    transition: none;
+  }
 }
 
 .app-stats__reveal {
