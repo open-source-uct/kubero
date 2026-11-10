@@ -108,18 +108,20 @@
             </v-tabs>
         </nav>
 
-        <v-window v-model="tab" class="app-detail-content">
+        <!-- sin deslizar con el dedo: el swipe pasa a la ventana siguiente aunque
+             su pestaña esté deshabilitada (Builds en apps docker, Logs sin permiso) -->
+        <v-window v-model="tab" class="app-detail-content" :touch="false">
             <v-window-item :transition="false" :reverse-transition="false" class="background">
                 <Overview :pipeline="pipeline" :phase="phase" :app="app" :appData="appData" :pipelineData="pipelineData"/>
             </v-window-item>
             <v-window-item :transition="false" :reverse-transition="false" class="background">
-                <Builds :pipeline="pipeline" :phase="phase" :app="app" :appData="appData" :pipelineData="pipelineData"/>
+                <Builds v-if="hasBuilds" :pipeline="pipeline" :phase="phase" :app="app" :appData="appData" :pipelineData="pipelineData"/>
             </v-window-item>
             <v-window-item :transition="false" :reverse-transition="false" class="background">
                 <Metrics :pipeline="pipeline" :phase="phase" :app="app" :host="appData.spec.ingress?.hosts?.[0]?.host ?? ''" :active="tab == 2"/>
             </v-window-item>
             <v-window-item :transition="false" :reverse-transition="false" class="background">
-                <LogsTab :pipeline="pipeline" :phase="phase" :app="app" :deploymentstrategy="appData.spec.deploymentstrategy" :buildstrategy="appData.spec.buildstrategy" :hasAddons="(appData.spec.addons?.length ?? 0) > 0" :addons="appData.spec.addons ?? []"/>
+                <LogsTab v-if="authStore.hasPermission('logs:ok')" :pipeline="pipeline" :phase="phase" :app="app" :deploymentstrategy="appData.spec.deploymentstrategy" :buildstrategy="appData.spec.buildstrategy" :hasAddons="(appData.spec.addons?.length ?? 0) > 0" :addons="appData.spec.addons ?? []"/>
             </v-window-item>
             <v-window-item :transition="false" :reverse-transition="false" class="background">
                 <Events :pipeline="pipeline" :phase="phase" :app="app"/>
