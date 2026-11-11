@@ -80,12 +80,12 @@
           <v-avatar size="57" rounded class="bg-primary-lighten-2 mb-2" style="background-color: rgb(var(--v-theme-secondary));" >
             <v-icon size="36">mdi-plus</v-icon>
           </v-avatar>
-          <span class="text-subtitle-1 font-weight-medium mt-2 text-primary">Add Addon</span>
+          <span class="text-subtitle-1 font-weight-medium mt-2 text-primary">{{ $t('app.form.addAddon') }}</span>
         </v-card>
       </template>
       <v-card color="cardBackground" class="uct-card">
         <v-card-title v-if="mode==='create'">
-          <span class="text-h6 font-weight-bold">Addon</span>
+          <span class="text-h6 font-weight-bold">{{ $t('app.form.addon') }}</span>
         </v-card-title>
         <v-card-title v-if="mode==='edit'">
           <v-container class="pb-0">
@@ -114,7 +114,7 @@
               <v-col cols="12">
                 <v-select
                   :items="availableAddons"
-                  label="Addon"
+                  :label="$t('app.form.addon')"
                   outlined
                   item-title="text"
                   item-value="value"

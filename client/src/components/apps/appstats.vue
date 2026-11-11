@@ -77,8 +77,8 @@
                 </p>
                 <div class="app-stats__metrics" v-if="metricsDisplay == 'bars'">
                     <v-row>
-                        <v-col cols="6" class="pb-0 text-left text-caption font-weight-light">CPU</v-col>
-                        <v-col cols="6" class="pb-0 text-right text-caption font-weight-light">Memory</v-col>
+                        <v-col cols="6" class="pb-0 text-left text-caption font-weight-light">{{ $t('app.cpu') }}</v-col>
+                        <v-col cols="6" class="pb-0 text-right text-caption font-weight-light">{{ $t('app.memory') }}</v-col>
                     </v-row>
                     <v-row v-for="metric in metrics" :key="metric.name" style="height:20px">
                         <v-col cols="6" class="text-left"><v-progress-linear :value="metric.cpu.percentage" color="primary" class="mr-6 float-left" rounded></v-progress-linear></v-col>
@@ -89,10 +89,10 @@
                     <table :aria-label="$t('app.titles.consumption')">
                         <thead>
                             <tr>
-                                <th scope="col">Pod</th>
-                                <th scope="col">CPU</th>
-                                <th scope="col">Memory</th>
-                                <th scope="col">Uptime</th>
+                                <th scope="col">{{ $t('app.pod') }}</th>
+                                <th scope="col">{{ $t('app.cpu') }}</th>
+                                <th scope="col">{{ $t('app.memory') }}</th>
+                                <th scope="col">{{ $t('app.uptime') }}</th>
                             </tr>
                         </thead>
                         <tbody>

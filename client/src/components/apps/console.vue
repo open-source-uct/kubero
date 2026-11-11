@@ -4,7 +4,7 @@
             <v-col cols="12" sm="5" md="5" lg="5">
                 <v-select
                     v-model="pod"
-                    label="Pod"
+                    :label="$t('app.pod')"
                     class="pa-1 ml-3"
                     :items=pods
                     item-title="name"
@@ -15,7 +15,7 @@
             <v-col cols="12" sm="3" md="3" lg="3">
                 <v-select
                     v-model="container"
-                    label="Container"
+                    :label="$t('app.console.container')"
                     class="pa-1"
                     :disabled="connected"
                     :items=pod.containers
@@ -24,15 +24,15 @@
             <v-col cols="12" sm="2" md="2" lg="2">
                 <v-combobox
                     v-model="command"
-                    label="Command"
+                    :label="$t('app.form.command')"
                     class="pa-1"
                     :disabled="connected"
                     :items="commands"
                 ></v-combobox>
             </v-col>
             <v-col cols="12" sm="2" md="2" lg="2" class="mt-4">
-                <v-btn @click="connect" color="primary" v-if="!connected">Run</v-btn>
-                <v-btn @click="disconnect" color="primary" v-if="connected">Exit</v-btn>
+                <v-btn @click="connect" color="primary" v-if="!connected">{{ $t('app.console.run') }}</v-btn>
+                <v-btn @click="disconnect" color="primary" v-if="connected">{{ $t('app.console.exit') }}</v-btn>
             </v-col>
         </v-row>
         <!--
