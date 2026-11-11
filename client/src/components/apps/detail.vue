@@ -124,7 +124,7 @@
                 <LogsTab v-if="authStore.hasPermission('logs:ok')" :pipeline="pipeline" :phase="phase" :app="app" :deploymentstrategy="appData.spec.deploymentstrategy" :buildstrategy="appData.spec.buildstrategy" :hasAddons="(appData.spec.addons?.length ?? 0) > 0" :addons="appData.spec.addons ?? []"/>
             </v-window-item>
             <v-window-item :transition="false" :reverse-transition="false" class="background">
-                <Events :pipeline="pipeline" :phase="phase" :app="app"/>
+                <Events :pipeline="pipeline" :phase="phase" :app="app" :appData="appData"/>
             </v-window-item>
             <v-window-item :transition="false" :reverse-transition="false" class="background">
                 <Audit :pipeline="pipeline" :phase="phase" :app="app"/>

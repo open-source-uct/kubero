@@ -74,6 +74,15 @@ function validationDetails(error: unknown): string {
   return list.filter((m): m is string => typeof m === 'string' && m.length > 0).join('. ')
 }
 
+// Motivo legible de un error de la API, para avisos dentro de una vista. El
+// interceptor de main.ts solo avisa de las acciones que modifican algo: un
+// GET que falla (logs, eventos) no mostraba nada. Sin texto para un 401: la
+// sesión vencida ya la maneja el interceptor.
+export function apiErrorReason(error: unknown): string {
+  if (axios.isAxiosError(error) && error.response?.status === 401) return ''
+  return String(i18n.global.t(`feedback.apiReasons.${reasonKey(error)}`))
+}
+
 export function notifyApiError(
   error: unknown,
   action: ApiFeedbackAction,

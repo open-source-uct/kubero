@@ -45,6 +45,18 @@
         >
             {{ $t('app.actions.crashing') }}
         </v-alert>
+        <v-alert
+            v-if="loadError"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="crash-alert"
+        >
+            {{ loadError }}
+            <template #append>
+                <v-btn size="small" variant="text" @click="retryLogs">{{ $t('global.retry') }}</v-btn>
+            </template>
+        </v-alert>
         <div class="console" id="console" ref="consoleEl" @scroll="onConsoleScroll">
             <div v-for="line in displayLines" :key="line.id">
             {{ new Date(line.time).toLocaleDateString() }} {{ new Date(line.time).toLocaleTimeString()}} <span :style="'color:' +line.color">[{{ lineLabel(line) }}]</span>
@@ -60,6 +72,7 @@
 import axios from "axios";
 import { ref, defineComponent, computed, watch, nextTick } from 'vue'
 import { useKuberoStore } from '../../stores/kubero'
+import { apiErrorReason } from '../../utils/apiFeedback'
 
 type LogLine = {
     app: string;
@@ -200,6 +213,10 @@ export default defineComponent({
             podsTimer: undefined as number | undefined,
             // reinicios ya vistos, para recargar el historial con cada reinicio nuevo
             seenRestarts: -1,
+            // antes, si la carga fallaba la consola quedaba vacía sin aviso
+            loadError: '',
+            // pestaña de logs de build abierta, para reintentar la misma
+            buildContainer: 'fetch',
         }
     },
     unmounted() {
@@ -325,20 +342,35 @@ export default defineComponent({
                 // sin permiso para ver los pods no se muestra el aviso
             });
         },
+        showLoadError(error: unknown) {
+            this.loadError = `${this.$t('app.logs.loadError')} ${apiErrorReason(error)}`.trim();
+        },
+        retryLogs() {
+            this.loadError = '';
+            if (this.logType == 'buildlogs') {
+                this.getBuildLogHistory(this.buildContainer);
+            } else {
+                this.startLogs();
+                this.getLogHistory(this.currentTab);
+            }
+        },
+        // pide al server que transmita las líneas nuevas por el socket
         startLogs() {
-            axios.get(`/api/logs/${this.pipeline}/${this.phase}/${this.app}`).then(() => {
-                console.log("logs started");
-            });
+            axios.get(`/api/logs/${this.pipeline}/${this.phase}/${this.app}`)
+                .catch((error) => this.showLoadError(error));
         },
         getLogHistory(container: string) {
             this.currentTab = container;
             axios.get(`/api/logs/${this.pipeline}/${this.phase}/${this.app}/${container}/history`).then((response) => {
                 this.loglines = response.data;
-            });
+                this.loadError = '';
+            }).catch((error) => this.showLoadError(error));
         },
         getBuildLogHistory(container: string) {
+            this.buildContainer = container;
             //http://localhost:2000/api/deployments/devcon/production/aaa/20240717-0651/log
             axios.get(`/api/deployments/${this.pipeline}/${this.phase}/${this.app}/${this.buildID}/${container}/history`).then((response) => {
+                this.loadError = '';
                 if (response.data.length > 0) {
                     this.loglines = response.data;
                 } else {
@@ -355,7 +387,7 @@ export default defineComponent({
                         time: Date.now(),
                     }];
                 }
-            });
+            }).catch((error) => this.showLoadError(error));
         },
     },
 });
