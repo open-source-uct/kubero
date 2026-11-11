@@ -462,6 +462,14 @@ const messages = {
         message: 'El TTL predeterminado para eventos en Kube-API es de 1 hora. Si deseas ver eventos más antiguos, debes aumentar el TTL en Kube-apiserver.',
         link: 'Documentación de Kubernetes',
       },
+      loading: 'Cargando eventos',
+      loadError: 'No se pudieron cargar los eventos de la app.',
+    },
+    logs: {
+      loadError: 'No se pudieron cargar los registros de la app.',
+    },
+    metrics: {
+      loadError: 'No se pudo cargar el consumo de la app. Se reintentará en unos segundos.',
     },
   },
   profile: {

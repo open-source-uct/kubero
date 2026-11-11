@@ -71,6 +71,10 @@
 
                 <section class="app-stats__section">
                     <h2 class="app-stats__title">{{ $t('app.titles.consumption') }}</h2>
+                <!-- se reintenta solo cada 40 s; si ya había datos, se mantienen -->
+                <p v-if="metricsError && metrics.length === 0" class="app-stats__error" role="status">
+                    {{ $t('app.metrics.loadError') }}
+                </p>
                 <div class="app-stats__metrics" v-if="metricsDisplay == 'bars'">
                     <v-row>
                         <v-col cols="6" class="pb-0 text-left text-caption font-weight-light">CPU</v-col>
@@ -497,6 +501,7 @@ export default defineComponent({
         return {
             metrics: [] as Metric[],
             metricsDisplay: "bars",
+            metricsError: false,
             metricsInterval: 0 as any, // can't find the right type for this
             uptimes: {} as any,
             showEnvValues: false,
@@ -554,9 +559,10 @@ export default defineComponent({
                     response.data[i].uptime = this.uptimes[response.data[i].name];
                 }
                 this.metrics = response.data;
+                this.metricsError = false;
             })
-            .catch(error => {
-                console.log(error);
+            .catch(() => {
+                this.metricsError = true;
             });
         },
     },
@@ -601,6 +607,12 @@ export default defineComponent({
 
 .app-stats__section-header .app-stats__title {
   margin: 0;
+}
+
+.app-stats__error {
+  margin: 8px 0 0;
+  color: rgb(var(--v-theme-error));
+  font-size: 0.8125rem;
 }
 
 .app-stats__section-header--collapsed {

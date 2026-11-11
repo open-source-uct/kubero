@@ -9,8 +9,25 @@
                         <v-col cols="6">{{ event.message }}</v-col>
                     </v-row>
             -->
+                <div v-if="loading" class="d-flex justify-center my-10">
+                    <v-progress-circular indeterminate color="primary" :aria-label="$t('app.events.loading')" />
+                </div>
+
+                <v-alert
+                    v-else-if="loadError"
+                    type="error"
+                    variant="tonal"
+                    border="start"
+                    class="mt-5"
+                >
+                    {{ loadError }}
+                    <template #append>
+                        <v-btn variant="text" @click="loadEvents">{{ $t('global.retry') }}</v-btn>
+                    </template>
+                </v-alert>
+
                 <v-row
-                    v-if="events.length > 0">
+                    v-else-if="events.length > 0">
                     <v-timeline align-top dense truncate-line="both" side="end" class="my-10">
 
                         <v-timeline-item
@@ -48,7 +65,7 @@
 
 
                 <v-row
-                    v-if="events.length === 0">
+                    v-else>
                     <v-col
                     cols="12"
                     md="6"
@@ -76,7 +93,8 @@
 <script lang="ts">
 import axios from "axios";
 import { defineComponent } from 'vue'
-import { eventTimestamp, sortEventsNewestFirst } from '../../utils/kubeEvents'
+import { appResourceMatcher, eventTimestamp, sortEventsNewestFirst } from '../../utils/kubeEvents'
+import { apiErrorReason } from '../../utils/apiFeedback'
 
 type Event = {
     action: string,
@@ -97,8 +115,17 @@ export default defineComponent({
     mounted() {
         this.loadEvents();
     },
+    computed: {
+        // El namespace es del pipeline entero: trae los eventos de todas sus
+        // apps. Se filtran acá (y no al cargar) porque appData puede llegar
+        // después que los eventos, y con él se reconocen los addons.
+        events(): Event[] {
+            const belongs = appResourceMatcher(this.app, (this.appData as any)?.spec);
+            return this.allEvents.filter((event) => belongs(event.involvedObject));
+        },
+    },
     data: () => ({
-        events: [
+        allEvents: [
             /* example
             {
                 action: "Binding",
@@ -112,6 +139,8 @@ export default defineComponent({
             },
             */
         ] as Event[],
+        loading: false,
+        loadError: '' as string,
     }),
     components: {
     },
@@ -127,17 +156,24 @@ export default defineComponent({
       app: {
         type: String,
         default: "new"
+      },
+      // para reconocer los recursos de la app (addons, volúmenes, cronjobs);
+      // sin él se filtra solo por lo que crea el operador
+      appData: {
+        type: Object,
+        default: null
       }
     },
     methods: {
       async loadEvents() {
         const self = this;
         const namespace = this.pipeline + "-" + this.phase;
-        //axios.get(`/api/events?namespace=${this.$route.query.namespace}`)
-        //console.log("loadEvents", namespace);
+        this.loading = true;
+        this.loadError = '';
+        this.allEvents = [];
         axios.get(`/api/kubernetes/events?namespace=${namespace}`)
         .then(response => {
-            response.data = sortEventsNewestFirst(response.data ?? []);
+            response.data = sortEventsNewestFirst((response.data ?? []) as any[]);
 
             for (let i = 0; i < response.data.length; i++) {
                 // la misma hora con que se ordena: la última vez que ocurrió
@@ -149,6 +185,7 @@ export default defineComponent({
                     type: response.data[i].type,
                     reason: response.data[i].reason,
                     uid: response.data[i].metadata.uid,
+                    involvedObject: '',
                 } as Event;
 
                 if (response.data[i].involvedObject.name) {
@@ -251,11 +288,14 @@ export default defineComponent({
                     default:
                         event.icon = "mdi-folder-outline";
                 }
-                self.events.push(event);
+                self.allEvents.push(event);
             }
         })
         .catch(error => {
-            console.log(error);
+            this.loadError = `${this.$t('app.events.loadError')} ${apiErrorReason(error)}`.trim();
+        })
+        .finally(() => {
+            this.loading = false;
         });
       },
     },
