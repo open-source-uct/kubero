@@ -324,7 +324,7 @@ const messages = {
       metrics: 'Métricas',
       logs: 'Registros',
       events: 'Eventos',
-      audit: 'Audit',
+      audit: 'Auditoría',
     },
     actions: {
       name: 'Acciones',
@@ -352,6 +352,7 @@ const messages = {
     cpu: 'CPU',
     memory: 'Memoria',
     pod: 'Pod',
+    uptime: 'Tiempo activo',
     titles: {
       consumption: 'Consumo de recursos',
       environmentVariables: 'Variables de entorno',
@@ -369,6 +370,11 @@ const messages = {
     },
     form: {
       createNewApp: 'Crear una nueva App en {pipeline}',
+      addAddon: 'Agregar addon',
+      addon: 'Addon',
+      selectOneOrMore: 'Selecciona uno o más',
+      envFileInput: 'Arrastra o elige un archivo .env',
+      autoscaleHint: 'Ajusta la cantidad de réplicas según el uso de CPU y memoria',
       editApp: 'Editar {app} en {pipeline}',
       loadError: 'No se pudo cargar la app. Se deshabilitó el guardado para no sobrescribir su configuración con un formulario vacío.',
       detailLoadError: 'No se pudo cargar la app.',
@@ -470,6 +476,26 @@ const messages = {
     },
     metrics: {
       loadError: 'No se pudo cargar el consumo de la app. Se reintentará en unos segundos.',
+      emptyTitle: 'No hay métricas disponibles',
+      emptyMessage: 'Las métricas de esta aplicación no están disponibles. Se activan en la configuración de Kubero.',
+      range: 'Rango',
+      timezone: 'Zona horaria',
+      timezoneSantiago: 'Santiago (Chile continental)',
+      refresh: 'Actualizar',
+      memoryUsage: 'Uso de memoria',
+      cpuUsage: 'Uso de CPU',
+      responseTime: 'Tiempo de respuesta',
+      throughput: 'Solicitudes por segundo',
+    },
+    audit: {
+      title: 'Actividad',
+      emptyTitle: 'Auditoría',
+      emptyMessage: 'El registro de auditoría está vacío o desactivado.',
+    },
+    console: {
+      container: 'Contenedor',
+      run: 'Ejecutar',
+      exit: 'Salir',
     },
   },
   profile: {

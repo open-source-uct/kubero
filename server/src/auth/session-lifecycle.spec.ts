@@ -41,8 +41,13 @@ describe('session lifecycle (isolated SQLite and HTTP)', () => {
   beforeAll(async () => {
     process.env.KUBERO_SESSION_KEY = 'issue-203-test-key';
     directory = await mkdtemp(join(tmpdir(), 'kubero-session-203-'));
+    // Una sola conexión, como `prisma migrate deploy`. Las migraciones que
+    // recrean una tabla (Role) desactivan las claves foráneas con PRAGMA, que
+    // vale solo para su conexión: con el pool por defecto cada sentencia podía
+    // caer en otra y, a veces en el CI, el CREATE INDEX fallaba con
+    // "index Role_name_key already exists".
     prisma = new PrismaClient({
-      datasourceUrl: `file:${join(directory, 'test.sqlite').replace(/\\/g, '/')}`,
+      datasourceUrl: `file:${join(directory, 'test.sqlite').replace(/\\/g, '/')}?connection_limit=1`,
     });
     const migrations = join(__dirname, '../../prisma/migrations');
     for (const name of (await readdir(migrations))

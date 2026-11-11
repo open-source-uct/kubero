@@ -352,6 +352,7 @@ const messages = {
         cpu: 'CPU',
         memory: 'Memory',
         pod: 'Pod',
+        uptime: 'Uptime',
         titles: {
           consumption: 'Resource Consumption',
           environmentVariables: 'Environment Variables',
@@ -369,6 +370,11 @@ const messages = {
         },
         form: {
           createNewApp: 'Create a new App in {pipeline}',
+          addAddon: 'Add addon',
+          addon: 'Addon',
+          selectOneOrMore: 'Select one or more',
+          envFileInput: 'Drop or select a .env file',
+          autoscaleHint: 'Scale pod replicas based on CPU and memory usage',
           editApp: 'Edit {app} in {pipeline}',
           loadError: 'The app could not be loaded. Saving is disabled so its configuration is not overwritten with an empty form.',
           detailLoadError: 'The app could not be loaded.',
@@ -470,6 +476,26 @@ const messages = {
         },
         metrics: {
           loadError: 'The app resource usage could not be loaded. It will be retried in a few seconds.',
+          emptyTitle: 'No metrics available',
+          emptyMessage: 'Metrics are not available for this application. They are enabled in the Kubero settings.',
+          range: 'Range',
+          timezone: 'Time zone',
+          timezoneSantiago: 'Santiago (mainland Chile)',
+          refresh: 'Refresh',
+          memoryUsage: 'Memory usage',
+          cpuUsage: 'CPU usage',
+          responseTime: 'Response time',
+          throughput: 'Requests per second',
+        },
+        audit: {
+          title: 'Activity',
+          emptyTitle: 'Audit',
+          emptyMessage: 'The audit log is either empty or disabled.',
+        },
+        console: {
+          container: 'Container',
+          run: 'Run',
+          exit: 'Exit',
         },
       },
       profile: {

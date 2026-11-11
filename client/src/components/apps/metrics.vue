@@ -14,9 +14,9 @@
                     variant="tonal"
                     border="start"
                 >
-                    <h3>No metrics available</h3>
+                    <h3>{{ $t('app.metrics.emptyTitle') }}</h3>
                     <p>
-                        Metrics are not available for this application. Metrics can be enabled in the Kubero CRD.
+                        {{ $t('app.metrics.emptyMessage') }}
                     </p>
                 </v-alert>
             </v-col>
@@ -29,7 +29,7 @@
             </v-col>
             <v-col cols="12" sm="6" md="2">
               <v-select
-                label="Rango"
+                :label="$t('app.metrics.range')"
                 v-model="scale"
                 :items="[ '2h', '24h' ]"
                 density="compact"
@@ -37,9 +37,9 @@
             </v-col>
             <v-col cols="12" sm="6" md="2">
               <v-select
-                label="Zona horaria"
+                :label="$t('app.metrics.timezone')"
                 v-model="timezone"
-                :items="timezoneItems"
+                :items="timezoneOptions"
                 density="compact"
               ></v-select>
             </v-col>
@@ -50,25 +50,25 @@
                     color="secondary"
                     >
                     <v-icon>mdi-refresh</v-icon>
-                    <span>Refresh</span>
+                    <span>{{ $t('app.metrics.refresh') }}</span>
                 </v-btn>
             </v-col>
         </v-row>
         <v-row>
             <v-col cols="12" sm="12" md="12">
-                Memory Usage
+                {{ $t('app.metrics.memoryUsage') }}
                 <VueApexCharts :key="'memory-' + scale + '-' + timezone + '-' + memoryDecimals" type="area" height="180" :options="memoryOptions" :series="memoryData"></VueApexCharts>
             </v-col>
         </v-row>
         <v-row>
           <!--
             <v-col cols="6" sm="6" md="6">
-                CPU usage
+                {{ $t('app.metrics.cpuUsage') }}
                 <VueApexCharts type="line" height="180" :options="cpuOptions" :series="cpuData"></VueApexCharts>
             </v-col>
           -->
             <v-col cols="12" sm="12" md="12">
-                CPU usage
+                {{ $t('app.metrics.cpuUsage') }}
                 <VueApexCharts :key="'cpu-' + scale + '-' + timezone + '-' + cpuDecimals" type="line" height="180" :options="cpuOptions" :series="cpuDataRate"></VueApexCharts>
             </v-col>
         </v-row>
@@ -82,13 +82,13 @@
         -->
         <v-row>
             <v-col cols="12" sm="12" md="12">
-                Responset Time
+                {{ $t('app.metrics.responseTime') }}
                 <VueApexCharts :key="'responsetime-' + scale + '-' + timezone + '-' + responsetimeDecimals" type="area" height="180" :options="ResponsetimeOptions" :series="responsetimeData"></VueApexCharts>
             </v-col>
         </v-row>
         <v-row>
             <v-col cols="12" sm="12" md="12">
-                Throughput
+                {{ $t('app.metrics.throughput') }}
                 <VueApexCharts :key="'throughput-' + scale + '-' + timezone + '-' + throughputDecimals" type="line" height="180" :options="httpStusCodeOptions" :series="httpStusCodeData"></VueApexCharts>
             </v-col>
         </v-row>
@@ -392,7 +392,7 @@ export default defineComponent({
         yaxis: {
           decimalsInFloat: 1,
           title: {
-            text: 'miliseconds',
+            text: 'ms',
           },
         }
       },
@@ -621,10 +621,6 @@ export default defineComponent({
       // zona horaria para mostrar las fechas de los gráficos; se guarda por
       // si la persona prefiere ver otra distinta a Santiago
       timezone: localStorage.getItem('kubero.metricsTimezone') || 'America/Santiago',
-      timezoneItems: [
-        { title: 'Santiago (Chile continental)', value: 'America/Santiago' },
-        { title: 'UTC', value: 'UTC' },
-      ] as { title: string, value: string }[],
       // decimales del eje Y de cada gráfico; se recalculan solos según la
       // magnitud real de sus datos (ver pickDecimals), no los elige la persona
       memoryDecimals: 1,
@@ -672,6 +668,13 @@ export default defineComponent({
         },
     },
     computed: {
+      // en computed (y no en data) para que el nombre cambie con el idioma
+      timezoneOptions(): { title: string, value: string }[] {
+        return [
+          { title: this.$t('app.metrics.timezoneSantiago'), value: 'America/Santiago' },
+          { title: 'UTC', value: 'UTC' },
+        ];
+      },
       ...mapState(useKuberoStore, ['kubero']),
     },
     methods: {

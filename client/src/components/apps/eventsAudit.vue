@@ -7,7 +7,7 @@
         v-if="auditEvents.length >0">
             <v-card-title class="app-audit__header">
                 <v-icon icon="mdi-history" color="primary" size="20"></v-icon>
-                <h2>Activity</h2>
+                <h2>{{ $t('app.audit.title') }}</h2>
             </v-card-title>
             <v-card-text class="app-audit__body">
                 <v-row class="ma-0">
@@ -40,8 +40,8 @@
             type="info"
             variant="tonal"
             v-if="auditEvents.length <1">
-            <h3>Audit</h3>
-            The audit log is ether empty or disabled.
+            <h3>{{ $t('app.audit.emptyTitle') }}</h3>
+            {{ $t('app.audit.emptyMessage') }}
 
         </v-alert>
     </div>
