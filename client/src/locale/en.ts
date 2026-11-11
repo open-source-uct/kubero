@@ -461,7 +461,15 @@ const messages = {
             title: 'No events for {app}',
             message: 'The default TTL for events in the Kube-API is 1 hour. If you want to see older events, you have to increase the TTL in the Kube-apiserver.',
             link: 'Kubernetes Docs',
-          }
+          },
+          loading: 'Loading events',
+          loadError: 'The app events could not be loaded.',
+        },
+        logs: {
+          loadError: 'The app logs could not be loaded.',
+        },
+        metrics: {
+          loadError: 'The app resource usage could not be loaded. It will be retried in a few seconds.',
         },
       },
       profile: {

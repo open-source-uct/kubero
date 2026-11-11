@@ -16,7 +16,7 @@ function loadSource(relative) {
   return loaded.exports
 }
 
-const { eventTimestamp, sortEventsNewestFirst } = loadSource('src/utils/kubeEvents.ts')
+const { eventTimestamp, sortEventsNewestFirst, appResourceMatcher } = loadSource('src/utils/kubeEvents.ts')
 
 const created = (name, at) => ({ name, metadata: { creationTimestamp: at } })
 
@@ -52,4 +52,52 @@ test('does not modify the received array', () => {
   const events = [created('a', '2026-11-11T09:00:00Z'), created('b', '2026-11-11T10:00:00Z')]
   sortEventsNewestFirst(events)
   assert.deepEqual(events.map((e) => e.name), ['a', 'b'])
+})
+
+// nombres reales de la U (pipeline uct-map y apuntesuct)
+const uctMap = {
+  'campus-api': { addons: [{ resourceDefinitions: { KuberoAddonPostgres: { metadata: { name: 'campus-api-postgres' } } } }] },
+  'incident-api': { addons: [{ resourceDefinitions: { KuberoAddonMongodb: { metadata: { name: 'incident-api-mongodb' } } } }] },
+}
+
+test('keeps the resources the operator creates for the app', () => {
+  const belongs = appResourceMatcher('campus-api', uctMap['campus-api'])
+  for (const name of ['campus-api', 'campus-api-kuberoapp', 'campus-api-kuberoapp-web', 'campus-api-kuberoapp-web-666ccb9db8', 'campus-api-kuberoapp-web-666ccb9db8-qj2v5', 'campus-api-kuberoapp-worker']) {
+    assert.equal(belongs(name), true, name)
+  }
+})
+
+test('keeps the addons of the app: resource, pod and volume', () => {
+  const belongs = appResourceMatcher('incident-api', uctMap['incident-api'])
+  for (const name of ['incident-api-mongodb', 'incident-api-mongodb-0', 'mongodb-volume-incident-api-mongodb-0']) {
+    assert.equal(belongs(name), true, name)
+  }
+  assert.equal(appResourceMatcher('server', { addons: [{ resourceDefinitions: { KuberoAddonPostgres: { metadata: { name: 'server-postgres' } } } }] })('data-server-postgres-0'), true)
+})
+
+test('leaves out other apps of the same pipeline, even with a similar name', () => {
+  const api = appResourceMatcher('api', {})
+  for (const name of ['api-gateway-kuberoapp-web', 'api-gateway-kuberoapp-web-556b777c84-x88d6', 'apiary-kuberoapp']) {
+    assert.equal(api(name), false, name)
+  }
+  const campus = appResourceMatcher('campus-api', uctMap['campus-api'])
+  for (const name of ['identity-api-postgres-0', 'incident-api-mongodb-0', 'schedule-api-kuberoapp-web-bc96bbf68-pbbhk', 'data-identity-api-postgres-0']) {
+    assert.equal(campus(name), false, name)
+  }
+})
+
+test('keeps volumes and cronjobs of the app by their exact name', () => {
+  const minio = appResourceMatcher('minio', { extraVolumes: [{ name: 'minio-data' }, { name: 'cache', emptyDir: true }], cronjobs: [{ name: 'backup' }] })
+  assert.equal(minio('minio-data'), true)
+  assert.equal(minio('cache'), false)
+  assert.equal(minio('backup'), true)
+  assert.equal(minio('backup-29384756'), true)
+  assert.equal(minio('backup-29384756-x7k2p'), true)
+  assert.equal(minio('backups-kuberoapp'), false)
+})
+
+test('without the app spec it still keeps what the operator creates', () => {
+  const belongs = appResourceMatcher('frontend', null)
+  assert.equal(belongs('frontend-kuberoapp-web-9d76584cb-p64xl'), true)
+  assert.equal(belongs('frontend-postgres-0'), false)
 })
