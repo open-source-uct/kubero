@@ -316,7 +316,7 @@
                   :menu-props="{ maxHeight: '400' }"
                   :label="$t('app.form.capabilitiesAdd')"
                   multiple
-                  hint="Select one or more"
+                  :hint="$t('app.form.selectOneOrMore')"
                   persistent-hint
                   chips
                   class="capability"
@@ -329,7 +329,7 @@
                   :menu-props="{ maxHeight: '400' }"
                   :label="$t('app.form.capabilitiesDrop')"
                   multiple
-                  hint="Select one or more"
+                  :hint="$t('app.form.selectOneOrMore')"
                   persistent-hint
                   chips
                   class="capability"
@@ -688,7 +688,7 @@
               <v-col cols="12" md="9">
                 <v-file-input
                   prepend-icon="mdi-file"
-                  label="Drop or select .env file"
+                  :label="$t('app.form.envFileInput')"
                   show-size
                   v-model="envFile"
                   @change="handleFileInput"
@@ -745,7 +745,7 @@
                 <v-switch
                   v-model="autoscale"
                   :label="$t('app.autoscale')"
-                  hint="Scale pod replicas based on CPU and Memory usage"
+                  :hint="$t('app.form.autoscaleHint')"
                   color="primary"
                 ></v-switch>
               </v-col>
@@ -811,7 +811,7 @@
           <v-expansion-panel-title
             class="text-uppercase text-caption-2 font-weight-medium"
             color="cardBackground"
-            >Volumes</v-expansion-panel-title
+            >{{ $t('app.titles.volumes') }}</v-expansion-panel-title
           >
           <v-expansion-panel-text color="cardBackground">
             <div v-for="(volume, index) in extraVolumes" :key="index">
