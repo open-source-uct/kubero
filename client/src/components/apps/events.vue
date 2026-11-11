@@ -76,6 +76,7 @@
 <script lang="ts">
 import axios from "axios";
 import { defineComponent } from 'vue'
+import { eventTimestamp, sortEventsNewestFirst } from '../../utils/kubeEvents'
 
 type Event = {
     action: string,
@@ -136,14 +137,11 @@ export default defineComponent({
         //console.log("loadEvents", namespace);
         axios.get(`/api/kubernetes/events?namespace=${namespace}`)
         .then(response => {
-            // sort by creationTimestamp
-            response.data.sort((a: any, b: any) => {
-                return new Date(b.metadata.creationTimestamp).getMilliseconds() - new Date(a.metadata.creationTimestamp).getMilliseconds();
-            });
-            response.data.reverse()
+            response.data = sortEventsNewestFirst(response.data ?? []);
 
             for (let i = 0; i < response.data.length; i++) {
-                const date = new Date(response.data[i].metadata.creationTimestamp)
+                // la misma hora con que se ordena: la última vez que ocurrió
+                const date = new Date(eventTimestamp(response.data[i]))
                 const event = {
                     action: response.data[i].action,
                     eventTime: date.toLocaleDateString() + " " + date.toLocaleTimeString(),
