@@ -52,7 +52,6 @@
         />
         <v-select v-model="teamFilter" :items="teamOptions" density="compact" variant="outlined" hide-details :label="$t('pipeline.list.teamFilter')" />
         <v-select v-model="phaseFilter" :items="phaseOptions" density="compact" variant="outlined" hide-details :label="$t('pipeline.list.phaseFilter')" />
-        <v-select v-model="sourceFilter" :items="sourceOptions" density="compact" variant="outlined" hide-details :label="$t('pipeline.list.sourceFilter')" />
         <v-btn
           v-if="hasActiveFilters"
           class="reset-filters"
@@ -78,24 +77,22 @@
               <th>{{ $t('pipeline.list.columns.domain') }}</th>
               <th>{{ $t('pipeline.list.columns.teams') }}</th>
               <th>{{ $t('pipeline.list.columns.phases') }}</th>
-              <th>{{ $t('pipeline.list.columns.source') }}</th>
               <th class="actions-heading"><span class="sr-only">{{ $t('pipeline.list.columns.actions') }}</span></th>
             </tr>
           </thead>
           <tbody>
             <template v-if="loading">
               <tr v-for="index in 6" :key="`pipeline-skeleton-${index}`">
-                <td colspan="6"><v-skeleton-loader type="list-item" /></td>
+                <td colspan="5"><v-skeleton-loader type="list-item" /></td>
               </tr>
             </template>
 
             <tr v-for="pipeline in paginatedPipelines" v-else :key="pipeline.name">
               <td>
                 <div class="pipeline-identity">
-                  <v-icon :icon="pipeline.git?.repository?.admin ? 'mdi-source-fork' : 'mdi-source-branch'" color="primary" size="21" aria-hidden="true" />
+                  <v-icon icon="mdi-source-branch" color="primary" size="21" aria-hidden="true" />
                   <div>
                     <RouterLink :to="{ name: 'Pipeline Apps', params: { pipeline: pipeline.name } }">{{ pipeline.name }}</RouterLink>
-                    <small v-if="pipeline.git?.repository?.description">{{ pipeline.git.repository.description }}</small>
                   </div>
                 </div>
               </td>
@@ -124,9 +121,6 @@
                   </v-chip>
                 </div>
               </td>
-              <td>
-                <v-chip size="small" variant="tonal" label>{{ pipeline.git?.repository?.admin ? $t('pipeline.list.managed') : $t('pipeline.list.connected') }}</v-chip>
-              </td>
               <td class="actions-cell">
                 <v-tooltip :text="$t('pipeline.list.open')" location="top">
                   <template #activator="{ props }">
@@ -147,7 +141,7 @@
             </tr>
 
             <tr v-if="!loading && !loadError && filteredPipelines.length === 0">
-              <td colspan="6">
+              <td colspan="5">
                 <div class="empty-state">
                   <v-icon :icon="pipelines.length === 0 ? 'mdi-source-branch-plus' : 'mdi-filter-off-outline'" size="38" color="primary" aria-hidden="true" />
                   <h2>{{ pipelines.length === 0 ? $t('pipeline.empty.title') : $t('pipeline.list.noResultsTitle') }}</h2>
@@ -191,7 +185,6 @@ type Pipeline = {
   name: string
   domain?: string
   access?: { teams?: string[] }
-  git?: { repository?: { admin?: boolean; description?: string } }
   phases?: PipelinePhase[]
 }
 
@@ -208,7 +201,6 @@ const deletingName = ref('')
 const search = ref('')
 const teamFilter = ref('all')
 const phaseFilter = ref('all')
-const sourceFilter = ref('all')
 const page = ref(1)
 const itemsPerPage = ref(10)
 const pageSizeOptions = [10, 25, 50]
@@ -232,27 +224,19 @@ const phaseOptions = computed(() => [
     .map((phase) => ({ title: t(`pipeline.phases.${phase}`), value: phase })),
 ])
 
-const sourceOptions = computed(() => [
-  { title: t('pipeline.list.allSources'), value: 'all' },
-  { title: t('pipeline.list.managed'), value: 'managed' },
-  { title: t('pipeline.list.connected'), value: 'connected' },
-])
-
-const hasActiveFilters = computed(() => Boolean(search.value.trim()) || teamFilter.value !== 'all' || phaseFilter.value !== 'all' || sourceFilter.value !== 'all')
+const hasActiveFilters = computed(() => Boolean(search.value.trim()) || teamFilter.value !== 'all' || phaseFilter.value !== 'all')
 
 const filteredPipelines = computed(() => {
   const query = search.value.trim().toLocaleLowerCase()
   return pipelines.value.filter((pipeline) => {
-    const searchable = [pipeline.name, pipeline.domain, pipeline.git?.repository?.description, ...(pipeline.access?.teams ?? [])]
+    const searchable = [pipeline.name, pipeline.domain, ...(pipeline.access?.teams ?? [])]
       .filter(Boolean)
       .join(' ')
       .toLocaleLowerCase()
     const matchesSearch = !query || searchable.includes(query)
     const matchesTeam = teamFilter.value === 'all' || pipeline.access?.teams?.includes(teamFilter.value)
     const matchesPhase = phaseFilter.value === 'all' || visiblePhases(pipeline).some((phase) => phase.name === phaseFilter.value && phase.enabled)
-    const isManaged = Boolean(pipeline.git?.repository?.admin)
-    const matchesSource = sourceFilter.value === 'all' || (sourceFilter.value === 'managed' ? isManaged : !isManaged)
-    return matchesSearch && matchesTeam && matchesPhase && matchesSource
+    return matchesSearch && matchesTeam && matchesPhase
   }).sort((a, b) => a.name.localeCompare(b.name))
 })
 
@@ -268,18 +252,21 @@ const pageRange = computed(() => {
   return t('pipeline.list.pageRange', { start, end, total: filteredPipelines.value.length })
 })
 
-watch([search, teamFilter, phaseFilter, sourceFilter, itemsPerPage], () => { page.value = 1 })
+watch([search, teamFilter, phaseFilter, itemsPerPage], () => { page.value = 1 })
 watch(pageCount, (count) => { if (page.value > count) page.value = count })
 
+// La fase review era para las apps de revisión de cada PR, que necesitaban un
+// repositorio git conectado; desde que solo se despliegan imágenes (#97) el
+// formulario no deja activarla. Se oculta salvo en un pipeline antiguo que
+// la tenga activa, para no esconder lo que sí corre ahí.
 function visiblePhases(pipeline: Pipeline) {
-  return (pipeline.phases ?? []).filter((phase) => pipeline.git?.repository?.admin || phase.name !== 'review')
+  return (pipeline.phases ?? []).filter((phase) => phase.name !== 'review' || phase.enabled)
 }
 
 function resetFilters() {
   search.value = ''
   teamFilter.value = 'all'
   phaseFilter.value = 'all'
-  sourceFilter.value = 'all'
 }
 
 async function loadPipelinesList() {
@@ -334,6 +321,8 @@ onBeforeUnmount(() => {
 .alert-content { display: flex; justify-content: space-between; gap: 24px; align-items: center; }
 .alert-content p { margin: 4px 0 0; }
 .reset-filters { grid-column: 1 / -1; justify-self: start; }
+/* búsqueda + 2 filtros (equipo y fase); la grilla compartida está pensada para 3 */
+.pipeline-toolbar { grid-template-columns: minmax(260px, 1.6fr) repeat(2, minmax(170px, .7fr)); }
 .pipeline-identity { display: flex; min-width: 220px; gap: 11px; align-items: flex-start; }
 .pipeline-identity > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
 .pipeline-identity a { color: rgb(var(--v-theme-on-cardBackground)); font-size: .875rem; font-weight: 600; text-decoration-color: rgba(var(--v-theme-primary), .45); text-decoration-thickness: 1px; text-underline-offset: 3px; }
@@ -348,10 +337,12 @@ onBeforeUnmount(() => {
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 @media (max-width: 1050px) {
+  .pipeline-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .toolbar-search { grid-column: 1 / -1; }
 }
 
 @media (max-width: 700px) {
+  .pipeline-toolbar { grid-template-columns: 1fr; }
   .toolbar-search { grid-column: auto; }
   .alert-content { align-items: flex-start; flex-direction: column; }
 }

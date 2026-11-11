@@ -6,7 +6,10 @@
 .pipeline-toolbar { display: grid; grid-template-columns: minmax(260px, 1.4fr) repeat(3, minmax(170px, .7fr)); gap: 12px; padding: 20px; border-bottom: 1px solid var(--uct-corp-gray-border); }
 .pipeline-toolbar :deep(.v-field) { background: rgb(var(--v-theme-cardBackground)); }
 .table-summary { display: flex; min-height: 46px; justify-content: space-between; gap: 16px; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--uct-corp-gray-border); color: rgb(var(--v-theme-on-cardBackground)); font-size: .8125rem; }
-.pipeline-table-wrap { overflow-x: auto; }
+/* position: relative para que los .sr-only (position: absolute) de la tabla
+   queden dentro de su scroll; si no, escapan y la página entera queda con
+   scroll lateral en el celular */
+.pipeline-table-wrap { position: relative; overflow-x: auto; }
 .pipeline-table { min-width: 1080px; background: transparent; }
 .pipeline-table :deep(th) { height: 44px !important; color: rgb(var(--v-theme-on-cardBackground)); font-size: .6875rem; font-weight: 600 !important; letter-spacing: .05em; text-transform: uppercase; opacity: .62; }
 .pipeline-table :deep(td) { height: 68px !important; color: rgb(var(--v-theme-on-cardBackground)); font-size: .8125rem; }

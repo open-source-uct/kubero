@@ -34,6 +34,25 @@ export default defineComponent({
     padding-left: 0;
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
+    /* en una sola fila, con nombres largos, se salían de la pantalla del
+       celular y toda la página quedaba con scroll hacia el lado */
+    flex-wrap: wrap;
+    row-gap: 6px;
+    min-width: 0;
+  }
+  .v-breadcrumbs :deep(.v-breadcrumbs-item) {
+    min-width: 0;
+  }
+  .breadcrumText {
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 599px) {
+    .v-breadcrumbs :deep(.v-breadcrumbs-divider) {
+      padding-inline: 4px;
+    }
+    .breadcrumText {
+      font-size: 1rem;
+    }
   }
   .breadcrumTitle {
     text-transform: uppercase;
