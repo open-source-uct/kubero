@@ -165,7 +165,6 @@ export default defineComponent({
             term.focus()
             
             socket.on("terminal", (data: any) => {
-                console.log("terminal", data);
                 term.write(data);
             });
 
@@ -173,105 +172,35 @@ export default defineComponent({
                 term.write(data)
             })
 
+            // sin console.log de lo que entra o sale: en la terminal se ven
+            // variables de entorno y se escriben contraseñas
             term.onData((data) => {
-                //console.log("onData", data);
-
                 socket.emit("terminal", {
                     room: this.room,
                     data: data,
                 });
             });
-            /*
-            term.onResize((size) => {
-                console.log("onResize", size);
-                socket.emit("terminal", {
-                    room: this.room,
-                    data: size,
-                });
-            });
-            term.onBinary((data) => {
-                console.log("onBinary", data);
-                socket.emit("terminal", {
-                    room: this.room,
-                    data: data,
-                });
-            });
-            term.onTitleChange((title) => {
-                console.log("onTitleChange", title);
-                socket.emit("terminal", {
-                    room: this.room,
-                    data: title,
-                });
-            });
-            
-            /*
-            term.onLineFeed(() => {
-                console.log("onLineFeed");
-                socket.emit("terminal", {
-                    room: this.room,
-                    data: "onLineFeed",
-                });
-            });
-            */
-            /*
-            term.onSelectionChange(() => {
-                console.log("onSelectionChange");
-                socket.emit("terminal", {
-                    room: this.room,
-                    data: "onSelectionChange",
-                });
-            });
-            /*
-            term.onScroll(() => {
-                console.log("onScroll");
-                socket.emit("terminal", {
-                    room: this.room,
-                    data: "onScroll",
-                });
-            });
-            /*
-            term.onKey((key, ev) => {
-                console.log("onKey", key, ev);
-                socket.emit("terminal", {
-                    room: `${this.pipeline}-${this.phase}-${this.app}`,
-                    data: key,
-                });
-            });
-            term.onRender((data) => {
-                console.log("onRender", data);
-                socket.emit("terminal", {
-                    room: `${this.pipeline}-${this.phase}-${this.app}`,
-                    data: data,
-                });
-            });
-            */
 
         },
         socketJoin() {
-            console.log("socketJoin", this.room);
             socket.emit("join", {
                 room: this.room,
             });
         },
         socketLeave() {
-            console.log("socketLeave", this.room);
             term.write("exit\r\n")
             socket.emit("leave", {
                 room: this.room,
             });
         },
         execInContainer2() {
-            axios.get(`/api/console/${this.pipeline}/${this.phase}/${this.app}/exec`).then(() => {
-                console.log(`attached to container ${this.container}`);
-            });
+            axios.get(`/api/console/${this.pipeline}/${this.phase}/${this.app}/exec`);
         },
         execInContainer(){
             axios.post(`/api/apps/${this.pipeline}/${this.phase}/${this.app}/console`, {
                 podName: this.pod.name,
                 containerName: this.container,
                 command: this.command,
-            }).then(() => {
-                console.log(`attached to container ${this.container}`);
             });
 
         }
