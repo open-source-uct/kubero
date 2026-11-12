@@ -32,6 +32,10 @@
             <p class="text-caption mt-1">
               {{ addon.id }}
             </p>
+            <p v-if="addonHost(addon)" class="text-caption mt-1">
+              {{ $t('app.form.addonHost') }}:
+              <code>{{ addonHost(addon) }}</code>
+            </p>
             <div v-if="showButtons">
               <v-divider class="my-3"></v-divider>
               <v-btn
@@ -147,6 +151,11 @@
                 </v-select>
               </v-col>
 
+              <v-col cols="12" v-if="dialogPostgresHost">
+                <v-alert type="info" variant="tonal" density="compact">
+                  {{ $t('app.form.addonHostHint', { host: dialogPostgresHost }) }}
+                </v-alert>
+              </v-col>
               <v-col cols="12" v-for="field in selectedAddon.formfields" v-bind:key="field.name">
                 <v-select
                     v-if="field.type === 'select-storageclass'"
@@ -241,7 +250,7 @@ import set from 'lodash/set';
 import get from 'lodash/get';
 import { defineComponent } from 'vue'
 import { confirmDestructiveAction } from '../../utils/destructiveConfirmation'
-import { addonPrefill, POSTGRES_ADDON_KIND, type EnvVar } from '../../utils/postgresEnv'
+import { addonPrefill, POSTGRES_ADDON_KIND, postgresServiceHost, type EnvVar } from '../../utils/postgresEnv'
 // los avisos de crear o eliminar un addon los muestra este componente, con
 // su nombre; sin esto el aviso genérico de "guardado" salía repetido
 const instantAddonConfig = { feedback: { error: false, success: false } }
@@ -337,6 +346,17 @@ export default defineComponent({
         hasLockedAddons(): boolean {
             return this.addons.some((addon) => !this.canEdit(addon));
         },
+        // Host que tendrá el PostgreSQL del diálogo según el nombre escrito:
+        // al guardar, el nombre se completa con el de la app (<app>-<nombre>)
+        dialogPostgresHost(): string {
+            if (this.selectedAddon?.kind !== POSTGRES_ADDON_KIND) return '';
+            const fields = (this.selectedAddon.formfields ?? {}) as unknown as Record<string, FormField>;
+            const field = Object.values(fields).find((f) => f?.name === 'metadata.name');
+            const short = typeof field?.default === 'string' ? field.default.trim() : '';
+            if (!short) return '';
+            const full = short.startsWith(this.appname) ? short : `${this.appname}-${short}`;
+            return postgresServiceHost(full);
+        },
     },
     data: () => ({
         valid: false,
@@ -379,6 +399,11 @@ export default defineComponent({
         addonName(addon: Addon): string {
             const definition = Object.values(addon?.resourceDefinitions ?? {})[0] as any;
             return definition?.metadata?.name ?? '';
+        },
+        // host del servicio de un PostgreSQL, que no siempre es su nombre
+        addonHost(addon: Addon): string {
+            const name = this.addonName(addon);
+            return addon?.kind === POSTGRES_ADDON_KIND && name ? postgresServiceHost(name) : '';
         },
         // Un addon ya creado no se edita: la base ignora usuario, contraseñas y
         // nombre nuevos, y en Postgres el operador quedaba actualizándolo en

@@ -57,6 +57,16 @@ const FIELD_NAMES: Record<keyof ConnectionData, string[]> = {
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '::1', '[::1]', '0.0.0.0', 'host.docker.internal']
 
 export const POSTGRES_ADDON_KIND = 'KuberoAddonPostgres'
+
+// Host (nombre del servicio) por el que la app llega a un addon de PostgreSQL.
+// Es la regla del chart (common.fullname): usa el nombre del addon si contiene
+// "postgres" y, si no, le agrega "-postgres". Con el nombre por defecto queda
+// <app>-postgres; un addon "db2" de la app client queda client-db2-postgres.
+export function postgresServiceHost(addonName: string): string {
+  const name = addonName.trim().toLowerCase()
+  const host = name.includes('postgres') ? name : `${name}-postgres`
+  return host.slice(0, 63).replace(/-+$/, '')
+}
 export const POSTGRES_PORT = '5432'
 
 // Variables pensadas para el computador del estudiante (LOCAL_DATABASE_URL,
@@ -160,22 +170,29 @@ export function addonPrefill(
   const host = connection.host?.toLowerCase()
   if (appname && host?.startsWith(`${appname}-`)) {
     const short = host.slice(appname.length + 1)
-    if (/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(short)) {
+    // solo si el addon con ese nombre responde en ese mismo host: con el host
+    // "client-db2" el addon "db2" quedaría en client-db2-postgres
+    if (
+      /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(short) &&
+      postgresServiceHost(`${appname}-${short}`) === host
+    ) {
       name = short
     }
   }
   return { name, auth, vars: connection.vars }
 }
 
-type PostgresAddon = { name: string, auth: PostgresAuth }
+type PostgresAddon = { name: string, host: string, auth: PostgresAuth }
 
 function postgresAddons(addons: any[]): PostgresAddon[] {
   return (addons || [])
     .filter((addon) => addon?.kind === POSTGRES_ADDON_KIND)
     .map((addon) => {
       const definition = addon.resourceDefinitions?.[POSTGRES_ADDON_KIND]
+      const name = definition?.metadata?.name as string
       return {
-        name: definition?.metadata?.name as string,
+        name,
+        host: name ? postgresServiceHost(name) : '',
         auth: (definition?.spec?.postgres?.auth ?? {}) as PostgresAuth,
       }
     })
@@ -189,20 +206,20 @@ export function postgresEnvWarnings(envVars: EnvVar[], addons: any[]): PostgresE
   if (pgAddons.length === 0) {
     return []
   }
-  const addonNames = pgAddons.map((addon) => addon.name).join(', ')
+  const addonHosts = pgAddons.map((addon) => addon.host).join(', ')
   const warnings: PostgresEnvWarning[] = []
 
   for (const connection of postgresConnections(envVars)) {
     const vars = connection.vars.join(', ')
     let addon = connection.host
-      ? pgAddons.find((a) => a.name === connection.host?.toLowerCase())
+      ? pgAddons.find((a) => a.host === connection.host?.toLowerCase())
       : undefined
 
     if (connection.host && !addon) {
       const local = LOCAL_HOSTS.includes(connection.host.toLowerCase())
       warnings.push({
         key: local ? 'postgresHostLocal' : 'postgresHostUnknown',
-        params: { vars, host: connection.host, expected: addonNames },
+        params: { vars, host: connection.host, expected: addonHosts },
       })
     }
     if (connection.port && connection.port !== POSTGRES_PORT) {
