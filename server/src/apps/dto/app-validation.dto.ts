@@ -11,6 +11,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { PodSizeResourcesDto } from '../../config/podsize/podsize.dto';
+import { parseK8sQuantity } from '../../common/validators/k8s-quantity.validator';
 
 class AppPodSizeDto {
   @IsOptional() @IsString() id?: string;
@@ -130,6 +131,46 @@ export function envVarProblems(value: unknown): string[] {
 // recursos de Kubernetes, que rechaza espacios, mayúsculas, etc.
 const DNS_LABEL = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 
+// Recursos de un addon (#224). Un valor que Kubernetes no entiende, o una
+// reserva mayor que el límite, hacen fallar el release: el operador lo
+// reintentaría sin fin. Los que faltan toman los valores del chart.
+const showValue = (value: unknown) =>
+  typeof value === 'string' ? value : JSON.stringify(value);
+
+function resourceProblems(addon: string, resources: unknown): string[] {
+  if (resources === undefined || resources === null) return [];
+  if (typeof resources !== 'object') {
+    return [`Los recursos del addon "${addon}" no son válidos`];
+  }
+  const problems: string[] = [];
+  const r = resources as Record<string, Record<string, unknown> | undefined>;
+  for (const key of ['cpu', 'memory'] as const) {
+    const values: Record<string, number | null> = {};
+    for (const kind of ['requests', 'limits'] as const) {
+      const raw = r[kind]?.[key];
+      if (raw === undefined || raw === null || raw === '') continue;
+      const parsed = parseK8sQuantity(raw);
+      if (parsed === null || parsed <= 0) {
+        problems.push(
+          `El addon "${addon}" tiene un valor de ${key} no válido: "${showValue(raw)}" (ej. 250m, 512Mi, 1Gi)`,
+        );
+      } else {
+        values[kind] = parsed;
+      }
+    }
+    if (
+      values.requests != null &&
+      values.limits != null &&
+      values.requests > values.limits
+    ) {
+      problems.push(
+        `En el addon "${addon}" la reserva de ${key} (${showValue(r.requests?.[key])}) no puede superar el límite (${showValue(r.limits?.[key])})`,
+      );
+    }
+  }
+  return problems;
+}
+
 export function addonProblems(value: unknown): string[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) return ['addons debe ser una lista'];
@@ -164,6 +205,9 @@ export function addonProblems(value: unknown): string[] {
             `El addon "${name}" necesita una contraseña para el usuario ${auth.username}`,
           );
         }
+        problems.push(
+          ...resourceProblems(name, definition?.spec?.postgres?.resources),
+        );
       }
     }
   }
