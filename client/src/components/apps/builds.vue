@@ -78,7 +78,8 @@
                                   small
                                   class="ma-2"
                                   color="secondary"
-                                  @click="deleteBuild(b.name)"
+                                  :aria-label="$t('app.a11y.deleteBuild', { name: b.name })"
+                  @click="deleteBuild(b.name)"
                                   >
                                       <v-icon color="primary">
                                           mdi-delete
@@ -91,7 +92,8 @@
                                   class="ma-2"
                                   color="secondary"
                                   v-if="b.state != 'Active'"
-                                  @click="showLogs(b.name)"
+                                  :aria-label="$t('app.a11y.buildLogs', { name: b.name })"
+                  @click="showLogs(b.name)"
                                   >
                                       <v-icon color="primary">
                                           mdi-format-align-justify
@@ -104,7 +106,8 @@
                                   small
                                   class="ma-2"
                                   color="secondary"
-                                  @click="triggerRebuild(b.metadata.name)"
+                                  :aria-label="$t('app.a11y.rebuild', { name: b.metadata.name })"
+                  @click="triggerRebuild(b.metadata.name)"
                                   >
                                       <v-icon color="primary">
                                           mdi-reload

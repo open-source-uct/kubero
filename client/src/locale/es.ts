@@ -452,6 +452,24 @@ const messages = {
       hideEnvValues: 'Ocultar valores',
       downloadEnvFile: 'Descargar .env',
     },
+    // nombres para lectores de pantalla de los botones que solo muestran un ícono
+    a11y: {
+      addAuthAccount: 'Agregar cuenta de autenticación básica',
+      removeAuthAccount: 'Quitar esta cuenta de autenticación básica',
+      addIngressAnnotation: 'Agregar anotación del ingress',
+      removeIngressAnnotation: 'Quitar esta anotación del ingress',
+      addSaAnnotation: 'Agregar anotación de Service Account',
+      removeSaAnnotation: 'Quitar esta anotación de Service Account',
+      addEnvVar: 'Agregar variable de entorno',
+      removeEnvVar: 'Quitar esta variable de entorno',
+      addVolume: 'Agregar volumen',
+      removeVolume: 'Quitar este volumen',
+      addCronjob: 'Agregar cronjob',
+      removeCronjob: 'Quitar este cronjob',
+      deleteBuild: 'Eliminar el build {name}',
+      buildLogs: 'Ver los registros del build {name}',
+      rebuild: 'Volver a construir {name}',
+    },
     cronjobs: {
       name: 'Cronjobs',
       schedule: 'Programación',
@@ -879,6 +897,8 @@ const messages = {
     },
     templates: {
       allowTemplates: 'Permitir plantillas',
+      addCatalog: 'Agregar catálogo de plantillas',
+      deleteCatalog: 'Eliminar este catálogo de plantillas',
     },
   },
   templates: {

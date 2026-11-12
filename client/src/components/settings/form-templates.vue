@@ -83,7 +83,8 @@
                         small
                         class="ma-2"
                         color="secondary"
-                        @click="deleteBuildpack(catalog)"
+                        :aria-label="$t('settings.templates.deleteCatalog')"
+                  @click="deleteBuildpack(catalog)"
                         >
                             <v-icon color="primary">
                                 mdi-delete
@@ -101,7 +102,8 @@
                 small
                 class="ma-2"
                 color="secondary"
-                @click="addTemplateCatalog"
+                :aria-label="$t('settings.templates.addCatalog')"
+                  @click="addTemplateCatalog"
                 >
                     <v-icon color="primary">
                         mdi-plus

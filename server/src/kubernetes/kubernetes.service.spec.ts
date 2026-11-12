@@ -239,6 +239,46 @@ describe('KubernetesService', () => {
     );
   });
 
+  describe('recursos que se están borrando', () => {
+    // con el finalizer del operador, un recurso borrado sigue en la lista con
+    // deletionTimestamp hasta que el operador desinstala su release
+    const deleting = (name: string) => ({
+      metadata: { name, deletionTimestamp: '2026-11-11T06:25:59Z' },
+      spec: { name, access: { teams: [] } },
+    });
+    const alive = (name: string) => ({
+      metadata: { name },
+      spec: { name, access: { teams: [] } },
+    });
+    const list = () =>
+      (service as any).customObjectsApi.listNamespacedCustomObject;
+
+    it('leaves out of the pipelines list the ones being deleted', async () => {
+      (service as any).invalidatePipelinesCache();
+      list().mockResolvedValueOnce({
+        items: [alive('ramtun'), deleting('lol')],
+      });
+      const result = await service.getPipelinesList(['admin']);
+      expect(result.items.map((p) => p.spec.name)).toEqual(['ramtun']);
+    });
+
+    it('leaves out of the apps list the ones being deleted', async () => {
+      list().mockResolvedValueOnce({
+        items: [alive('client'), deleting('server')],
+      });
+      const result = await service.getAppsList('ramtun-production', 'default');
+      expect(result.items.map((a: any) => a.metadata.name)).toEqual(['client']);
+    });
+
+    it('does not modify the cached list when filtering', async () => {
+      (service as any).invalidatePipelinesCache();
+      const cached = { items: [alive('ramtun'), deleting('lol')] };
+      list().mockResolvedValueOnce(cached);
+      await service.getPipelinesList(['admin']);
+      expect(cached.items).toHaveLength(2);
+    });
+  });
+
   it('should getAllAppsList', async () => {
     await expect(service.getAllAppsList('ctx')).resolves.toHaveProperty(
       'items',

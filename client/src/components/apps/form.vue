@@ -234,6 +234,7 @@
                   elevation="2"
                   icon
                   small
+                  :aria-label="$t('app.a11y.removeAuthAccount')"
                   @click="removeAuthLine(account.user)"
                 >
                   <v-icon dark> mdi-minus </v-icon>
@@ -243,7 +244,8 @@
 
             <v-row>
               <v-col cols="12">
-                <v-btn elevation="2" icon small @click="addAuthLine()">
+                <v-btn elevation="2" icon small :aria-label="$t('app.a11y.addAuthAccount')"
+                  @click="addAuthLine()">
                   <v-icon dark> mdi-plus </v-icon>
                 </v-btn>
               </v-col>
@@ -429,6 +431,7 @@
                   elevation="2"
                   icon
                   small
+                  :aria-label="$t('app.a11y.removeIngressAnnotation')"
                   @click="removeCustomIngressAnnotationLine(index)"
                 >
                   <v-icon dark> mdi-minus </v-icon>
@@ -437,7 +440,8 @@
             </v-row>
             <v-row>
               <v-col cols="12">
-                <v-btn elevation="2" icon small @click="addCustomIngressAnnotationLine()">
+                <v-btn elevation="2" icon small :aria-label="$t('app.a11y.addIngressAnnotation')"
+                  @click="addCustomIngressAnnotationLine()">
                   <v-icon dark> mdi-plus </v-icon>
                 </v-btn>
               </v-col>
@@ -607,6 +611,7 @@
                   elevation="2"
                   icon
                   small
+                  :aria-label="$t('app.a11y.removeSaAnnotation')"
                   @click="removeSAAnnotationLine(annotation.annotation)"
                 >
                   <v-icon dark> mdi-minus </v-icon>
@@ -615,7 +620,8 @@
             </v-row>
             <v-row>
               <v-col cols="12">
-                <v-btn elevation="2" icon small @click="addSAAnnotationLine()">
+                <v-btn elevation="2" icon small :aria-label="$t('app.a11y.addSaAnnotation')"
+                  @click="addSAAnnotationLine()">
                   <v-icon dark> mdi-plus </v-icon>
                 </v-btn>
               </v-col>
@@ -669,6 +675,7 @@
                   elevation="2"
                   icon
                   small
+                  :aria-label="$t('app.a11y.removeEnvVar')"
                   @click="removeEnvLine(envvar.name)"
                 >
                   <v-icon dark> mdi-minus </v-icon>
@@ -678,7 +685,8 @@
 
             <v-row>
               <v-col cols="12">
-                <v-btn elevation="2" icon small @click="addEnvLine()">
+                <v-btn elevation="2" icon small :aria-label="$t('app.a11y.addEnvVar')"
+                  @click="addEnvLine()">
                   <v-icon dark> mdi-plus </v-icon>
                 </v-btn>
               </v-col>
@@ -834,7 +842,8 @@
                     elevation="2"
                     icon
                     small
-                    @click="removeVolumeLine(volume.name)"
+                    :aria-label="$t('app.a11y.removeVolume')"
+                  @click="removeVolumeLine(volume.name)"
                   >
                     <v-icon dark> mdi-minus </v-icon>
                   </v-btn>
@@ -867,7 +876,8 @@
 
             <v-row>
               <v-col cols="12">
-                <v-btn elevation="2" icon small @click="addVolumeLine()">
+                <v-btn elevation="2" icon small :aria-label="$t('app.a11y.addVolume')"
+                  @click="addVolumeLine()">
                   <v-icon dark> mdi-plus </v-icon>
                 </v-btn>
               </v-col>
@@ -905,7 +915,8 @@
                     elevation="2"
                     icon
                     small
-                    @click="removeCronjobLine(cronjob.name)"
+                    :aria-label="$t('app.a11y.removeCronjob')"
+                  @click="removeCronjobLine(cronjob.name)"
                   >
                     <v-icon dark> mdi-minus </v-icon>
                   </v-btn>
@@ -930,7 +941,8 @@
 
             <v-row>
               <v-col cols="12">
-                <v-btn elevation="2" icon small @click="addCronjobLine()">
+                <v-btn elevation="2" icon small :aria-label="$t('app.a11y.addCronjob')"
+                  @click="addCronjobLine()">
                   <v-icon dark> mdi-plus </v-icon>
                 </v-btn>
               </v-col>
