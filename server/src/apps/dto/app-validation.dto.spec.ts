@@ -9,12 +9,12 @@ const run = async (app: object) =>
     await validate(plainToInstance(AppValidationDto, app)),
   );
 
-const postgres = (name: string, auth: object) => ({
+const postgres = (name: string, auth: object, resources?: object) => ({
   kind: 'KuberoAddonPostgres',
   resourceDefinitions: {
     KuberoAddonPostgres: {
       metadata: { name },
-      spec: { postgres: { auth } },
+      spec: { postgres: { auth, resources } },
     },
   },
 });
@@ -138,5 +138,83 @@ describe('AppValidationDto addons', () => {
         addons: [postgres('db', { ...okAuth, username: '', password: '' })],
       }),
     ).toEqual([]);
+  });
+
+  describe('recursos del addon de PostgreSQL (#224)', () => {
+    const resources = (
+      requests: Record<string, string>,
+      limits: Record<string, string>,
+    ) => ({ requests, limits });
+
+    it('accepts the default resources and an addon without resources', async () => {
+      expect(
+        await run({
+          addons: [
+            postgres(
+              'db',
+              okAuth,
+              resources(
+                { cpu: '50m', memory: '128Mi' },
+                { cpu: '500m', memory: '512Mi' },
+              ),
+            ),
+          ],
+        }),
+      ).toEqual([]);
+      // los addons creados antes del cambio no traen resources
+      expect(await run({ addons: [postgres('db', okAuth)] })).toEqual([]);
+      expect(await run({ addons: [postgres('db', okAuth, {})] })).toEqual([]);
+    });
+
+    it('accepts equivalent notations (request equal to the limit)', async () => {
+      expect(
+        await run({
+          addons: [
+            postgres(
+              'db',
+              okAuth,
+              resources(
+                { cpu: '0.5', memory: '0.5Gi' },
+                { cpu: '500m', memory: '512Mi' },
+              ),
+            ),
+          ],
+        }),
+      ).toEqual([]);
+    });
+
+    it('rejects a value Kubernetes does not understand', async () => {
+      const errors = await run({
+        addons: [
+          postgres(
+            'db',
+            okAuth,
+            resources(
+              { cpu: 'mucho', memory: '128Mi' },
+              { cpu: '500m', memory: '512 MB' },
+            ),
+          ),
+        ],
+      });
+      expect(errors.join(' ')).toContain('"mucho"');
+      expect(errors.join(' ')).toContain('"512 MB"');
+    });
+
+    it('rejects a request above its limit', async () => {
+      const errors = await run({
+        addons: [
+          postgres(
+            'db',
+            okAuth,
+            resources(
+              { cpu: '1', memory: '1Gi' },
+              { cpu: '500m', memory: '512Mi' },
+            ),
+          ),
+        ],
+      });
+      expect(errors.join(' ')).toContain('reserva de cpu');
+      expect(errors.join(' ')).toContain('reserva de memory');
+    });
   });
 });

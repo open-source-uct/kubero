@@ -88,6 +88,48 @@ export class KuberoAddonPostgres extends Plugin implements IPlugin {
       default: '',
       description: 'Name for a custom database to create',
     },
+    // Reserva y límite del contenedor de la base. Los valores por defecto son
+    // los del chart del operador (v0.2.2-uct.3): en la UCT cada base usaba
+    // 40-60m de CPU y 25-40Mi de memoria en reposo. Sin ellos la base quedaba
+    // como BestEffort, la primera en ser desalojada si un nodo se queda sin
+    // memoria (#224). Solo se eligen al crearla: un addon creado no se edita.
+    'KuberoAddonPostgres.spec.postgres.resources.requests.cpu': {
+      type: 'combobox',
+      label: 'CPU Request',
+      options: ['50m', '100m', '250m', '500m'],
+      name: 'spec.postgres.resources.requests.cpu',
+      required: true,
+      default: '50m',
+      description: 'CPU the node sets aside for the database',
+    },
+    'KuberoAddonPostgres.spec.postgres.resources.limits.cpu': {
+      type: 'combobox',
+      label: 'CPU Limit',
+      options: ['250m', '500m', '1', '2'],
+      name: 'spec.postgres.resources.limits.cpu',
+      required: true,
+      default: '500m',
+      description: 'Maximum CPU the database can use',
+    },
+    'KuberoAddonPostgres.spec.postgres.resources.requests.memory': {
+      type: 'combobox',
+      label: 'Memory Request',
+      options: ['128Mi', '256Mi', '512Mi', '1Gi'],
+      name: 'spec.postgres.resources.requests.memory',
+      required: true,
+      default: '128Mi',
+      description: 'Memory the node sets aside for the database',
+    },
+    'KuberoAddonPostgres.spec.postgres.resources.limits.memory': {
+      type: 'combobox',
+      label: 'Memory Limit',
+      options: ['256Mi', '512Mi', '1Gi', '2Gi'],
+      name: 'spec.postgres.resources.limits.memory',
+      required: true,
+      default: '512Mi',
+      description:
+        'Maximum memory the database can use; above it Kubernetes restarts it',
+    },
     'KuberoAddonPostgres.spec.postgres.persistence.storageClass': {
       type: 'select-storageclass',
       label: 'Storage Class',
@@ -136,7 +178,10 @@ export class KuberoAddonPostgres extends Plugin implements IPlugin {
             password: '',
             database: '',
           },
-          resources: {},
+          resources: {
+            requests: { cpu: '50m', memory: '128Mi' },
+            limits: { cpu: '500m', memory: '512Mi' },
+          },
           persistence: {
             enabled: true,
             storageClass: '',
