@@ -452,6 +452,24 @@ const messages = {
           hideEnvValues: 'Hide values',
           downloadEnvFile: 'Download .env',
         },
+        // screen reader names for buttons that only show an icon
+        a11y: {
+          addAuthAccount: 'Add basic auth account',
+          removeAuthAccount: 'Remove this basic auth account',
+          addIngressAnnotation: 'Add ingress annotation',
+          removeIngressAnnotation: 'Remove this ingress annotation',
+          addSaAnnotation: 'Add Service Account annotation',
+          removeSaAnnotation: 'Remove this Service Account annotation',
+          addEnvVar: 'Add environment variable',
+          removeEnvVar: 'Remove this environment variable',
+          addVolume: 'Add volume',
+          removeVolume: 'Remove this volume',
+          addCronjob: 'Add cronjob',
+          removeCronjob: 'Remove this cronjob',
+          deleteBuild: 'Delete build {name}',
+          buildLogs: 'Show logs of build {name}',
+          rebuild: 'Rebuild {name}',
+        },
         cronjobs: {
           name: 'Cronjobs',
           schedule: 'Schedule',
@@ -879,6 +897,8 @@ const messages = {
         },
         templates: {
           allowTemplates: 'Allow Templates',
+          addCatalog: 'Add template catalog',
+          deleteCatalog: 'Delete this template catalog',
         },
       },
       templates: {

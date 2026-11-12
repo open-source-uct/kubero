@@ -17,6 +17,8 @@ export interface IKubectlPipeline {
 
 export interface IKubectlMetadata {
   creationTimestamp?: Date;
+  // lo pone Kubernetes al borrar un recurso que aún tiene finalizers
+  deletionTimestamp?: Date | string;
   generation?: number;
   //labels?: [Object];
   annotations?: object;

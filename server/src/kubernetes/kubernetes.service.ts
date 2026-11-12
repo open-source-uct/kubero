@@ -57,6 +57,16 @@ function kubeErrorStatus(error: any): number | undefined {
 // Los patch de Kubero son JSON Patch (https://jsonpatch.com/)
 const jsonPatch = setHeaderOptions('Content-Type', PatchStrategy.JsonPatch);
 
+// Pipelines y apps tienen el finalizer del operador (uninstall-release): al
+// borrarlos siguen existiendo, con deletionTimestamp, hasta que el operador
+// desinstala su release. La lista que pedía la web justo después de borrar
+// (al recibir el aviso) los traía de vuelta y había que recargar la página.
+export function withoutDeleting<
+  T extends { metadata?: { deletionTimestamp?: Date | string } },
+>(items: T[]): T[] {
+  return items.filter((item) => !item?.metadata?.deletionTimestamp);
+}
+
 // Traduce el error de Kubernetes al guardar una app a uno que el cliente
 // pueda mostrar
 function appWriteError(error: any): Error {
@@ -369,6 +379,7 @@ export class KubernetesService {
       this.logger.error('❌ getPipelinesList: error getting pipelines!');
       throw error;
     }
+    pipelines.items = withoutDeleting(pipelines.items ?? []);
     if (pipelines.items.length > 0) {
       pipelines.items = pipelines.items.filter((pipeline) => {
         if (!pipeline.spec || !pipeline.spec.access) return true;
@@ -645,7 +656,9 @@ export class KubernetesService {
         namespace,
         plural: 'kuberoapps',
       });
-      return appslist as IKubectlAppList;
+      const list = appslist as IKubectlAppList;
+      list.items = withoutDeleting(list.items ?? []);
+      return list;
     } catch {
       //this.logger.debug(error);
       this.logger.debug('getAppsList: error getting apps');
