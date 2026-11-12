@@ -20,6 +20,7 @@ const {
   postgresConnections,
   addonPrefill,
   postgresEnvWarnings,
+  postgresServiceHost,
 } = loadSource('src/utils/postgresEnv.ts')
 
 const env = (vars) => Object.entries(vars).map(([name, value]) => ({ name, value }))
@@ -129,9 +130,40 @@ test('a host that is not an addon of the app is reported, and nothing is compare
     [pgAddon('server-postgres', {}), pgAddon('server-reportes', {})],
   )
   assert.deepEqual(keys(warnings), ['postgresHostUnknown'])
-  assert.equal(warnings[0].params.expected, 'server-postgres, server-reportes')
+  // "server-reportes" no contiene "postgres": su servicio es server-reportes-postgres
+  assert.equal(warnings[0].params.expected, 'server-postgres, server-reportes-postgres')
 })
 
 test('apps without a postgres addon get no warnings', () => {
   assert.deepEqual(postgresEnvWarnings(env({ DATABASE_URL: 'postgresql://a:b@localhost/x' }), []), [])
+})
+
+test('the service host follows the chart rule: the addon name if it has "postgres", if not name-postgres', () => {
+  assert.equal(postgresServiceHost('client-postgres'), 'client-postgres')
+  assert.equal(postgresServiceHost('cristianwigand-server-postgresql'), 'cristianwigand-server-postgresql')
+  assert.equal(postgresServiceHost('client-db2'), 'client-db2-postgres')
+  assert.equal(postgresServiceHost('Client-DB2'), 'client-db2-postgres')
+})
+
+test('an addon whose name has no "postgres" is reached by name-postgres, without false warnings', () => {
+  const addons = [pgAddon('client-db2', { enablePostgresUser: true, postgresPassword: 'root' })]
+  // el host correcto ya no se marca como desconocido
+  assert.deepEqual(
+    postgresEnvWarnings(env({ DATABASE_URL: 'postgresql://postgres:root@client-db2-postgres:5432/postgres' }), addons),
+    [],
+  )
+  // y con el nombre del addon como host se sugiere el host real
+  const warnings = postgresEnvWarnings(env({ DATABASE_URL: 'postgresql://postgres:root@client-db2:5432/postgres' }), addons)
+  assert.deepEqual(keys(warnings), ['postgresHostUnknown'])
+  assert.equal(warnings[0].params.expected, 'client-db2-postgres')
+})
+
+test('prefill only proposes a name when that addon would answer on the same host', () => {
+  const vars = (host) => env({ DATABASE_URL: `postgresql://app:pw@${host}:5432/notas` })
+  // client-db2-postgres: el addon "db2-postgres" queda en ese mismo host
+  assert.equal(addonPrefill(vars('client-db2-postgres'), 'client').name, 'db2-postgres')
+  // client-db2: ningún addon queda en ese host (sería client-db2-postgres)
+  assert.equal(addonPrefill(vars('client-db2'), 'client').name, undefined)
+  // el caso de siempre no cambia
+  assert.equal(addonPrefill(vars('server-postgres'), 'server').name, 'postgres')
 })
