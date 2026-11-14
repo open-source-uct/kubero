@@ -7,3 +7,6 @@ allowBuilds:
 # vulnerable, dentro de la misma versión mayor.
 overrides:
   'ws@>=8 <8.21.0': ^8.21.0 # lo fija engine.io-client (socket.io-client)
+  # salto mayor (GHSA-g3hv-75wg-m249, solo desarrollo): @vue/language-core
+  # (vue-tsc) solo llama a minimatch(ruta, patrón), que no cambió en la 11
+  'minimatch@>=7 <11.0.1': 11.0.3
