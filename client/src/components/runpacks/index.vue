@@ -205,64 +205,68 @@
     </v-data-table>
     </section>
 
-    <v-dialog v-model="editDialog" max-width="1000px">
+    <v-dialog v-model="editDialog" max-width="1000px"><v-form @submit.prevent="saveEdit">
       <v-card color="cardBackground" class="uct-card uct-dialog-card">
         <v-card-title class="text-h6 font-weight-bold">{{ $t('runpacks.actions.edit') }}</v-card-title>
         <v-card-text v-if="editedRunpack">
-          <v-text-field v-model="editedRunpack.name" :label="$t('runpacks.form.name')"></v-text-field>
-          <v-text-field v-model="editedRunpack.language" :label="$t('runpacks.form.language')"></v-text-field>
+          <ValidationField as="v-text-field" :validation="editValidation.field('name')" v-model="editedRunpack.name" :label="$t('runpacks.form.name')"></ValidationField>
+          <ValidationField as="v-text-field" :validation="editValidation.field('language')" v-model="editedRunpack.language" :label="$t('runpacks.form.language')"></ValidationField>
           <v-divider class="my-4"></v-divider>
           <v-header class="text-uppercase text-caption-2 font-weight-medium" color="cardBackground">{{ $t('runpacks.stages.fetch') }}</v-header>
-          <RunpacksItem :buildpackStage="editedRunpack.fetch" title="Fetch" :advanced="true"></RunpacksItem>
+          <RunpacksItem :validation="editValidation" v-model:buildpackStage="editedRunpack.fetch" title="Fetch" :advanced="true"></RunpacksItem>
           <v-divider class="my-4"></v-divider>
           <v-header class="text-uppercase text-caption-2 font-weight-medium" color="cardBackground">{{ $t('runpacks.stages.build') }}</v-header>
-          <RunpacksItem :buildpackStage="editedRunpack.build" title="Build" :advanced="true"></RunpacksItem>
+          <RunpacksItem :validation="editValidation" v-model:buildpackStage="editedRunpack.build" title="Build" :advanced="true"></RunpacksItem>
           <v-divider class="my-4"></v-divider>
           <v-header class="text-uppercase text-caption-2 font-weight-medium" color="cardBackground">{{ $t('runpacks.stages.run') }}</v-header>
-          <RunpacksItem :buildpackStage="editedRunpack.run" title="Run" :advanced="true"></RunpacksItem>
+          <RunpacksItem :validation="editValidation" v-model:buildpackStage="editedRunpack.run" title="Run" :advanced="true"></RunpacksItem>
         </v-card-text>
         <v-card-text v-else>
           <v-alert type="error" dismissible>
             {{ $t('runpacks.errors.load') }}
           </v-alert>
         </v-card-text>
+        <FormValidationSummary :validation="editValidation" class="px-6" />
         <v-card-actions>
           <v-spacer />
           <v-btn text @click="editDialog = false">{{ $t('runpacks.actions.abort') }}</v-btn>
-          <v-btn color="primary" @click="saveEdit">{{ $t('runpacks.actions.save') }}</v-btn>
+          <v-btn color="primary" type="submit" :disabled="!editValidation.valid || validationSaving" :loading="validationSaving">{{ $t('runpacks.actions.save') }}</v-btn>
         </v-card-actions>
       </v-card>      
-    </v-dialog>
+    </v-form></v-dialog>
 
-    <v-dialog v-model="createDialog" max-width="1000px">
+    <v-dialog v-model="createDialog" max-width="1000px"><v-form @submit.prevent="saveCreate">
       <v-card color="cardBackground" class="uct-card uct-dialog-card">
         <v-card-title class="text-h6 font-weight-bold">{{ $t('runpacks.actions.create') }}</v-card-title>
         <v-card-text>
-          <v-text-field v-model="newRunpack.name" :label="$t('runpacks.form.name')"></v-text-field>
-          <v-text-field v-model="newRunpack.language" :label="$t('runpacks.form.language')"></v-text-field>
+          <ValidationField as="v-text-field" :validation="createValidation.field('name')" v-model="newRunpack.name" :label="$t('runpacks.form.name')"></ValidationField>
+          <ValidationField as="v-text-field" :validation="createValidation.field('language')" v-model="newRunpack.language" :label="$t('runpacks.form.language')"></ValidationField>
           <v-divider class="my-4"></v-divider>
           <v-header class="text-uppercase text-caption-2 font-weight-medium" color="cardBackground">{{ $t('runpacks.stages.fetch') }}</v-header>
-          <RunpacksItem :buildpackStage="newRunpack.fetch" title="Fetch" :advanced="true"></RunpacksItem>
+          <RunpacksItem :validation="createValidation" v-model:buildpackStage="newRunpack.fetch" title="Fetch" :advanced="true"></RunpacksItem>
           <v-divider class="my-4"></v-divider>
           <v-header class="text-uppercase text-caption-2 font-weight-medium" color="cardBackground">{{ $t('runpacks.stages.build') }}</v-header>
-          <RunpacksItem :buildpackStage="newRunpack.build" title="Build" :advanced="true"></RunpacksItem>
+          <RunpacksItem :validation="createValidation" v-model:buildpackStage="newRunpack.build" title="Build" :advanced="true"></RunpacksItem>
           <v-divider class="my-4"></v-divider>
           <v-header class="text-uppercase text-caption-2 font-weight-medium" color="cardBackground">{{ $t('runpacks.stages.run') }}</v-header>
-          <RunpacksItem :buildpackStage="newRunpack.run" title="Run" :advanced="true"></RunpacksItem>
+          <RunpacksItem :validation="createValidation" v-model:buildpackStage="newRunpack.run" title="Run" :advanced="true"></RunpacksItem>
         </v-card-text>
+        <FormValidationSummary :validation="createValidation" class="px-6" />
         <v-card-actions>
           <v-spacer />
           <v-btn text @click="createDialog = false">{{ $t('runpacks.actions.abort') }}</v-btn>
-          <v-btn color="primary" @click="saveCreate">{{ $t('runpacks.actions.create') }}</v-btn>
+          <v-btn color="primary" type="submit" :disabled="!createValidation.valid || validationSaving" :loading="validationSaving">{{ $t('runpacks.actions.create') }}</v-btn>
         </v-card-actions>
       </v-card>
-    </v-dialog>
+    </v-form></v-dialog>
   </v-container>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, computed } from 'vue'
+import { defineComponent, ref, onMounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { runpackFields } from '../../validation/resources'
+import { createFormValidation } from '../../composables/useFormValidation'
 import axios from 'axios'
 import RunpacksItem from './runpacks-item.vue'
 import { confirmDestructiveAction } from '../../utils/destructiveConfirmation'
@@ -374,6 +378,7 @@ export default defineComponent({
       },
     })
 
+    const initialRunpack = JSON.parse(JSON.stringify(newRunpack.value))
     const headers = computed(() => [
       { title: t('runpacks.table.name'), value: 'name' },
       { title: t('runpacks.table.language'), value: 'language' },
@@ -402,13 +407,15 @@ export default defineComponent({
     }
 
     const saveEdit = async () => {
+      if (validationSaving.value || !editValidation.validate()) return
+      validationSaving.value = true
       try {
         await axios.put(`/api/config/runpacks/${editedRunpack?.value?.id }`, editedRunpack.value)
         await loadRunpacks()
         editDialog.value = false
       } catch (e) {
         console.error('Error saving runpack:', e)
-      }
+      } finally { validationSaving.value = false }
     }
 
     const deleteRunpack = async (runpack: any) => {
@@ -429,12 +436,14 @@ export default defineComponent({
     }
 
     const openCreateDialog = () => {
-      var newRunpack = <Runpack>{};
+      newRunpack.value = JSON.parse(JSON.stringify(initialRunpack))
         
       createDialog.value = true
     }
 
     const saveCreate = async () => {
+      if (validationSaving.value || !createValidation.validate()) return
+      validationSaving.value = true
       try {
         // Remove empty id and timestamps before sending to backend
         const payload = JSON.parse(JSON.stringify(newRunpack.value))
@@ -452,14 +461,21 @@ export default defineComponent({
         createDialog.value = false
       } catch (e) {
         console.error('Error creating runpack:', e)
-      }
+      } finally { validationSaving.value = false }
     }
 
     onMounted(() => {
       loadRunpacks()
     })
 
+    const validationSaving = ref(false)
+    const editValidation = createFormValidation(() => runpackFields(editedRunpack.value, t))
+    const createValidation = createFormValidation(() => runpackFields(newRunpack.value, t))
+    watch(editDialog, value => { if (value) editValidation.reset() })
+    watch(createDialog, value => { if (value) createValidation.reset() })
+
     return {
+      validationSaving, editValidation, createValidation,
       runpacks,
       headers,
       loading,

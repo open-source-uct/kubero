@@ -3,7 +3,7 @@
     <div>
 
         <v-switch
-            v-model="settings.kubero.config.templates.enabled"
+            :model-value="settings.kubero.config.templates.enabled" @update:model-value="update('settings', 'kubero.config.templates.enabled', $event)"
             :label="$t('settings.templates.allowTemplates')"
             color="primary"
             required
@@ -21,23 +21,23 @@
                     cols="12"
                     md="3"
                 >
-                    <v-text-field
-                    v-model="catalog.name"
+                    <ValidationField as="v-text-field" :validation="validation.field('catalog-' + validationRowId(catalog) + '-name')"
+                    :model-value="catalog.name" @update:model-value="update('settings', `kubero.config.templates.catalogs.${index}.name`, $event)"
                     label="Name"
                     required
                     density="compact"
-                    ></v-text-field>
+                    ></ValidationField>
                 </v-col>
                 <v-col
                     cols="12"
                     md="7"
                 >
-                    <v-text-field
-                    v-model="catalog.description"
+                    <ValidationField as="v-text-field" :validation="validation.field('catalog-' + validationRowId(catalog) + '-description')"
+                    :model-value="catalog.description" @update:model-value="update('settings', `kubero.config.templates.catalogs.${index}.description`, $event)"
                     label="Description"
                     required
                     density="compact"
-                    ></v-text-field>
+                    ></ValidationField>
                 </v-col>
             </v-row>
             <v-row>
@@ -45,12 +45,12 @@
                     cols="12"
                     md="6"
                 >
-                    <v-select
-                    v-model="catalog.index.format"
+                    <ValidationField as="v-select" :validation="validation.field('catalog-' + validationRowId(catalog) + '-format')"
+                    :model-value="catalog.index.format" @update:model-value="update('settings', `kubero.config.templates.catalogs.${index}.index.format`, $event)"
                     :items="['json']"
                     label="Index Format"
                     required
-                    ></v-select>
+                    ></ValidationField>
                 </v-col>
             </v-row>
             <v-row justify="space-between">
@@ -58,12 +58,12 @@
                     cols="12"
                     md="10"
                 >
-                    <v-text-field
-                    v-model="catalog.index.url"
+                    <ValidationField as="v-text-field" :validation="validation.field('catalog-' + validationRowId(catalog) + '-url')"
+                    :model-value="catalog.index.url" @update:model-value="update('settings', `kubero.config.templates.catalogs.${index}.index.url`, $event)"
                     label="Index URL"
                     required
                     density="compact"
-                    ></v-text-field>
+                    ></ValidationField>
                 </v-col>
             </v-row>
             <v-row justify="space-between">
@@ -115,7 +115,9 @@
 
 
 <script lang="ts">
-import { defineComponent } from 'vue'
+import type { FormValidation } from '../../composables/useFormValidation'
+import { validationRowId, updateModelPath } from '../../composables/useFormValidation'
+import { defineComponent, PropType } from 'vue'
 import { confirmDestructiveAction } from '../../utils/destructiveConfirmation'
 
 // Types
@@ -129,7 +131,9 @@ export interface Buildpack {
 
 export default defineComponent({
     name: 'FormTemplates',
+    emits: ['update:settings', 'update:secrets'],
     props: {
+        validation: { type: Object as PropType<FormValidation>, required: true },
         settings: {
             type: Object as () => any,
             required: true,
@@ -140,10 +144,17 @@ export default defineComponent({
     data() {
         return {
             show: false,
-            panel: -1
+            panel: [] as number[]
         }
     },
     methods: {
+        update(source: 'settings' | 'secrets', path: string, value: unknown) {
+            const model = source === 'settings' ? this.settings : ('secrets' in this ? this.secrets : {})
+            this.$emit(source === 'settings' ? 'update:settings' : 'update:secrets', updateModelPath(model, path, value))
+        },
+
+        validationRowId,
+        revealCatalog(index: number) { if (!this.panel.includes(index)) this.panel = [...this.panel, index]; },
         async deleteBuildpack(catalog: Catalog) {
             const confirmed = await confirmDestructiveAction({
                 title: this.$t('feedback.confirmRemove.title', { name: catalog.name }),
@@ -153,21 +164,21 @@ export default defineComponent({
             })
             if (!confirmed) return
 
-            this.panel = -1
-            this.settings.kubero.config.templates.catalogs.splice(this.settings.kubero.config.templates.catalogs.indexOf(catalog), 1)
+            this.panel = []
+            this.update('settings', 'kubero.config.templates.catalogs', this.settings.kubero.config.templates.catalogs.filter((item: Catalog) => item !== catalog))
         },
         addTemplateCatalog() {
-            this.settings.kubero.config.templates.catalogs.push({
+            this.update('settings', 'kubero.config.templates.catalogs', [...this.settings.kubero.config.templates.catalogs, {
                 name: '',
                 description: '',
                 index: {
                     url: '',
                     format: 'json'
                 }
-            })
+            }])
 
             // open panel 
-            this.panel = this.settings.kubero.config.templates.catalogs.length - 1
+            this.panel = [this.settings.kubero.config.templates.catalogs.length]
         }
     }
 })

@@ -134,14 +134,14 @@
     </div>
 
     <!-- Dialog to edit a user -->
-    <v-dialog v-model="editDialog" max-width="500px">
+    <v-dialog v-model="editDialog" max-width="500px"><v-form @submit.prevent="saveEdit">
       <v-card color="cardBackground" class="uct-card">
         <v-card-title class="text-h6 font-weight-bold">{{ $t('user.actions.edit') }}</v-card-title>
         <v-card-text>
-          <v-text-field v-model="editedUser.username" :label="$t('user.username')"></v-text-field>
+          <ValidationField as="v-text-field" :validation="editValidation.field('username')" v-model="editedUser.username" :label="$t('user.username')"></ValidationField>
           <v-text-field v-model="editedUser.firstName" :label="$t('user.firstName')"></v-text-field>
           <v-text-field v-model="editedUser.lastName" :label="$t('user.lastName')"></v-text-field>
-          <v-text-field v-model="editedUser.email" :label="$t('user.email')"></v-text-field>
+          <ValidationField as="v-text-field" :validation="editValidation.field('email')" v-model="editedUser.email" :label="$t('user.email')"></ValidationField>
           <v-switch v-model="editedUser.isActive" :label="$t('user.active')" color="primary"></v-switch>
           <v-select
             v-model="editedUser.role"
@@ -151,7 +151,7 @@
             :label="$t('user.role')"
             clearable
           ></v-select>
-          <v-select
+          <ValidationField as="v-select" :validation="editValidation.field('teams')"
             v-model="editedUser.userGroups"
             :items="assignableTeams"
             item-title="name"
@@ -163,26 +163,27 @@
             <template v-slot:selection="{ item }">
               <v-chip :text="item.title"></v-chip>
             </template>
-          </v-select>
+          </ValidationField>
         </v-card-text>
+        <FormValidationSummary :validation="editValidation" class="px-6" />
         <v-card-actions>
           <v-spacer />
           <v-btn text @click="editDialog = false">{{ $t('global.abort') }}</v-btn>
-          <v-btn color="primary" @click="saveEdit">{{ $t('global.save') }}</v-btn>
+          <v-btn color="primary" type="submit" :disabled="!editValidation.valid || validationSaving" :loading="validationSaving">{{ $t('global.save') }}</v-btn>
         </v-card-actions>
       </v-card>
-    </v-dialog>
+    </v-form></v-dialog>
 
     <!-- Dialog for a new User -->
-    <v-dialog v-model="createDialog" max-width="500px">
+    <v-dialog v-model="createDialog" max-width="500px"><v-form @submit.prevent="saveCreate">
       <v-card color="cardBackground" class="uct-card">
         <v-card-title class="text-h6 font-weight-bold">{{ $t('user.actions.create') }}</v-card-title>
         <v-card-text>
-          <v-text-field v-model="newUser.username" :label="$t('user.username')"></v-text-field>
+          <ValidationField as="v-text-field" :validation="createValidation.field('username')" v-model="newUser.username" :label="$t('user.username')"></ValidationField>
           <v-text-field v-model="newUser.firstName" :label="$t('user.firstName')"></v-text-field>
           <v-text-field v-model="newUser.lastName" :label="$t('user.lastName')"></v-text-field>
-          <v-text-field v-model="newUser.email" :label="$t('user.email')"></v-text-field>
-          <v-text-field
+          <ValidationField as="v-text-field" :validation="createValidation.field('email')" v-model="newUser.email" :label="$t('user.email')"></ValidationField>
+          <ValidationField as="v-text-field" :validation="createValidation.field('password')"
             v-model="newUser.password"
             :label="$t('user.password')"
             :type="showNewUserPassword ? 'text' : 'password'"
@@ -190,7 +191,7 @@
             append-icon="mdi-key-variant"
             @click:append-inner="showNewUserPassword = !showNewUserPassword"
             @click:append="generateNewUserPassword"
-          ></v-text-field>
+          ></ValidationField>
           <v-switch v-model="newUser.isActive" :label="$t('user.active')" color="primary"></v-switch>
           <v-select
             v-model="newUser.role"
@@ -200,12 +201,12 @@
             :label="$t('user.role')"
             clearable
           ></v-select>
-          <v-select
+          <ValidationField as="v-select" :validation="createValidation.field('teams')"
             v-model="newUser.userGroups"
             :items="assignableTeams"
             item-title="name"
             item-value="id"
-            :label="isScopedCaller ? `${$t('user.teams')} *` : $t('user.teams')"
+            :label="$t('user.teams')"
             :hint="isScopedCaller ? $t('user.errors.teamRequired') : undefined"
             :persistent-hint="isScopedCaller"
             multiple
@@ -214,22 +215,23 @@
             <template v-slot:selection="{ item }">
               <v-chip :text="item.title"></v-chip>
             </template>
-          </v-select>
+          </ValidationField>
         </v-card-text>
+        <FormValidationSummary :validation="createValidation" class="px-6" />
         <v-card-actions>
           <v-spacer />
           <v-btn text @click="createDialog = false">{{ $t('global.abort') }}</v-btn>
-          <v-btn color="primary" @click="saveCreate">{{ $t('global.create') }}</v-btn>
+          <v-btn color="primary" type="submit" :disabled="!createValidation.valid || validationSaving" :loading="validationSaving">{{ $t('global.create') }}</v-btn>
         </v-card-actions>
       </v-card>
-    </v-dialog>
+    </v-form></v-dialog>
 
     <!-- Dialog to change password -->
-    <v-dialog v-model="changePasswordDialog" max-width="500px">
+    <v-dialog v-model="changePasswordDialog" max-width="500px"><v-form @submit.prevent="saveChangePassword">
       <v-card color="cardBackground" class="uct-card">
         <v-card-title class="text-h6 font-weight-bold">{{ $t('user.changePasswordFor', {user: editedUser.username}) }}</v-card-title>
         <v-card-text>
-          <v-text-field
+          <ValidationField as="v-text-field" :validation="passwordValidation.field('password')"
             v-model="editedUser.password"
             :label="$t('user.newPassword')"
             :type="showChangePassword ? 'text' : 'password'"
@@ -237,27 +239,30 @@
             append-icon="mdi-key-variant"
             @click:append-inner="showChangePassword = !showChangePassword"
             @click:append="generateEditedUserPassword"
-          ></v-text-field>
-          <v-text-field
+          ></ValidationField>
+          <ValidationField as="v-text-field" :validation="passwordValidation.field('confirmation')"
             v-model="editedUser.confirmPassword"
             :label="$t('user.confirmPassword')"
             :type="showConfirmPassword ? 'text' : 'password'"
             :append-inner-icon="showConfirmPassword ? 'mdi-eye-off' : 'mdi-eye'"
             @click:append-inner="showConfirmPassword = !showConfirmPassword"
-          ></v-text-field>
+          ></ValidationField>
         </v-card-text>
+        <FormValidationSummary :validation="passwordValidation" class="px-6" />
         <v-card-actions>
           <v-spacer />
           <v-btn text @click="changePasswordDialog = false">{{ $t('global.abort') }}</v-btn>
-          <v-btn color="primary" @click="saveChangePassword">{{ $t('user.changePassword') }}</v-btn>
+          <v-btn color="primary" type="submit" :disabled="!passwordValidation.valid || validationSaving" :loading="validationSaving">{{ $t('user.changePassword') }}</v-btn>
         </v-card-actions>
       </v-card>
-    </v-dialog>
+    </v-form></v-dialog>
   </v-container>
 </template>
 
 <script lang="ts">
 import { computed, defineComponent, nextTick, ref, onMounted, watch } from 'vue'
+import { userFields, passwordFields } from '../../validation/accounts'
+import { createFormValidation } from '../../composables/useFormValidation'
 import axios from 'axios'
 import { useDisplay } from 'vuetify'
 import { useAuthStore } from '../../stores/auth'
@@ -491,13 +496,15 @@ export default defineComponent({
     }
 
     const saveEdit = async () => {
+      if (validationSaving.value || !editValidation.validate()) return
+      validationSaving.value = true
       try {
         await axios.put(`/api/users/id/${editedUser.value.id}`, editedUser.value, handledApiErrorConfig)
         await loadUsers()
         editDialog.value = false
       } catch (e) {
         notifyApiError(e, 'saveUser')
-      }
+      } finally { validationSaving.value = false }
     }
 
     const deleteUser = async (user: User) => {
@@ -549,6 +556,7 @@ export default defineComponent({
     }
 
     const saveCreate = async () => {
+      if (validationSaving.value || !createValidation.validate()) return
       // un rol acotado que crea un usuario sin equipo lo deja invisible para
       // sí mismo desde el día uno (solo admin podría volver a encontrarlo)
       if (authStore.scopeToOwnTeam && !newUser.value.userGroups?.length) {
@@ -558,13 +566,14 @@ export default defineComponent({
         )
         return
       }
+      validationSaving.value = true
       try {
         await axios.post('/api/users', newUser.value, handledApiErrorConfig)
         await loadUsers()
         createDialog.value = false
       } catch (e) {
         notifyApiError(e, 'createUser')
-      }
+      } finally { validationSaving.value = false }
     }
 
     const openChangePasswordDialog = (user: User) => {
@@ -573,10 +582,12 @@ export default defineComponent({
     }
 
     const saveChangePassword = async () => {
+      if (validationSaving.value || !passwordValidation.validate()) return
       if (editedUser.value.password !== editedUser.value.confirmPassword) {
-        alert('Passwords do not match!')
+        passwordValidation.validate()
         return
       }
+      validationSaving.value = true
       try {
         await axios.put(`/api/users/id/${editedUser.value.id}/password`, {
           password: editedUser.value.password,
@@ -584,7 +595,7 @@ export default defineComponent({
         changePasswordDialog.value = false
       } catch (e) {
         notifyApiError(e, 'changeUserPassword')
-      }
+      } finally { validationSaving.value = false }
     }
 
     const deleteGroupFromUser = async (team: any, user: User) => {
@@ -610,7 +621,16 @@ export default defineComponent({
       loadRoles()
     })
 
+    const validationSaving = ref(false)
+    const editValidation = createFormValidation(() => userFields(editedUser.value, false, authStore.scopeToOwnTeam, t))
+    const createValidation = createFormValidation(() => userFields(newUser.value, true, authStore.scopeToOwnTeam, t))
+    const passwordValidation = createFormValidation(() => passwordFields(editedUser.value.password, editedUser.value.confirmPassword, t))
+    watch(editDialog, value => { if (value) editValidation.reset() })
+    watch(createDialog, value => { if (value) createValidation.reset() })
+    watch(changePasswordDialog, value => { if (value) { editedUser.value.password = ''; editedUser.value.confirmPassword = ''; passwordValidation.reset() } })
+
     return {
+      validationSaving, editValidation, createValidation, passwordValidation,
       users,
       userTable,
       headers,

@@ -67,7 +67,7 @@
                   </v-row>
                   <v-row>
                     <v-col cols="12">
-                      <v-textarea 
+                      <ValidationField as="v-textarea" :validation="validation.field('kubeconfig')"
                       rows=30 
                       label="kubeconfig" 
                       hint="kubectl config view --raw --minify --flatten"
@@ -76,17 +76,17 @@
                       :placeholder="kubeconfigPlaceholder" 
                       wrap="off"
                       style="white-space: nowrap; overflow-x: auto;">
-                    </v-textarea>
+                    </ValidationField>
                     </v-col>
                   </v-row>
                   <v-row>
                     <v-col cols="12">
-                      <v-combobox
+                      <ValidationField as="v-combobox" :validation="validation.field('context')"
                         label="context"
                         hint="This value is derived from the kubeconfig file `current-context` or the first context in the list"
                         v-model="kubeContext"
                         :items="kubeContextItems"
-                      ></v-combobox>
+                      ></ValidationField>
                     </v-col>
                   </v-row>
                   <v-row>
@@ -113,34 +113,34 @@
                 <v-card flat>
                   <v-row>
                     <v-col cols="12">
-                      <v-text-field label="kubeconfig base64 encoded" readonly v-model="dotenv.KUBECONFIG_BASE64"></v-text-field>
+                      <ValidationField as="v-text-field" :validation="validation.field('KUBECONFIG_BASE64')" label="kubeconfig base64 encoded" readonly v-model="dotenv.KUBECONFIG_BASE64"></ValidationField>
                     </v-col>
                   </v-row>
                   <v-row>
                     <v-col cols="12">
-                      <v-text-field label="kubeconfig context" readonly v-model="dotenv.KUBERO_CONTEXT"></v-text-field>
+                      <ValidationField as="v-text-field" :validation="validation.field('KUBERO_CONTEXT')" label="kubeconfig context" readonly v-model="dotenv.KUBERO_CONTEXT"></ValidationField>
                     </v-col>
                   </v-row>
                   <v-row>
                     <v-col cols="12">
-                      <v-text-field label="kubero namespace" v-model="dotenv.KUBERO_NAMESPACE"></v-text-field>
+                      <ValidationField as="v-text-field" :validation="validation.field('KUBERO_NAMESPACE')" label="kubero namespace" v-model="dotenv.KUBERO_NAMESPACE"></ValidationField>
                     </v-col>
                   </v-row>
                   <v-row>
                     <v-col cols="12">
-                      <v-text-field label="kubero session key" v-model="dotenv.KUBERO_SESSION_KEY"></v-text-field>
+                      <ValidationField as="v-text-field" :validation="validation.field('KUBERO_SESSION_KEY')" label="kubero session key" v-model="dotenv.KUBERO_SESSION_KEY"></ValidationField>
                     </v-col>
                   </v-row>
                   <v-row>
                     <v-col cols="12">
-                      <v-text-field label="kubero webhook secret" v-model="dotenv.KUBERO_WEBHOOK_SECRET"></v-text-field>
+                      <ValidationField as="v-text-field" :validation="validation.field('KUBERO_WEBHOOK_SECRET')" label="kubero webhook secret" v-model="dotenv.KUBERO_WEBHOOK_SECRET"></ValidationField>
                     </v-col>
                   </v-row>
                   <!-- SAVE Button -->
                   <v-row>
                     <v-col cols="12">
                       <v-btn
-                        :disabled="saveSuccess === 'ok'"
+                        :disabled="saveSuccess === 'ok' || !validation.valid || validationSaving" :loading="validationSaving"
                         color="primary"
                         @click="save(dotenv)"
                       >
@@ -320,6 +320,7 @@
               </v-stepper-window-item>
             </v-stepper-window>
 
+            <FormValidationSummary :validation="validation" />
             <v-stepper-actions
               @click:next="customNext(next)"
               @click:prev="prev"
@@ -333,12 +334,16 @@
 </template>
 
 <script lang="ts">
+import formValidationMixin from '../../composables/formValidationMixin'
+import { setupFields, kubeconfigContexts } from '../../validation/settings'
+import type { ValidationFieldDefinition } from '../../composables/useFormValidation'
 import { defineComponent } from 'vue'
 import axios from "axios"
 import YAML from 'yaml'
 //import { Buffer } from 'buffer'
 
 export default defineComponent({
+  mixins: [formValidationMixin],
   data() {
     return {
       step: '1',
@@ -385,6 +390,7 @@ users:
     }
   },
   computed: {
+    validationFields(): ValidationFieldDefinition[] { return setupFields(this.step, this.kubeConfig, this.kubeContext, this.dotenv); },
     componentsInstalled() {
       return this.installedComponents.operator && this.installedComponents.ingress
     },
@@ -433,6 +439,8 @@ users:
       window.location.href = '/'
     },
     save(obj: any) {
+      if (this.validationSaving || !this.validation.validate()) return;
+      this.validationSaving = true;
       axios.post('/api/config/setup/save', obj)
       .then((response) => {
         if (response.status === 201 && response.data.status === 'ok') {
@@ -449,7 +457,7 @@ users:
       .catch((error) => {
         this.saveSuccess = 'error'
         this.saveErrorMessage = error.message
-      })
+      }).finally(() => { this.validationSaving = false })
     },
     download(content: string, filename: string) {
       const element = document.createElement('a')
@@ -480,6 +488,7 @@ users:
         this.kubeconfigValid = false
       }
 
+      if (!kubeconfigContexts(this.kubeConfig).includes(this.kubeContext)) return;
       // test if the backend is able to validate the kubeconfig
       try {
         this.kubeconfigValid = await this.validateKubeconfig()
@@ -493,6 +502,7 @@ users:
       }
     },
     async customNext(next: () => void) {
+      if (this.validationSaving || !this.validation.validate()) return;
       if (this.step === '1') {
         this.kubeconfigValid = await this.validateKubeconfig()
         if (!this.kubeconfigValid) {
@@ -506,6 +516,7 @@ users:
       next()
     },
     async validateKubeconfig(): Promise<boolean> {
+      if (!kubeconfigContexts(this.kubeConfig).includes(this.kubeContext)) return false;
       if (this.kubeConfig === '') {
         //this.kubeconfigError = 'kubeconfig is empty'
         this.kubeconfigError = ''
@@ -521,7 +532,6 @@ users:
         context: this.kubeContext
       })
 
-      console.log(response.data)
 
       if (response.status === 201) {
         if (response.data.valid) {

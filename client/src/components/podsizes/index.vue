@@ -138,46 +138,50 @@
       </template>
     </v-data-table>
     </section>
-    <v-dialog v-model="editDialog" max-width="600px">
+    <v-dialog v-model="editDialog" max-width="600px"><v-form @submit.prevent="saveEdit">
       <v-card color="cardBackground" class="uct-card uct-dialog-card">
         <v-card-title class="text-h6 font-weight-bold">{{ $t('podsizes.actions.edit') }}</v-card-title>
         <v-card-text v-if="editedPodsize">
-          <v-text-field v-model="editedPodsize.name" :label="$t('podsizes.form.name')"></v-text-field>
-          <v-text-field v-model="editedPodsize.description" :label="$t('podsizes.form.description')"></v-text-field>
-          <PodsizeResourceFields v-model="editedPodsize.resources" />
+          <ValidationField as="v-text-field" :validation="editValidation.field('name')" v-model="editedPodsize.name" :label="$t('podsizes.form.name')"></ValidationField>
+          <ValidationField as="v-text-field" :validation="editValidation.field('description')" v-model="editedPodsize.description" :label="$t('podsizes.form.description')"></ValidationField>
+          <PodsizeResourceFields :validation="editValidation" v-model="editedPodsize.resources" />
         </v-card-text>
         <v-card-text v-else>
           <v-alert type="error" dismissible>
             {{ $t('podsizes.errors.loadingPodsize') }}
           </v-alert>
         </v-card-text>
+        <FormValidationSummary :validation="editValidation" class="px-6" />
         <v-card-actions>
           <v-spacer />
           <v-btn text @click="editDialog = false">{{ $t('global.abort') }}</v-btn>
-          <v-btn color="primary" :disabled="!editedPodsize || !canSave(editedPodsize)" @click="saveEdit">{{ $t('global.save') }}</v-btn>
+          <v-btn color="primary"  type="submit" :disabled="!editValidation.valid || validationSaving" :loading="validationSaving">{{ $t('global.save') }}</v-btn>
         </v-card-actions>
       </v-card>
-    </v-dialog>
-    <v-dialog v-model="createDialog" max-width="600px">
+    </v-form></v-dialog>
+    <v-dialog v-model="createDialog" max-width="600px"><v-form @submit.prevent="saveCreate">
       <v-card color="cardBackground" class="uct-card uct-dialog-card">
         <v-card-title class="text-h6 font-weight-bold">{{ $t('podsizes.actions.create') }}</v-card-title>
         <v-card-text>
-          <v-text-field v-model="newPodsize.name" :label="$t('podsizes.form.name')"></v-text-field>
-          <v-text-field v-model="newPodsize.description" :label="$t('podsizes.form.description')"></v-text-field>
-          <PodsizeResourceFields v-model="newPodsize.resources" />
+          <ValidationField as="v-text-field" :validation="createValidation.field('name')" v-model="newPodsize.name" :label="$t('podsizes.form.name')"></ValidationField>
+          <ValidationField as="v-text-field" :validation="createValidation.field('description')" v-model="newPodsize.description" :label="$t('podsizes.form.description')"></ValidationField>
+          <PodsizeResourceFields :validation="createValidation" v-model="newPodsize.resources" />
         </v-card-text>
+        <FormValidationSummary :validation="createValidation" class="px-6" />
         <v-card-actions>
           <v-spacer />
           <v-btn text @click="createDialog = false">{{ $t('global.abort') }}</v-btn>
-          <v-btn color="primary" :disabled="!canSave(newPodsize)" @click="saveCreate">{{ $t('global.create') }}</v-btn>
+          <v-btn color="primary"  type="submit" :disabled="!createValidation.valid || validationSaving" :loading="validationSaving">{{ $t('global.create') }}</v-btn>
         </v-card-actions>
       </v-card>
-    </v-dialog>
+    </v-form></v-dialog>
   </v-container>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from 'vue'
+import { defineComponent, ref, onMounted, watch } from 'vue'
+import { podsizeFields } from '../../validation/resources'
+import { createFormValidation } from '../../composables/useFormValidation'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import { handledApiErrorConfig, notifyApiError } from '../../utils/apiFeedback'
@@ -185,8 +189,6 @@ import { confirmDestructiveAction } from '../../utils/destructiveConfirmation'
 import {
   canonicalResources,
   PodsizeResources,
-  requestAboveLimit,
-  resourcesComplete,
 } from '../../utils/podsizeOptions'
 import PodsizeResourceFields from './ResourceFields.vue'
 
@@ -239,18 +241,16 @@ export default defineComponent({
       editedPodsize.value = copy
       editDialog.value = true
     }
-    const canSave = (podsize: Podsize) => {
-      const above = requestAboveLimit(podsize.resources)
-      return !!podsize.name.trim() && resourcesComplete(podsize.resources) && !above.cpu && !above.memory
-    }
     const saveEdit = async () => {
+      if (validationSaving.value || !editValidation.validate()) return
+      validationSaving.value = true
       try {
         await axios.put(`/api/config/podsizes/${editedPodsize?.value?.id }`, editedPodsize.value, handledApiErrorConfig)
         await loadPodsizes()
         editDialog.value = false
       } catch (e) {
         notifyApiError(e, 'savePodsize')
-      }
+      } finally { validationSaving.value = false }
     }
     const deletePodsize = async (podsize: any) => {
       const confirmed = await confirmDestructiveAction({
@@ -280,6 +280,8 @@ export default defineComponent({
       createDialog.value = true
     }
     const saveCreate = async () => {
+      if (validationSaving.value || !createValidation.validate()) return
+      validationSaving.value = true
       try {
         const payload = JSON.parse(JSON.stringify(newPodsize.value))
         delete payload.id
@@ -288,18 +290,24 @@ export default defineComponent({
         createDialog.value = false
       } catch (e) {
         notifyApiError(e, 'createPodsize')
-      }
+      } finally { validationSaving.value = false }
     }
     onMounted(() => {
       loadPodsizes()
     })
+    const validationSaving = ref(false)
+    const editValidation = createFormValidation(() => podsizeFields(editedPodsize.value, t))
+    const createValidation = createFormValidation(() => podsizeFields(newPodsize.value, t))
+    watch(editDialog, value => { if (value) editValidation.reset() })
+    watch(createDialog, value => { if (value) createValidation.reset() })
+
     return {
+      validationSaving, editValidation, createValidation,
       podsizes,
       headers,
       loading,
       search,
       openEditDialog,
-      canSave,
       deletePodsize,
       editDialog,
       editedPodsize,

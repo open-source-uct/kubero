@@ -47,6 +47,7 @@ export default createVuetify({
           
           accent: '#EDC500',
           error: '#EF4444',
+          'validation-error': '#FCA5A5',
           info: '#0090DC',
           success: '#10B981',
           warning: '#EDC500',
@@ -67,6 +68,7 @@ export default createVuetify({
 
           accent: '#EDC500',
           error: '#EF4444',
+          'validation-error': '#B91C1C',
           info: '#0075B4',
           success: '#10B981',
           warning: '#EDC500',
