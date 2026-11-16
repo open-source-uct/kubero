@@ -138,11 +138,11 @@
             <v-card color="cardBackground" class="profile-dialog uct-card">
               <v-card-title class="profile-dialog__title"><v-icon icon="mdi-key-plus" color="primary" />{{ $t('profile.token.create') }}</v-card-title>
               <v-card-text>
-                
+
                   <ValidationField as="v-text-field" :validation="tokenValidation.field('name')" v-model="newToken.name" :label="$t('global.name')" variant="outlined" ></ValidationField>
                   <!-- el input nativo datetime-local deja el valor vacío si no se completa cada segmento (día, hora, minuto, etc.), sin avisar -->
                   <ValidationField as="v-text-field" :validation="tokenValidation.field('expiresAt')" v-model="newToken.expiresAt" :label="$t('profile.token.expiresAt')" type="datetime-local" variant="outlined" ></ValidationField>
-                
+
               </v-card-text>
               <FormValidationSummary :validation="tokenValidation" class="px-6" />
         <v-card-actions><v-spacer /><v-btn variant="text" @click="createDialog = false">{{ $t('global.abort') }}</v-btn><v-btn color="primary" variant="flat" type="submit" :disabled="!tokenValidation.valid || validationSaving" :loading="validationSaving">{{ $t('global.create') }}</v-btn></v-card-actions>
