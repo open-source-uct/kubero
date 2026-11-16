@@ -1,5 +1,5 @@
 <template>
-  <v-form v-model="valid">
+  <div>
 
   <v-alert
     v-if="showButtons && persisted"
@@ -87,7 +87,7 @@
           <span class="text-subtitle-1 font-weight-medium mt-2 text-primary">{{ $t('app.form.addAddon') }}</span>
         </v-card>
       </template>
-      <v-card color="cardBackground" class="uct-card">
+      <v-form @submit.prevent="submitForm"><v-card color="cardBackground" class="uct-card">
         <v-card-title v-if="mode==='create'">
           <span class="text-h6 font-weight-bold">{{ $t('app.form.addon') }}</span>
         </v-card-title>
@@ -116,7 +116,7 @@
                 </v-alert>
               </v-col>
               <v-col cols="12">
-                <v-select
+                <ValidationField as="v-select" :validation="validation.field('addon')"
                   :items="availableAddons"
                   :label="$t('app.form.addon')"
                   outlined
@@ -148,7 +148,7 @@
                     ></v-avatar>
                     <span>{{ item.value.displayName }}</span>
                   </template>
-                </v-select>
+                </ValidationField>
               </v-col>
 
               <v-col cols="12" v-if="dialogPostgresHost">
@@ -157,17 +157,16 @@
                 </v-alert>
               </v-col>
               <v-col cols="12" v-for="field in selectedAddon.formfields" v-bind:key="field.name">
-                <v-select
+                <ValidationField as="v-select" :validation="validation.field('addon-' + field.name)"
                     v-if="field.type === 'select-storageclass'"
                     :items="availableStorageClasses"
                     :label="field.label"
-                    :rules="baseSelectRule"
                     item-title="text"
                     item-value="value"
                     dense
                     v-model="field.default"
-                ></v-select>
-                <v-select
+                ></ValidationField>
+                <ValidationField as="v-select" :validation="validation.field('addon-' + field.name)"
                     v-if="field.type === 'select' && typeof field.default === 'object'"
                     :items="field.options"
                     :label="field.label"
@@ -175,8 +174,8 @@
                     item-value="value"
                     dense
                     v-model="field.default"
-                ></v-select>
-                <v-combobox
+                ></ValidationField>
+                <ValidationField as="v-combobox" :validation="validation.field('addon-' + field.name)"
                     v-if="field.type === 'combobox' && typeof field.default === 'string'"
                     :items="field.options"
                     :label="field.label"
@@ -184,24 +183,22 @@
                     item-value="value"
                     dense
                     v-model="field.default"
-                ></v-combobox>
-                <v-text-field
+                ></ValidationField>
+                <ValidationField as="v-text-field" :validation="validation.field('addon-' + field.name)"
                     v-if="field.type === 'text'"
                     v-model="field.default"
                     :label="field.label"
-                    :rules="field.required ? baseRule : []"
                     :required="field.required"
                     dense
-                ></v-text-field>
-                <v-text-field
+                ></ValidationField>
+                <ValidationField as="v-text-field" :validation="validation.field('addon-' + field.name)"
                     v-if="field.type === 'number'"
                     v-model="field.default"
                     :label="field.label"
-                    :rules="field.required ? baseRule : []"
                     :required="field.required"
                     dense
                     type="number"
-                ></v-text-field>
+                ></ValidationField>
                 <v-switch
                     v-model="field.default"
                     :rules="field.required ? baseRule : []"
@@ -217,6 +214,7 @@
           </v-container>
           <small>*indicates required field</small>
         </v-card-text>
+        <FormValidationSummary :validation="validation" class="px-6" />
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn
@@ -229,23 +227,26 @@
           <v-btn
             color="primary"
             variant="flat"
-            :disabled="!valid"
+            :disabled="!validation.valid || saving"
             :loading="saving"
-            @click="submitForm"
+            type="submit"
           >
             {{ $t('global.save') }}
           </v-btn>
         </v-card-actions>
-      </v-card>
+      </v-card></v-form>
     </v-dialog>
   </v-col>
   </v-row>
-  </v-form>
+  </div>
 </template>
 
 
 <script lang="ts">
 import axios from "axios";
+import formValidationMixin from "../../composables/formValidationMixin";
+import { addonFields } from "../../validation/addons";
+import type { ValidationFieldDefinition } from "../../composables/useFormValidation";
 import set from 'lodash/set';
 import get from 'lodash/get';
 import { defineComponent } from 'vue'
@@ -303,6 +304,7 @@ type Event = {
 }
 
 export default defineComponent({
+    mixins: [formValidationMixin],
     props: {
         addons: {
             type: Array<Addon>,
@@ -338,11 +340,16 @@ export default defineComponent({
         },
     },
     watch: {
+        dialog(value: boolean) { if (value) this.validation.reset(); },
         selectedAddon() {
+            this.validation.reset();
             this.onAddonSelected();
         },
     },
     computed: {
+        validationFields(): ValidationFieldDefinition[] {
+            return addonFields(this.selectedAddon?.kind, Object.values(this.selectedAddon?.formfields || {}), this.appname);
+        },
         hasLockedAddons(): boolean {
             return this.addons.some((addon) => !this.canEdit(addon));
         },
@@ -554,7 +561,7 @@ export default defineComponent({
 
             // remove addon from local view and kuberoapp yaml
             const index = this.addons.indexOf(addon);
-            if (index !== -1) this.addons.splice(index, 1);
+            if (index !== -1) this.$emit('update:addons', this.addons.filter((_, i) => i !== index));
             this.newInSession = this.newInSession.filter((name) => name !== this.addonName(addon));
         },
         editAddon(addon: Addon) {
@@ -608,6 +615,7 @@ export default defineComponent({
             });
         },
         async submitForm() {
+            if (this.saving || !this.validation.validate()) return;
             // replace the formfields with the form value
             Object.entries(this.selectedAddon.formfields as FormField[]).forEach(([field, value]) => {
 
@@ -670,7 +678,7 @@ export default defineComponent({
         },
         // la lista es la misma que el formulario envía al guardar la app
         pushAddon(addon: Addon) {
-            this.addons.push(addon);
+            this.$emit('update:addons', [...this.addons, addon]);
         },
         addAddon(addon: Addon) {
             this.pushAddon(addon);
@@ -682,7 +690,7 @@ export default defineComponent({
             // reemplazaba siempre el primero
             if (this.editingIndex !== -1) {
                 const previousName = this.addonName(this.addons[this.editingIndex]);
-                this.addons[this.editingIndex] = addon;
+                this.$emit('update:addons', this.addons.map((item, index) => index === this.editingIndex ? addon : item));
                 this.newInSession = this.newInSession.map((name) =>
                     name === previousName ? this.addonName(addon) : name,
                 );

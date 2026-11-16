@@ -1,0 +1,16 @@
+const { test } = require('node:test')
+const assert = require('node:assert/strict')
+const { addonFields, buildFields } = require('./helpers/load-source.cjs')('src/validation/addons.ts')
+const valid = fields => addonFields('Postgres', fields, 'myapp').every(field => field.rules.every(rule => rule.test(field.value)))
+test('dynamic addon fields check required values, numbers and the final prefixed name', () => {
+  assert.equal(valid([{ name: 'metadata.name', label: 'Name', type: 'text', default: 'database', required: true }]), true)
+  assert.equal(valid([{ name: 'metadata.name', label: 'Name', type: 'text', default: 'a'.repeat(60), required: true }]), false)
+  assert.equal(valid([{ name: 'replicas', label: 'Replicas', type: 'number', default: '3bad' }]), false)
+  assert.equal(valid([{ name: 'enabled', label: 'Enabled', type: 'switch', default: false, required: true }]), true)
+})
+test('builds require a supported strategy and non-blank reference', () => {
+  const validBuild = model => buildFields(model, key => key).every(field => field.rules.every(rule => rule.test(field.value)))
+  assert.equal(validBuild({ buildstrategy: 'dockerfile', reference: 'main' }), true)
+  assert.equal(validBuild({ buildstrategy: 'dockerfile', reference: '  ' }), false)
+  assert.equal(validBuild({ buildstrategy: 'unsupported', reference: 'main' }), false)
+})

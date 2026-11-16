@@ -14,7 +14,7 @@
           ></v-btn>
         </template>
   
-        <v-card
+        <v-form @submit.prevent="saveBuild"><v-card
           color="cardBackground"
           class="uct-card"
           prepend-icon="mdi-wrench"
@@ -27,7 +27,7 @@
                 cols="12"
                 sm="6"
               >
-                <v-select
+                <ValidationField as="v-select" :validation="validation.field('strategy')"
                   :items="['nixpacks', 'dockerfile', 'buildpacks']"
                   label="Build strategy*"
                   description="The strategy to build the source code"
@@ -35,18 +35,18 @@
                   required
                   v-model="form.buildstrategy"
                   @update:modelValue="changedBuildStrategy"
-                ></v-select>
+                ></ValidationField>
               </v-col>
               <v-col
                 cols="12"
                 sm="6"
               >
-                <v-combobox
+                <ValidationField as="v-combobox" :validation="validation.field('reference')"
                   label="Branch/Tag/Commit*"
                   description="The reference to the source code"
                   :items="references"
                   v-model="form.reference"
-                ></v-combobox>
+                ></ValidationField>
               </v-col>
               <v-col
                 cols="12"
@@ -66,6 +66,7 @@
   
           <v-divider></v-divider>
   
+          <FormValidationSummary :validation="validation" class="px-6" />
           <v-card-actions>
             <v-spacer></v-spacer>
   
@@ -79,10 +80,10 @@
               color="primary"
               :text="$t('builds.build')"
               variant="flat"
-              @click="saveBuild"
+              type="submit" :disabled="!validation.valid || validationSaving" :loading="validationSaving"
             ></v-btn>
           </v-card-actions>
-        </v-card>
+        </v-card></v-form>
       </v-dialog>
     </div>
 </template>
@@ -90,11 +91,15 @@
 
 
 <script lang="ts">
+import formValidationMixin from "../../composables/formValidationMixin";
+import { buildFields } from "../../validation/addons";
+import type { ValidationFieldDefinition } from "../../composables/useFormValidation";
 import axios from "axios";
 import { defineComponent } from 'vue'
 import { handledApiErrorConfig, notifyApiError } from '../../utils/apiFeedback'
 
 export default defineComponent({
+  mixins: [formValidationMixin],
   name: 'BuildsForm',
   
   props: {
@@ -123,6 +128,13 @@ export default defineComponent({
     },
     references: [] as string[],
   }),
+
+  computed: {
+    validationFields(): ValidationFieldDefinition[] {
+      return buildFields(this.form, key => this.$t(key));
+    },
+  },
+  watch: { dialog(value: boolean) { if (value) this.validation.reset(); } },
   mounted() {
     this.loadReferences()
     console.log('BuildsForm', this.pipeline, this.phase, this.app, this.appData)
@@ -149,6 +161,8 @@ export default defineComponent({
         })
     },
     saveBuild() {
+        if (this.validationSaving || !this.validation.validate()) return;
+        this.validationSaving = true;
         //console.log('Build', this.pipeline, this.phase, this.app, this.form, this.appData)
         let repository = this.appData?.spec.gitrepo.ssh_url
         if (!this.appData?.spec.gitrepo.private) {
@@ -168,7 +182,7 @@ export default defineComponent({
         })
         .catch(error => {
             notifyApiError(error, 'submitBuild')
-        })
+        }).finally(() => { this.validationSaving = false })
     }
   }
 })

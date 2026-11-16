@@ -1003,7 +1003,7 @@
         <!-- en una app ya creada los addons se guardan al instante; la versión
              nueva de la app evita que el próximo "Actualizar" choque -->
         <Addons
-          :addons="addons"
+          v-model:addons="addons"
           :appname="name"
           :pipeline="pipeline"
           :phase="phase"
