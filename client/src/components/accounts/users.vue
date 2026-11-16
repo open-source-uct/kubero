@@ -206,7 +206,7 @@
             :items="assignableTeams"
             item-title="name"
             item-value="id"
-            :label="isScopedCaller ? `${$t('user.teams')} *` : $t('user.teams')"
+            :label="$t('user.teams')"
             :hint="isScopedCaller ? $t('user.errors.teamRequired') : undefined"
             :persistent-hint="isScopedCaller"
             multiple

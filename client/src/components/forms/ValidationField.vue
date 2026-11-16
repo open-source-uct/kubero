@@ -7,14 +7,14 @@
     :style="{ '--v-theme-error': 'var(--v-theme-validation-error)' }"
     :label="outlined ? undefined : $attrs.label"
     :error="validation.touched && failures.length > 0"
-    :error-messages="validation.touched ? failures.slice(0, 1).map(message) : []"
+    :error-messages="errorMessages"
     :aria-required="validation.required || undefined"
     :aria-labelledby="validation.id + '-label'"
     :aria-expanded="selection ? String(menu) : undefined"
     :aria-controls="selection ? validation.id + '-menu' : undefined"
     :menu-props="selection ? menuProps : undefined"
     :aria-invalid="validation.touched && failures.length > 0 || undefined"
-    :aria-describedby="validation.requirements.length ? validation.id + '-requirements' : undefined"
+    :aria-describedby="requirements.length ? validation.id + '-requirements' : undefined"
     @focusin="focused = true" @focusout="focused = false; validation.touch()"
     @update:menu="menu = $event"
   >
@@ -24,8 +24,8 @@
       <span v-if="validation.required" class="validation-error ms-1" aria-hidden="true">*</span>
     </template>
     <template #details>
-      <ul v-if="validation.requirements.length" :id="validation.id + '-requirements'" class="validation-requirements" :class="{ 'validation-requirements--visible': focused || validation.touched }">
-        <li v-for="(requirement, index) in validation.requirements" :key="index" :class="{ 'validation-error': !requirement.valid }">
+      <ul v-if="requirements.length" :id="validation.id + '-requirements'" class="validation-requirements" :class="{ 'validation-requirements--visible': focused || validation.touched }">
+        <li v-for="(requirement, index) in requirements" :key="index" :class="{ 'validation-error': !requirement.valid }">
           <v-icon :icon="requirement.valid ? 'mdi-check-circle-outline' : 'mdi-circle-outline'" size="14" aria-hidden="true" />
           <span class="validation-sr-only">{{ $t(requirement.valid ? 'validation.met' : 'validation.pending') }}:</span>
           {{ requirementMessage(requirement) }}
@@ -54,8 +54,14 @@ const menuProps = computed(() => ({ ...(typeof attrs['menu-props'] === 'object' 
 const slots = useSlots()
 const forwardedSlots = computed(() => Object.fromEntries(Object.entries(slots).filter(([name]) => name !== 'details' && name !== 'label')))
 const failures = computed(() => props.validation.requirements.filter(requirement => !requirement.valid))
+const requirements = computed(() => props.validation.requirements.filter(requirement => requirement.key !== 'required'))
 const { t, te } = useI18n()
 const message = (requirement: Requirement) => t('validation.' + requirement.key, requirement.params || {})
+// The label's asterisk and aria-required already communicate mandatory fields.
+const errorMessages = computed(() => {
+  const failure = failures.value[0]
+  return props.validation.touched && failure && failure.key !== 'required' ? [message(failure)] : []
+})
 const requirementMessage = (requirement: Requirement) => te('validation.requirement_' + requirement.key)
   ? t('validation.requirement_' + requirement.key, requirement.params || {}) : message(requirement)
 </script>

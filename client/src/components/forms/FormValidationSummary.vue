@@ -3,7 +3,7 @@
     <p><span aria-hidden="true">* </span>{{ reason || $t('validation.complete') }}</p>
     <ul v-if="!reason">
       <li v-for="issue in validation.issues" :key="issue.field">
-        <button type="button" @click="validation.focus(issue.field)">{{ issue.label }}: {{ $t('validation.' + issue.key, issue.params || {}) }}</button>
+        <button type="button" @click="validation.focus(issue.field)">{{ issue.label }}<template v-if="issue.key !== 'required'">: {{ $t('validation.' + issue.key, issue.params || {}) }}</template></button>
       </li>
     </ul>
   </div>

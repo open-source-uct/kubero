@@ -29,7 +29,7 @@
               >
                 <ValidationField as="v-select" :validation="validation.field('strategy')"
                   :items="['nixpacks', 'dockerfile', 'buildpacks']"
-                  label="Build strategy*"
+                  :label="$t('validation.buildStrategy')"
                   description="The strategy to build the source code"
                   auto-select-first
                   required
@@ -42,7 +42,7 @@
                 sm="6"
               >
                 <ValidationField as="v-combobox" :validation="validation.field('reference')"
-                  label="Branch/Tag/Commit*"
+                  :label="$t('validation.buildReference')"
                   description="The reference to the source code"
                   :items="references"
                   v-model="form.reference"
