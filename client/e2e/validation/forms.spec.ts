@@ -1,4 +1,4 @@
-import { test, expect, field } from './fixtures'
+import { test, expect, field, pipeline } from './fixtures'
 
 test('apps block invalid ports, validate on blur, and send exactly one valid request', async ({ page, writes }) => {
   await page.goto('/pipeline/course/production/apps/new')
@@ -33,6 +33,7 @@ test('app summary reveals and focuses an invalid field in a closed panel', async
 
 test('pipelines explain required fields and reject names before sending', async ({ page, writes }) => {
   await page.goto('/pipeline/new')
+  await expect(field(page, 'domain')).toHaveValue('inf.uct.cl')
   await expect(page.locator('.validation-summary')).toContainText('Name')
   await field(page, 'name').fill('Upper_Name')
   await field(page, 'name').press('Tab')
@@ -44,7 +45,25 @@ test('pipelines explain required fields and reject names before sending', async 
   await field(page, 'name').press('Enter')
   await expect.poll(() => writes.length).toBe(1)
   expect(writes[0].body.pipelineName).toBe('course-pipeline')
+  expect(writes[0].body.domain).toBe('inf.uct.cl')
 })
+
+for (const domain of ['example.test', '']) {
+  test(`pipeline creation defaults stay optional and do not replace an existing ${domain || 'empty'} domain`, async ({ page, writes }) => {
+    await page.route('**/api/pipelines/course', route => route.fulfill({ json: { ...pipeline(), domain } }))
+    await page.goto('/pipeline/course')
+    await expect(field(page, 'name')).toHaveValue('course')
+    await expect(field(page, 'domain')).toHaveValue(domain)
+    expect(writes).toHaveLength(0)
+    await page.goto('/pipeline/new')
+    await expect(field(page, 'domain')).toHaveValue('inf.uct.cl')
+    await field(page, 'domain').fill('')
+    await field(page, 'name').fill('optional-domain')
+    await field(page, 'name').press('Enter')
+    await expect.poll(() => writes.length).toBe(1)
+    expect(writes[0].body.domain).toBe('')
+  })
+}
 
 test('account creation blocks invalid email and password and resets feedback on reopen', async ({ page, writes }) => {
   await page.goto('/accounts/users')

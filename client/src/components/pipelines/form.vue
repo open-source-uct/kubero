@@ -264,7 +264,7 @@ export default defineComponent({
       validationLoading: true,
       validationLoadError: false,
       pipelineName: '',
-      domain: '',
+      domain: this.pipeline === 'new' ? 'inf.uct.cl' : '',
       reviewapps: false,
       contextList: [] as string[], // a list of kubernets contexts in the kubeconfig to select from
       // solo se llenan al editar un pipeline existente, para no perder lo que ya tenía
