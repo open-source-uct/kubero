@@ -46,7 +46,13 @@ export const rules = {
   }),
   tag: optional('tag', value => /^[\w][\w.-]{0,127}$/.test(text(value))),
   absolutePath: optional('absolutePath', value => text(value).startsWith('/')),
-  date: optional('date', value => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?$/.test(text(value)) && Number.isFinite(Date.parse(text(value)))),
+  date: optional('date', value => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?$/.exec(text(value))
+    if (!match) return false
+    const [, year, month, day, hour, minute] = match.map(Number)
+    const second = Number(match[6] ?? 0)
+    return year > 0 && month >= 1 && month <= 12 && day >= 1 && day <= new Date(Date.UTC(year, month, 0)).getUTCDate() && hour < 24 && minute < 60 && Number(second) < 60 && Number.isFinite(Date.parse(text(value)))
+  }),
   annotation: optional('annotation', value => /^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/)?[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$/.test(text(value))),
   cron: optional('cron', value => validCron(text(value))),
 }

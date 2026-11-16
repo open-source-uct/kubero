@@ -134,19 +134,20 @@
             </tbody>
           </v-table>
 
-          <v-dialog v-model="createDialog" max-width="500px">
+          <v-dialog v-model="createDialog" max-width="500px"><v-form @submit.prevent="saveCreate">
             <v-card color="cardBackground" class="profile-dialog uct-card">
               <v-card-title class="profile-dialog__title"><v-icon icon="mdi-key-plus" color="primary" />{{ $t('profile.token.create') }}</v-card-title>
               <v-card-text>
-                <v-form ref="createTokenForm">
-                  <v-text-field v-model="newToken.name" :label="$t('global.name')" variant="outlined" :rules="[requiredRule]" />
+                
+                  <ValidationField as="v-text-field" :validation="tokenValidation.field('name')" v-model="newToken.name" :label="$t('global.name')" variant="outlined" ></ValidationField>
                   <!-- el input nativo datetime-local deja el valor vacío si no se completa cada segmento (día, hora, minuto, etc.), sin avisar -->
-                  <v-text-field v-model="newToken.expiresAt" :label="$t('profile.token.expiresAt')" type="datetime-local" variant="outlined" :rules="[requiredRule]" />
-                </v-form>
+                  <ValidationField as="v-text-field" :validation="tokenValidation.field('expiresAt')" v-model="newToken.expiresAt" :label="$t('profile.token.expiresAt')" type="datetime-local" variant="outlined" ></ValidationField>
+                
               </v-card-text>
-              <v-card-actions><v-spacer /><v-btn variant="text" @click="createDialog = false">{{ $t('global.abort') }}</v-btn><v-btn color="primary" variant="flat" @click="saveCreate">{{ $t('global.create') }}</v-btn></v-card-actions>
+              <FormValidationSummary :validation="tokenValidation" class="px-6" />
+        <v-card-actions><v-spacer /><v-btn variant="text" @click="createDialog = false">{{ $t('global.abort') }}</v-btn><v-btn color="primary" variant="flat" type="submit" :disabled="!tokenValidation.valid || validationSaving" :loading="validationSaving">{{ $t('global.create') }}</v-btn></v-card-actions>
             </v-card>
-          </v-dialog>
+          </v-form></v-dialog>
 
           <v-dialog v-model="tokenDialog" max-width="500px">
             <v-card color="cardBackground" class="profile-dialog uct-card">
@@ -162,13 +163,14 @@
           </v-dialog>
         </v-card>
 
-        <v-dialog v-model="editAvatarDialog" max-width="440px">
+        <v-dialog v-model="editAvatarDialog" max-width="440px"><v-form @submit.prevent="saveAvatar">
           <v-card color="cardBackground" class="profile-dialog uct-card">
             <v-card-title class="profile-dialog__title"><v-icon icon="mdi-camera-outline" color="primary" />{{ $t('profile.avatar.edit') }}</v-card-title>
-            <v-card-text><v-alert type="warning" variant="tonal" density="compact" class="mb-4">{{ $t('profile.avatar.limitMessage') }}</v-alert><v-file-input v-model="avatarFile" :label="$t('profile.avatar.uploadAvatar')" accept="image/*" prepend-icon="mdi-image-outline" variant="outlined" /></v-card-text>
-            <v-card-actions><v-spacer /><v-btn variant="text" @click="editAvatarDialog = false">{{ $t('global.cancel') }}</v-btn><v-btn color="primary" variant="flat" :disabled="!avatarFile" @click="saveAvatar">{{ $t('global.save') }}</v-btn></v-card-actions>
+            <v-card-text><v-alert type="warning" variant="tonal" density="compact" class="mb-4">{{ $t('profile.avatar.limitMessage') }}</v-alert><ValidationField as="v-file-input" :validation="avatarValidation.field('avatar')" v-model="avatarFile" :label="$t('profile.avatar.uploadAvatar')" accept="image/*" prepend-icon="mdi-image-outline" variant="outlined" ></ValidationField></v-card-text>
+            <FormValidationSummary :validation="avatarValidation" class="px-6" />
+        <v-card-actions><v-spacer /><v-btn variant="text" @click="editAvatarDialog = false">{{ $t('global.cancel') }}</v-btn><v-btn color="primary" variant="flat" type="submit" :disabled="!avatarValidation.valid || validationSaving" :loading="validationSaving">{{ $t('global.save') }}</v-btn></v-card-actions>
           </v-card>
-        </v-dialog>
+        </v-form></v-dialog>
       </main>
     </div>
   </v-container>
@@ -176,6 +178,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, ref, onMounted, watch } from 'vue'
+import { tokenFields, avatarFields } from '../../validation/access'
 import { passwordFields } from '../../validation/accounts'
 import { createFormValidation } from '../../composables/useFormValidation'
 import { rules } from '../../utils/validationRules'
@@ -228,7 +231,6 @@ export default defineComponent({
     const generatedToken = ref<any>({ name: '', expiresAt: '', token: '' })
     const newToken = ref<any>({ name: '', expiresAt: '' })
     const textareaFlash = ref(false)
-    const createTokenForm = ref<any>(null)
     const requiredRule = (value: string) => !!value || t('profile.token.fieldRequired')
 
     const loadProfile = async () => {
@@ -272,9 +274,11 @@ export default defineComponent({
     }
 
     const saveAvatar = async () => {
+      if (validationSaving.value || !avatarValidation.validate()) return
       if (!avatarFile.value) return
       const formData = new FormData()
       formData.append('avatar', avatarFile.value)
+      validationSaving.value = true
       try {
         await axios.post('/api/users/profile/avatar', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
@@ -283,7 +287,7 @@ export default defineComponent({
         await loadProfile()
       } catch (e) {
         // error handling
-      }
+      } finally { validationSaving.value = false }
     }
 
     const openEditProfileDialog = () => {
@@ -360,12 +364,12 @@ export default defineComponent({
     }
 
     const saveCreate = async () => {
+      if (validationSaving.value || !tokenValidation.validate()) return
       // el datetime-local queda vacío por dentro si no se completa cada segmento
       // (día, hora, minuto...), sin aviso del navegador; esto lo bloquea antes
       // de mandarlo al servidor
-      const { valid } = await createTokenForm.value?.validate() ?? { valid: true }
-      if (!valid) return
 
+      validationSaving.value = true
       try {
         const response = await axios.post('/api/tokens/my', newToken.value, handledApiErrorConfig)
         generatedToken.value = response.data
@@ -374,7 +378,7 @@ export default defineComponent({
         tokenDialog.value = true
       } catch (e) {
         notifyApiError(e, 'createToken')
-      }
+      } finally { validationSaving.value = false }
     }
 
     const copyToken = () => {
@@ -411,7 +415,13 @@ export default defineComponent({
     watch(editProfileDialog, value => { if (value) profileValidation.reset() })
     watch(changePasswordDialog, value => { if (value) passwordValidation.reset() })
 
+    const tokenValidation = createFormValidation(() => tokenFields(newToken.value, t))
+    const avatarValidation = createFormValidation(() => avatarFields(avatarFile.value, t))
+    watch(createDialog, value => { if (value) tokenValidation.reset() })
+    watch(editAvatarDialog, value => { if (value) { avatarFile.value = null; avatarValidation.reset() } })
+
     return {
+      tokenValidation, avatarValidation,
       validationSaving, profileValidation, passwordValidation,
       locale,
       availableLanguages,
@@ -439,7 +449,6 @@ export default defineComponent({
       saveCreate,
       copyToken,
       textareaFlash,
-      createTokenForm,
       requiredRule,
       authStore,
       profileError,

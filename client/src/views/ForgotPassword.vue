@@ -40,8 +40,8 @@
                     {{ error }}
                 </v-alert>
 
-                <form @submit.prevent="submit">
-                    <v-text-field
+                <v-form @submit.prevent="submit">
+                    <ValidationField as="v-text-field" :validation="validation.field('email')"
                         v-model="email"
                         :label="$t('user.email')"
                         type="email"
@@ -52,8 +52,9 @@
                         prepend-inner-icon="mdi-email-outline"
                         required
                         class="mb-4"
-                    ></v-text-field>
+                    ></ValidationField>
 
+                    <FormValidationSummary :validation="validation" />
                     <v-btn
                         block
                         color="primary"
@@ -61,25 +62,30 @@
                         type="submit"
                         elevation="1"
                         class="font-weight-bold mb-2"
-                        :loading="loading"
+                        :loading="loading" :disabled="!validation.valid || loading"
                     >
                         {{ $t('user.forgotPasswordSend') }}
                     </v-btn>
                     <v-btn block variant="text" color="primary" to="/login">
                         {{ $t('user.backToLogin') }}
                     </v-btn>
-                </form>
+                </v-form>
             </template>
         </v-card>
     </div>
 </template>
 
 <script lang="ts">
+import formValidationMixin from "../composables/formValidationMixin";
+import { rules } from "../utils/validationRules";
+import type { ValidationFieldDefinition } from "../composables/useFormValidation";
+
 import axios from 'axios'
 import { defineComponent } from 'vue'
 import i18n from '@/plugins/i18n'
 
 export default defineComponent({
+    mixins: [formValidationMixin],
     name: 'ForgotPassword',
     data: () => ({
         email: '',
@@ -87,8 +93,10 @@ export default defineComponent({
         sent: false,
         error: '',
     }),
+    computed: { validationFields(): ValidationFieldDefinition[] { return [{ id: 'email', label: this.$t('user.email'), value: this.email, rules: [rules.required, rules.email] }] } },
     methods: {
         submit() {
+            if (this.loading || !this.validation.validate()) return
             this.loading = true
             this.error = ''
             axios.post('/api/auth/forgot-password', { email: this.email })
