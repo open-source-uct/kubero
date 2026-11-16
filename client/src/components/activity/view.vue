@@ -36,8 +36,8 @@
           clearable hide-details="auto"
           @update:search="usernameSearch = $event"
         />
-        <ValidationField as="v-text-field" :validation="dateValidation.field('from')" v-model="filters.from" type="date" :label="$t('activity.from')" variant="outlined" density="compact" hide-details ></ValidationField>
-        <ValidationField as="v-text-field" :validation="dateValidation.field('to')" v-model="filters.to" type="date" :label="$t('activity.to')" variant="outlined" density="compact" hide-details ></ValidationField>
+        <ValidationField as="v-text-field" :validation="dateValidation.field('from')" v-model="filters.from" type="date" :label="$t('activity.from')" variant="outlined" density="compact" label-placement="floating" :show-requirements="false" ></ValidationField>
+        <ValidationField as="v-text-field" :validation="dateValidation.field('to')" v-model="filters.to" type="date" :label="$t('activity.to')" variant="outlined" density="compact" label-placement="floating" :show-requirements="false" ></ValidationField>
         <div class="activity-filter-actions">
           <v-btn v-if="hasClearableFilters" class="activity-button" variant="text" color="primary" prepend-icon="mdi-filter-remove-outline" :disabled="loading" @click="resetFilters">{{ $t('activity.clear') }}</v-btn>
           <v-btn class="activity-button" type="submit" color="primary" elevation="0" :disabled="loading || !dateValidation.valid">{{ $t('activity.apply') }}</v-btn>

@@ -1,11 +1,11 @@
 <template>
-  <label v-if="outlined" :id="validation.id + '-label'" :for="validation.id" class="validation-field-label" :class="{ 'validation-error': validation.touched && failures.length > 0 }">
+  <label v-if="externalLabel" :id="validation.id + '-label'" :for="validation.id" class="validation-field-label" :class="{ 'validation-error': validation.touched && failures.length > 0 }">
     <slot name="label">{{ validation.label || $attrs.label }}</slot><span v-if="validation.required" class="validation-error ms-1" aria-hidden="true">*</span>
   </label>
   <component
     :is="control" v-bind="$attrs" class="validated-field" :id="validation.id" :rules="[]" :hide-details="false"
     :style="{ '--v-theme-error': 'var(--v-theme-validation-error)' }"
-    :label="outlined ? undefined : $attrs.label"
+    :label="externalLabel ? undefined : $attrs.label"
     :error="validation.touched && failures.length > 0"
     :error-messages="errorMessages"
     :aria-required="validation.required || undefined"
@@ -19,7 +19,7 @@
     @update:menu="menu = $event"
   >
     <template v-for="(_, slot) in forwardedSlots" #[slot]="slotProps"><slot :name="slot" v-bind="slotProps || {}" /></template>
-    <template v-if="!outlined" #label="slotProps">
+    <template v-if="!externalLabel" #label="slotProps">
       <slot name="label" v-bind="slotProps || {}">{{ validation.label || $attrs.label }}</slot>
       <span v-if="validation.required" class="validation-error ms-1" aria-hidden="true">*</span>
     </template>
@@ -34,7 +34,7 @@
       <slot name="details" />
     </template>
   </component>
-  <span v-if="!outlined" :id="validation.id + '-label'" class="validation-sr-only">{{ validation.label || $attrs.label }}</span>
+  <span v-if="!externalLabel" :id="validation.id + '-label'" class="validation-sr-only">{{ validation.label || $attrs.label }}</span>
 </template>
 <script setup lang="ts">
 import { computed, ref, useSlots, useAttrs } from 'vue'
@@ -42,13 +42,18 @@ import { useI18n } from 'vue-i18n'
 import { VTextField, VSelect, VCombobox, VTextarea, VFileInput, VAutocomplete, VSlider, VRangeSlider } from 'vuetify/components'
 import type { FieldFeedback, Requirement } from '../../composables/useFormValidation'
 defineOptions({ inheritAttrs: false })
-const props = withDefaults(defineProps<{ validation: FieldFeedback; as?: string; showRequirements?: boolean }>(), { showRequirements: true })
+const props = withDefaults(defineProps<{
+  validation: FieldFeedback
+  as?: string
+  showRequirements?: boolean
+  labelPlacement?: 'above' | 'floating'
+}>(), { showRequirements: true, labelPlacement: 'above' })
 const controls = { 'v-text-field': VTextField, 'v-select': VSelect, 'v-combobox': VCombobox, 'v-textarea': VTextarea, 'v-file-input': VFileInput, 'v-autocomplete': VAutocomplete, VSlider, VRangeSlider }
 const control = computed(() => controls[props.as as keyof typeof controls] || VTextField)
 const focused = ref(false)
 const menu = ref(false)
 const attrs = useAttrs()
-const outlined = computed(() => attrs.variant === 'outlined')
+const externalLabel = computed(() => attrs.variant === 'outlined' && props.labelPlacement === 'above')
 const selection = computed(() => ['v-select', 'v-combobox', 'v-autocomplete'].includes(props.as || ''))
 const menuProps = computed(() => ({ ...(typeof attrs['menu-props'] === 'object' ? attrs['menu-props'] : {}), id: props.validation.id + '-menu', eager: true }))
 const slots = useSlots()
