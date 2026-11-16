@@ -2,53 +2,47 @@
   <div class="podsize-resources">
     <p class="podsize-resources__hint">{{ $t('podsizes.form.resourcesHint') }}</p>
     <div class="podsize-resources__grid">
-      <v-select
+      <ValidationField as="v-select" :validation="validation.field('requests-cpu')"
         :model-value="modelValue.requests.cpu"
         :items="cpuOptions(modelValue.requests.cpu)"
         :label="$t('podsizes.form.cpuRequest')"
-        :rules="[required]"
         @update:model-value="update('requests', 'cpu', $event)"
-      ></v-select>
-      <v-select
+      ></ValidationField>
+      <ValidationField as="v-select" :validation="validation.field('limits-cpu')"
         :model-value="modelValue.limits.cpu"
         :items="cpuOptions(modelValue.limits.cpu)"
         :label="$t('podsizes.form.cpuLimit')"
-        :rules="[required]"
-        :error-messages="above.cpu ? $t('podsizes.errors.requestAboveLimit') : []"
         @update:model-value="update('limits', 'cpu', $event)"
-      ></v-select>
-      <v-select
+      ></ValidationField>
+      <ValidationField as="v-select" :validation="validation.field('requests-memory')"
         :model-value="modelValue.requests.memory"
         :items="memoryOptions(modelValue.requests.memory)"
         :label="$t('podsizes.form.memoryRequest')"
-        :rules="[required]"
         @update:model-value="update('requests', 'memory', $event)"
-      ></v-select>
-      <v-select
+      ></ValidationField>
+      <ValidationField as="v-select" :validation="validation.field('limits-memory')"
         :model-value="modelValue.limits.memory"
         :items="memoryOptions(modelValue.limits.memory)"
         :label="$t('podsizes.form.memoryLimit')"
-        :rules="[required]"
-        :error-messages="above.memory ? $t('podsizes.errors.requestAboveLimit') : []"
         @update:model-value="update('limits', 'memory', $event)"
-      ></v-select>
+      ></ValidationField>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, PropType } from 'vue'
-import { useI18n } from 'vue-i18n'
+import type { FormValidation } from '../../composables/useFormValidation'
+import { defineComponent, PropType } from 'vue'
 import {
   cpuOptions,
   memoryOptions,
   PodsizeResources,
-  requestAboveLimit,
 } from '../../utils/podsizeOptions'
 
 export default defineComponent({
   name: 'PodsizeResourceFields',
   props: {
+    validation: { type: Object as PropType<FormValidation>, required: true },
     modelValue: {
       type: Object as PropType<PodsizeResources>,
       required: true,
@@ -56,16 +50,13 @@ export default defineComponent({
   },
   emits: ['update:modelValue'],
   setup(props, { emit }) {
-    const { t } = useI18n()
-    const above = computed(() => requestAboveLimit(props.modelValue))
-    const required = (value: string) => !!value || t('podsizes.errors.required')
     const update = (kind: 'requests' | 'limits', key: 'cpu' | 'memory', value: string) => {
       emit('update:modelValue', {
         ...props.modelValue,
         [kind]: { ...props.modelValue[kind], [key]: value },
       })
     }
-    return { above, cpuOptions, memoryOptions, required, update }
+    return { cpuOptions, memoryOptions, update }
   },
 })
 </script>

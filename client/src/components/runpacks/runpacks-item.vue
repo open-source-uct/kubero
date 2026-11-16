@@ -5,47 +5,45 @@
                 cols="12"
                 md="4"
             >
-                <v-text-field
-                v-model="buildpackStage.repository"
+                <ValidationField as="v-text-field" :validation="validation.field(title.toLowerCase() + '-repository')"
+                :model-value="buildpackStage.repository" @update:model-value="update('repository', $event)"
                 :label="$t('runpacks.details.repository')"
                 required
                 density="compact"
-                ></v-text-field>
+                ></ValidationField>
             </v-col>
             <v-col
                 cols="12"
                 md="2"
             >
-                <v-text-field
-                v-model="buildpackStage.tag"
+                <ValidationField as="v-text-field" :validation="validation.field(title.toLowerCase() + '-tag')"
+                :model-value="buildpackStage.tag" @update:model-value="update('tag', $event)"
                 :label="$t('runpacks.form.tag')"
                 required
                 density="compact"
-                ></v-text-field>
+                ></ValidationField>
             </v-col>
             <v-col
                 cols="12"
                 md="3"
                 v-if="advanced"
             >
-                <v-text-field
-                    v-model="buildpackStage.securityContext.runAsUser"
-                    :rules="uidRules"
+                <ValidationField as="v-text-field" :validation="validation.field(title.toLowerCase() + '-uid')"
+                    :model-value="buildpackStage.securityContext.runAsUser" @update:model-value="update('securityContext.runAsUser', $event)"
                     density="compact"
                     :label="$t('runpacks.form.runAsUser')"
-                ></v-text-field>
+                ></ValidationField>
             </v-col>
             <v-col
                 cols="12"
                 md="3"
                 v-if="advanced"
             >
-                <v-text-field
-                    v-model="buildpackStage.securityContext.runAsGroup"
-                    :rules="uidRules"
+                <ValidationField as="v-text-field" :validation="validation.field(title.toLowerCase() + '-gid')"
+                    :model-value="buildpackStage.securityContext.runAsGroup" @update:model-value="update('securityContext.runAsGroup', $event)"
                     density="compact"
                     :label="$t('runpacks.form.runAsGroup')"
-                ></v-text-field>
+                ></ValidationField>
             </v-col>
         </v-row>
 
@@ -55,7 +53,7 @@
                 md="3"
             >
                 <v-switch
-                    v-model="buildpackStage.readOnlyAppStorage"
+                    :model-value="buildpackStage.readOnlyAppStorage" @update:model-value="update('readOnlyAppStorage', $event)"
                     :label="$t('runpacks.form.readOnlyAppVolume')"
                     density="compact"
                     color="primary"
@@ -66,7 +64,7 @@
                 md="3"
             >
                 <v-switch
-                    v-model="buildpackStage.securityContext.readOnlyRootFilesystem"
+                    :model-value="buildpackStage.securityContext.readOnlyRootFilesystem" @update:model-value="update('securityContext.readOnlyRootFilesystem', $event)"
                     :label="$t('runpacks.form.readOnlyRootFilesystem')"
                     density="compact"
                     color="primary"
@@ -77,7 +75,7 @@
                 md="3"
             >
                 <v-switch
-                    v-model="buildpackStage.securityContext.allowPrivilegeEscalation"
+                    :model-value="buildpackStage.securityContext.allowPrivilegeEscalation" @update:model-value="update('securityContext.allowPrivilegeEscalation', $event)"
                     :label="$t('runpacks.form.allowPrivilegeEscalation')"
                     density="compact"
                     color="primary"
@@ -88,7 +86,7 @@
                 md="3"
             >
                 <v-switch
-                    v-model="buildpackStage.securityContext.runAsNonRoot"
+                    :model-value="buildpackStage.securityContext.runAsNonRoot" @update:model-value="update('securityContext.runAsNonRoot', $event)"
                     :label="$t('runpacks.form.runAsNonRoot')"
                     density="compact"
                     color="primary"
@@ -102,7 +100,7 @@
                 md="6"
             >
                 <v-select
-                    v-model="buildpackStage.securityContext.capabilities.add"
+                    :model-value="buildpackStage.securityContext.capabilities.add" @update:model-value="update('securityContext.capabilities.add', $event)"
                     :items="capabilities"
                     :menu-props="{ maxHeight: '400' }"
                     :label="$t('runpacks.form.capabilitiesAdd')"
@@ -118,7 +116,7 @@
                 md="6"
             >
                 <v-select
-                    v-model="buildpackStage.securityContext.capabilities.drop"
+                    :model-value="buildpackStage.securityContext.capabilities.drop" @update:model-value="update('securityContext.capabilities.drop', $event)"
                     :items="capabilities"
                     :menu-props="{ maxHeight: '400' }"
                     :label="$t('runpacks.form.capabilitiesDrop')"
@@ -135,12 +133,15 @@
 
 
 <script lang="ts">
-import { defineComponent, computed } from 'vue'
-import { useI18n } from 'vue-i18n'
+import type { FormValidation } from '../../composables/useFormValidation'
+import set from 'lodash/set'
+import { defineComponent, PropType } from 'vue'
 
 export default defineComponent({
     name: 'RunpacksItem',
+    emits: ['update:buildpackStage'],
     props: {
+        validation: { type: Object as PropType<FormValidation>, required: true },
         title: {
             type: String,
             required: true
@@ -154,21 +155,13 @@ export default defineComponent({
             default: false
         }
     },
-    setup(props) {
-        const { t } = useI18n()
-        
-        const uidRules = computed(() => [
-            (v: string) => !!v || t('runpacks.form.required'),
-            (v: string) => /^\d+$/.test(v) || t('runpacks.form.mustBeNumber')
-        ])
-        
-        console.log('RunpacksItem props:', props.buildpackStage)
-        return {
-            buildpackStage: props.buildpackStage,
-            title: props.title,
-            advanced: props.advanced,
-            uidRules
+    setup(props, { emit }) {
+        const update = (path: string, value: unknown) => {
+            const next = { ...props.buildpackStage, securityContext: { ...props.buildpackStage.securityContext, capabilities: { ...props.buildpackStage.securityContext?.capabilities } } }
+            set(next, path, value)
+            emit('update:buildpackStage', next)
         }
+        return { update }
     },
     data () {
         return {
