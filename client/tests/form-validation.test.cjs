@@ -20,6 +20,21 @@ test('required preserves zero and false but rejects blanks and empty selections'
   for (const value of [0, false, 'value', ['a']]) assert.equal(rules.required.test(value), true)
   for (const value of [null, undefined, '', '   ', []]) assert.equal(rules.required.test(value), false)
 })
+
+test('mandatory labels remove legacy markers from fields and summaries without changing definitions', () => {
+  for (const label of ['Password*', 'Password * ', 'Password * *']) {
+    const definition = { id: 'password', label, value: '', rules: [rules.required] }
+    const form = createFormValidation(() => [definition,
+      { id: 'optional', label: 'Wildcard *', value: '', rules: [] },
+    ])
+    assert.equal(form.field('password').label, 'Password')
+    assert.equal(form.field('password').required, true)
+    assert.equal(form.issues[0].label, 'Password')
+    assert.equal(form.field('optional').label, 'Wildcard *')
+    assert.equal(definition.label, label)
+    assert.equal(form.valid, false)
+  }
+})
 test('ports reject partial numbers, fractions and out-of-range values', () => {
   const rule = rules.integer(1, 65535)
   for (const value of [1, '65535', 8080]) assert.equal(rule.test(value), true)

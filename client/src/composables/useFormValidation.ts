@@ -47,7 +47,11 @@ export function createFormValidation(definitions: () => ValidationFieldDefinitio
   const prefix = `validation-${++sequence}-`
   const touched = reactive(new Set<string>())
   const attempted = ref(false)
-  const fields = computed(() => definitions().filter(field => field.active !== false))
+  const fields = computed(() => definitions().filter(field => field.active !== false).map(field => ({
+    ...field,
+    // Older addon catalogs include the mandatory marker in the label itself.
+    label: field.rules.some(rule => rule.required) ? field.label.replace(/(?:\s*\*)+\s*$/u, '') : field.label,
+  })))
   const evaluate = (field: ValidationFieldDefinition): Requirement[] => field.rules.map(rule => ({ key: rule.key, params: rule.params,
     valid: !(field.rules.some(check => check.required) && empty(field.value)) && rule.test(field.value) }))
   const issues = computed<ValidationIssue[]>(() => fields.value.flatMap(field => {
