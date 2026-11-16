@@ -42,8 +42,8 @@
                     {{ $t('user.errors.wrongCredentials') }}
                 </v-alert>
 
-                <v-form @submit.prevent="login">
-                    <ValidationField as="v-text-field" :validation="validation.field('username')"
+                <form @submit.prevent="login">
+                    <v-text-field
                         v-model="username"
                         :label="$t('user.username')"
                         name="username"
@@ -53,9 +53,9 @@
                         prepend-inner-icon="mdi-account-outline"
                         required
                         class="mb-2"
-                    ></ValidationField>
+                    ></v-text-field>
 
-                    <ValidationField as="v-text-field" :validation="validation.field('password')"
+                    <v-text-field
                         v-model="password"
                         :label="$t('user.password')"
                         type="password"
@@ -66,7 +66,7 @@
                         prepend-inner-icon="mdi-lock-outline"
                         required
                         class="mb-2"
-                    ></ValidationField>
+                    ></v-text-field>
 
                     <div class="text-right mb-4">
                         <router-link to="/forgot-password" class="text-caption text-primary text-decoration-none">
@@ -74,19 +74,18 @@
                         </router-link>
                     </div>
 
-                    <FormValidationSummary :validation="validation" />
                     <v-btn
                         block
                         color="primary"
                         size="large"
                         type="submit"
-                        :disabled="!validation.valid || validationSaving" :loading="validationSaving"
+                        :disabled="loggingIn" :loading="loggingIn"
                         elevation="1"
                         class="font-weight-bold"
                     >
                         {{ $t('global.login') }}
                     </v-btn>
-                </v-form>
+                </form>
             </div>
 
             <template v-if="authMethods.github">
@@ -121,20 +120,16 @@
 </template>
 
 <script lang="ts">
-import formValidationMixin from "../composables/formValidationMixin";
-import { rules } from "../utils/validationRules";
-import type { ValidationFieldDefinition } from "../composables/useFormValidation";
-
 import axios from "axios"
 import { defineComponent } from 'vue'
 
 
 export default defineComponent({
-    mixins: [formValidationMixin],
     name: "Login",
     data: () => ({
         error: false,
         errorshake: false,
+        loggingIn: false,
         username: '',
         password: '',
         authMethods : {
@@ -144,7 +139,6 @@ export default defineComponent({
         }
     }),
     computed: {
-        validationFields(): ValidationFieldDefinition[] { return [{ id: 'username', label: this.$t('user.username'), value: this.username, rules: [rules.required] }, { id: 'password', label: this.$t('user.password'), value: this.password, rules: [rules.required] }] },
         isDemoDomain(): boolean {
             const demoDomains = [
                 'demo.kubero.dev',
@@ -172,9 +166,9 @@ export default defineComponent({
                 })
         },
         login: function (e: Event) {
-            if (this.validationSaving || !this.validation.validate()) return
-            this.validationSaving = true
             e.preventDefault()
+            if (this.loggingIn) return
+            this.loggingIn = true
             let username = this.username
             let password = this.password
             let login = () => {
@@ -193,7 +187,7 @@ export default defineComponent({
                             this.errorshake = false;
                         }, 300);
                         void errors
-                    }).finally(() => { this.validationSaving = false })
+                    }).finally(() => { this.loggingIn = false })
             }
             login()
         },

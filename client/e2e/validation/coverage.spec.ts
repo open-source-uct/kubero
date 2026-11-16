@@ -28,13 +28,30 @@ test('avatar files are checked before upload', async ({ page, writes }) => {
   expect(writes[0].path).toBe('/api/users/profile/avatar')
 })
 
-test('login only requires existing credentials, while reset requires eight matching characters', async ({ page, writes }) => {
+test('login keeps its original fields without validation feedback or input-based blocking', async ({ page, writes }) => {
+  await page.route('**/api/auth/login', async route => {
+    writes.push({ method: 'POST', path: '/api/auth/login', body: route.request().postDataJSON() })
+    await route.fulfill({ status: 401, json: { message: 'Invalid credentials' } })
+  })
   await page.goto('/login')
-  await field(page, 'username').fill(' ')
-  await expect(page.locator('button[type="submit"]')).toBeDisabled()
-  await field(page, 'username').fill('fixture-user')
-  await field(page, 'password').fill('old')
+  const username = page.locator('input[name="username"]')
+  const password = page.locator('input[name="password"]')
+  await username.waitFor({ state: 'visible' })
   await expect(page.locator('button[type="submit"]')).toBeEnabled()
+  await username.fill(' ')
+  await username.press('Tab')
+  await password.fill('old')
+  await password.press('Tab')
+  await expect(page.locator('.validated-field, .validation-summary, .validation-requirements')).toHaveCount(0)
+  await expect(page.locator('button[type="submit"]')).toBeEnabled()
+  await password.press('Enter')
+  await expect.poll(() => writes.length).toBe(1)
+  expect(writes[0].body).toEqual({ username: ' ', password: 'old' })
+  await expect(page.getByRole('alert').filter({ hasText: 'Wrong username or password' })).toBeVisible()
+  await expect(page.locator('button[type="submit"]')).toBeEnabled()
+})
+
+test('reset still requires eight matching characters', async ({ page, writes }) => {
   await page.goto('/reset-password?token=fixture-token')
   await field(page, 'password').fill('short')
   await field(page, 'confirmation').fill('short')
