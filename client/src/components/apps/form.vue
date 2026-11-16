@@ -1,5 +1,5 @@
 <template>
-  <v-form v-model="valid" class="app-form">
+  <v-form class="app-form" @submit.prevent="app === 'new' ? createApp() : updateApp()">
     <v-overlay v-model="loading" class="align-center justify-center">
       <v-progress-circular
         color="primary"
@@ -59,21 +59,20 @@
         <v-card-text class="app-basics-card__body">
           <v-row class="app-primary-fields">
             <v-col cols="12" md="6">
-              <v-text-field
+              <ValidationField as="v-text-field" :validation="validation.field('name')"
                 v-model="name"
-                :rules="nameRules"
                 :counter="60"
                 :disabled="app != 'new'"
                 :label="$t('app.form.appName')"
                 v-on:input="changeName(name)"
                 required
-              ></v-text-field>
+              ></ValidationField>
             </v-col>
             <v-col cols="12" md="6">
-              <v-text-field
+              <ValidationField as="v-text-field" :validation="validation.field('port')"
                 v-model="containerPort"
                 :label="$t('app.form.containerPort')"
-              ></v-text-field>
+              ></ValidationField>
             </v-col>
           </v-row>
 
@@ -85,13 +84,12 @@
               align="center"
             >
               <v-col cols="12" sm="7" md="8">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('host-' + validationRowId(host))"
                   v-model="host.host"
-                  :rules="domainRules"
                   :counter="60"
                   :label="$t('app.form.domain')"
                   required
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="8" sm="3" md="3" class="app-domain-row__ssl">
                 <v-switch
@@ -153,22 +151,22 @@
             <div>
               <v-row>
                 <v-col cols="12" md="6">
-                  <v-text-field
+                  <ValidationField as="v-text-field" :validation="validation.field('image')"
                     v-model="docker.image"
                     :counter="60"
                     :label="$t('app.form.containerImage')"
                     required
-                  ></v-text-field>
+                  ></ValidationField>
                 </v-col>
               </v-row>
               <v-row>
                 <v-col cols="12" md="6">
-                  <v-text-field
+                  <ValidationField as="v-text-field" :validation="validation.field('tag')"
                     v-model="docker.tag"
                     :counter="60"
                     :label="$t('app.form.tag')"
                     required
-                  ></v-text-field>
+                  ></ValidationField>
                 </v-col>
               </v-row>
               <v-row v-if="advanced">
@@ -653,14 +651,13 @@
             </v-row>
             <v-row v-for="(envvar, index) in envVars" :key="index">
               <v-col cols="12" md="5">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('env-' + validationRowId(envvar))"
                   v-model="envvar.name"
                   :label="$t('global.name')"
                   :counter="60"
-                  :rules="getEnvNameRules(envvar.name, index)"
                   :error="isDuplicateEnvVar(envvar.name, index)"
                   :error-messages="isDuplicateEnvVar(envvar.name, index) ? [$t('app.form.duplicateEnvVar')] : []"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" md="6">
                 <v-text-field
@@ -1052,10 +1049,10 @@
               item-value="name"
               show-select
             >
-              <template v-slot:item.oldValue="{ item }">
+              <template v-slot:[`item.oldValue`]="{ item }">
                 <code class="text-caption">{{ item.oldValue }}</code>
               </template>
-              <template v-slot:item.newValue="{ item }">
+              <template v-slot:[`item.newValue`]="{ item }">
                 <code class="text-caption">{{ item.newValue }}</code>
               </template>
             </v-data-table>
@@ -1073,6 +1070,7 @@
       </v-dialog>
 
       <!-- SUBMIT -->
+      <FormValidationSummary :validation="validation" />
       <div class="app-form-actions">
         <v-btn
           color="primary"
@@ -1081,8 +1079,8 @@
           prepend-icon="mdi-plus"
           size="large"
           variant="flat"
-          @click="createApp()"
-          :disabled="!valid"
+          type="submit"
+          :disabled="!validation.valid || loading || loadError"
           >{{ $t("global.create") }}</v-btn
         >
         <v-btn
@@ -1092,8 +1090,8 @@
           prepend-icon="mdi-content-save-outline"
           size="large"
           variant="flat"
-          @click="updateApp()"
-          :disabled="!valid || loadError"
+          type="submit"
+          :disabled="!validation.valid || loading || loadError"
           >{{ $t("global.update") }}</v-btn
         >
       </div>
@@ -1103,6 +1101,9 @@
 
 <script lang="ts">
 import axios from "axios";
+import formValidationMixin from "../../composables/formValidationMixin";
+import { appFields } from "../../validation/apps";
+import type { ValidationFieldDefinition } from "../../composables/useFormValidation";
 import Addons from "./addons.vue";
 import { defineComponent } from "vue";
 import { useKuberoStore } from "../../stores/kubero";
@@ -1270,6 +1271,7 @@ const MANAGED_INGRESS_ANNOTATIONS = [
 ];
 
 export default defineComponent({
+  mixins: [formValidationMixin],
   props: {
     pipeline: {
       type: String,
@@ -1653,6 +1655,9 @@ export default defineComponent({
     };
   },
   computed: {
+    validationFields(): ValidationFieldDefinition[] {
+      return appFields({ name: this.name, creating: this.app === "new", containerPort: this.containerPort, docker: this.docker, hosts: this.ingress.hosts, envVars: this.envVars, takenDomains: this.takenDomains }, key => this.$t(key), this.revealValidation);
+    },
     kuberoConfig() {
       const store = useKuberoStore();
       return store.kubero;
@@ -1710,6 +1715,10 @@ export default defineComponent({
     Breadcrumbs,
   },
   methods: {
+    revealValidation(index: number) {
+      if ([1, 2, 3, 4, 5, 10].includes(index)) this.advanced = true;
+      if (!this.panel.includes(index)) this.panel = [...this.panel, index];
+    },
     // un addon creado o quitado al instante cambia la app en el clúster: el
     // formulario toma su versión nueva para que "Actualizar" no choque
     onAddonsSaved(saved: { resourceVersion?: string; generation?: number }) {
@@ -2163,6 +2172,7 @@ export default defineComponent({
       }
     },
     async updateApp() {
+      if (this.loading || !this.validation.validate()) return;
       if (this.loadError) {
         return;
       }
@@ -2287,6 +2297,7 @@ export default defineComponent({
       }
     },
     async createApp() {
+      if (this.loading || !this.validation.validate()) return;
       this.loading = true;
       try {
         if (this.pipelineData.buildpack !== undefined) {

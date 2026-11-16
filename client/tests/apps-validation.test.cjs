@@ -1,0 +1,15 @@
+const { test } = require('node:test')
+const assert = require('node:assert/strict')
+const { appFields } = require('./helpers/load-source.cjs')('src/validation/apps.ts')
+const valid = model => appFields(model, key => key, () => {}).every(field => field.active === false || field.rules.every(rule => rule.test(field.value)))
+const app = () => ({ name: 'app-1', creating: true, containerPort: '8080', docker: { image: 'ghcr.io/team/app', tag: 'latest' }, hosts: [{ host: 'app.example.com' }], envVars: [], takenDomains: [] })
+test('apps cannot submit with an invalid port, missing image, duplicate host or reserved variable', () => {
+  assert.equal(valid(app()), true)
+  for (const port of ['', 'puerto-invalido', '65536']) assert.equal(valid({ ...app(), containerPort: port }), false)
+  assert.equal(valid({ ...app(), docker: { image: '', tag: 'latest' } }), false)
+  assert.equal(valid({ ...app(), hosts: [{ host: 'app.example.com' }, { host: 'app.example.com' }] }), false)
+  assert.equal(valid({ ...app(), envVars: [{ name: 'PORT', value: 'secret' }] }), false)
+})
+test('editing does not require renaming an immutable identifier', () => {
+  assert.equal(valid({ ...app(), name: 'legacy_NAME', creating: false }), true)
+})
