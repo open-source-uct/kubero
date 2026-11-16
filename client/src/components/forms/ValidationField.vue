@@ -42,7 +42,7 @@ import { useI18n } from 'vue-i18n'
 import { VTextField, VSelect, VCombobox, VTextarea, VFileInput, VAutocomplete, VSlider, VRangeSlider } from 'vuetify/components'
 import type { FieldFeedback, Requirement } from '../../composables/useFormValidation'
 defineOptions({ inheritAttrs: false })
-const props = defineProps<{ validation: FieldFeedback; as?: string }>()
+const props = withDefaults(defineProps<{ validation: FieldFeedback; as?: string; showRequirements?: boolean }>(), { showRequirements: true })
 const controls = { 'v-text-field': VTextField, 'v-select': VSelect, 'v-combobox': VCombobox, 'v-textarea': VTextarea, 'v-file-input': VFileInput, 'v-autocomplete': VAutocomplete, VSlider, VRangeSlider }
 const control = computed(() => controls[props.as as keyof typeof controls] || VTextField)
 const focused = ref(false)
@@ -54,7 +54,7 @@ const menuProps = computed(() => ({ ...(typeof attrs['menu-props'] === 'object' 
 const slots = useSlots()
 const forwardedSlots = computed(() => Object.fromEntries(Object.entries(slots).filter(([name]) => name !== 'details' && name !== 'label')))
 const failures = computed(() => props.validation.requirements.filter(requirement => !requirement.valid))
-const requirements = computed(() => props.validation.requirements.filter(requirement => requirement.key !== 'required'))
+const requirements = computed(() => props.showRequirements ? props.validation.requirements.filter(requirement => requirement.key !== 'required') : [])
 const { t, te } = useI18n()
 const message = (requirement: Requirement) => t('validation.' + requirement.key, requirement.params || {})
 // The label's asterisk and aria-required already communicate mandatory fields.

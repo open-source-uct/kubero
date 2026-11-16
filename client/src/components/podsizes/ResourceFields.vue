@@ -3,24 +3,28 @@
     <p class="podsize-resources__hint">{{ $t('podsizes.form.resourcesHint') }}</p>
     <div class="podsize-resources__grid">
       <ValidationField as="v-select" :validation="validation.field('requests-cpu')"
+        :show-requirements="false"
         :model-value="modelValue.requests.cpu"
         :items="cpuOptions(modelValue.requests.cpu)"
         :label="$t('podsizes.form.cpuRequest')"
         @update:model-value="update('requests', 'cpu', $event)"
       ></ValidationField>
       <ValidationField as="v-select" :validation="validation.field('limits-cpu')"
+        :show-requirements="false"
         :model-value="modelValue.limits.cpu"
         :items="cpuOptions(modelValue.limits.cpu)"
         :label="$t('podsizes.form.cpuLimit')"
         @update:model-value="update('limits', 'cpu', $event)"
       ></ValidationField>
       <ValidationField as="v-select" :validation="validation.field('requests-memory')"
+        :show-requirements="false"
         :model-value="modelValue.requests.memory"
         :items="memoryOptions(modelValue.requests.memory)"
         :label="$t('podsizes.form.memoryRequest')"
         @update:model-value="update('requests', 'memory', $event)"
       ></ValidationField>
       <ValidationField as="v-select" :validation="validation.field('limits-memory')"
+        :show-requirements="false"
         :model-value="modelValue.limits.memory"
         :items="memoryOptions(modelValue.limits.memory)"
         :label="$t('podsizes.form.memoryLimit')"
