@@ -12,6 +12,8 @@ import { registerPlugins } from '@/plugins'
 
 // Components
 import App from './App.vue'
+import ValidationField from './components/forms/ValidationField.vue'
+import FormValidationSummary from './components/forms/FormValidationSummary.vue'
 
 // Composables
 import { createApp } from 'vue'
@@ -23,6 +25,8 @@ import { useNotificationStore } from '@/stores/notifications'
 import i18n from '@/plugins/i18n'
 
 const app = createApp(App)
+app.component('ValidationField', ValidationField)
+app.component('FormValidationSummary', FormValidationSummary)
 //app.config.performance = true
 
 registerPlugins(app)

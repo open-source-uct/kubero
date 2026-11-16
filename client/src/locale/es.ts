@@ -1,6 +1,8 @@
 import { es } from 'vuetify/locale'
+import { validationEs } from './validation'
 
 const messages = {
+  validation: validationEs,
   activity: {
     description: 'Filtra el registro de auditoría para encontrar la actividad relevante.',
     refresh: 'Actualizar',
@@ -120,6 +122,7 @@ const messages = {
     },
   },
   global: {
+    description: 'Descripción',
     name: 'Nombre',
     value: 'Valor',
     annotation: 'Anotación',

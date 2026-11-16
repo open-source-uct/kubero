@@ -1,6 +1,8 @@
 import { en } from 'vuetify/locale'
+import { validationEn } from './validation'
 
 const messages = {
+      validation: validationEn,
   activity: {
     description: 'Filter the audit log to find relevant activity.',
     refresh: 'Refresh',
@@ -120,6 +122,7 @@ const messages = {
         },
       },
       global: {
+        description: 'Description',
         name: "Name",
         value: "Value",
         annotation: "Annotation",
