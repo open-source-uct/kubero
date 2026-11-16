@@ -1,5 +1,5 @@
 <template>
-  <v-form class="uct-management-form">
+  <v-form class="uct-management-form" @submit.prevent="saveSettings">
     <v-container class="uct-management-page uct-settings-page">
       <header class="uct-page-header">
         <div class="uct-page-header__identity">
@@ -20,29 +20,30 @@
 
         <v-window v-model="tab" class="uct-settings-window">
           <v-window-item value="general">
-            <FormGeneral
-              :settings="settings.settings"
-              :secrets="settings.secrets"
+            <FormGeneral :validation="validation"
+              v-model:settings="settings.settings"
+              v-model:secrets="settings.secrets"
             ></FormGeneral>
           </v-window-item>
 
           <v-window-item value="deployment">
-            <FormDeployment :settings="settings"></FormDeployment>
+            <FormDeployment :validation="validation" v-model:settings="settings"></FormDeployment>
           </v-window-item>
 
           <v-window-item value="templates">
-            <FormTemplates :settings="settings.settings"></FormTemplates>
+            <FormTemplates ref="templatesForm" :validation="validation" v-model:settings="settings.settings"></FormTemplates>
           </v-window-item>
         </v-window>
       </v-card>
 
+      <FormValidationSummary :validation="validation" :reason="validationLoading ? $t('validation.loading') : validationLoadError ? $t('validation.loadError') : undefined" />
       <div class="uct-page-actions">
         <v-btn
           color="primary"
           variant="flat"
           size="large"
           prepend-icon="mdi-content-save-outline"
-          @click="saveSettings"
+          type="submit" :disabled="!validation.valid || validationSaving || validationLoading || validationLoadError" :loading="validationSaving"
         >
           {{ $t('global.applyChanges') }}
         </v-btn>
@@ -53,6 +54,9 @@
 
 <script lang="ts">
 import axios from "axios";
+import formValidationMixin from "../../composables/formValidationMixin";
+import { settingsFields } from "../../validation/settings";
+import type { ValidationFieldDefinition } from "../../composables/useFormValidation";
 import { handledApiErrorConfig, notifyApiError } from '../../utils/apiFeedback'
 import { defineComponent } from "vue";
 import FormGeneral from "./form-general.vue";
@@ -157,14 +161,14 @@ export interface Github {
   callbackUrl: string;
 }
 export interface Oauth2 {
-  enabled: boolean;
-  name: string;
-  id: string;
   authUrl: string;
-  tokenUrl: string;
-  secret: string;
   callbackUrl: string;
+  enabled: boolean;
+  id: string;
+  name: string;
   scopes: string;
+  secret: string;
+  tokenUrl: string;
 }
 export interface Config {
   buildpacks?: Buildpack[] | null;
@@ -305,23 +309,8 @@ export interface Auth {
   github: Github;
   oauth2: Oauth2;
 }
-export interface Oauth2 {
-  enabled: boolean;
-  name: string;
-  id: string;
-  authUrl: string;
-  tokenUrl: string;
-  secret: string;
-  callbackUrl: string;
-  scopes: string;
-}
-export interface AuditLogs {
-  enabled: boolean;
-  storageClassName: string;
-  accessModes?: string[] | null;
-  size: string;
-  limit: string;
-}
+
+
 export interface RepositoryProviders {
   github: Github2;
   gitea: GiteaOrGitlabOrGogs;
@@ -352,11 +341,16 @@ export type Catalog = {
 };
 
 export default defineComponent({
+  mixins: [formValidationMixin],
   sockets: {},
   mounted() {
     this.loadSettings();
   },
+  computed: {
+    validationFields(): ValidationFieldDefinition[] { return settingsFields(this.settings, key => this.$t(key), this.secretPresent, this.revealValidation); },
+  },
   data: () => ({
+    validationLoading: true, validationLoadError: false, secretPresent: {} as Record<string, boolean>, configuredSecrets: {} as Partial<Secrets>,
     tab: "general",
     show: false,
     settings: {
@@ -483,7 +477,13 @@ export default defineComponent({
     FormTemplates,
   },
   methods: {
+    revealValidation(tab: string, index?: number) {
+      this.tab = tab;
+      if (index !== undefined) this.$nextTick(() => { (this.$refs.templatesForm as { revealCatalog: (index: number) => void } | undefined)?.revealCatalog(index); });
+    },
     saveSettings() {
+      if (this.validationSaving || this.validationLoading || this.validationLoadError || !this.validation.validate()) return;
+      this.validationSaving = true;
       const self = this;
 
       self.settings.settings.kubero.config.podSizeList.forEach(
@@ -498,11 +498,15 @@ export default defineComponent({
         },
       );
 
+      const payload = { ...self.settings, secrets: { ...self.settings.secrets } as Partial<Secrets> };
+      for (const key of Object.keys(payload.secrets) as (keyof Secrets)[]) {
+        if (self.secretPresent[key] && !payload.secrets[key] && !key.endsWith('_BASEURL') && !key.endsWith('_USERNAME')) payload.secrets[key] = self.configuredSecrets[key];
+      }
       axios
-        .post(`/api/config`, self.settings, handledApiErrorConfig)
+        .post(`/api/config`, payload, handledApiErrorConfig)
         .catch((error) => {
           notifyApiError(error, 'saveSettings');
-        });
+        }).finally(() => { this.validationSaving = false; });
     },
     async loadSettings() {
       const self = this;
@@ -510,10 +514,13 @@ export default defineComponent({
         .get(`/api/config`)
         .then((response) => {
           self.settings = response.data;
+          self.configuredSecrets = response.data.secrets || {};
+          self.secretPresent = Object.fromEntries(Object.entries(response.data.secrets || {}).map(([key, value]) => [key, !!value]));
         })
         .catch((error) => {
+          self.validationLoadError = true;
           notifyApiError(error, 'loadSettings');
-        });
+        }).finally(() => { self.validationLoading = false; });
     },
   },
 });

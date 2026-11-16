@@ -36,13 +36,14 @@
           clearable hide-details="auto"
           @update:search="usernameSearch = $event"
         />
-        <v-text-field v-model="filters.from" type="date" :label="$t('activity.from')" variant="outlined" density="compact" hide-details />
-        <v-text-field v-model="filters.to" type="date" :label="$t('activity.to')" variant="outlined" density="compact" hide-details />
+        <ValidationField as="v-text-field" :validation="dateValidation.field('from')" v-model="filters.from" type="date" :label="$t('activity.from')" variant="outlined" density="compact" hide-details ></ValidationField>
+        <ValidationField as="v-text-field" :validation="dateValidation.field('to')" v-model="filters.to" type="date" :label="$t('activity.to')" variant="outlined" density="compact" hide-details ></ValidationField>
         <div class="activity-filter-actions">
           <v-btn v-if="hasClearableFilters" class="activity-button" variant="text" color="primary" prepend-icon="mdi-filter-remove-outline" :disabled="loading" @click="resetFilters">{{ $t('activity.clear') }}</v-btn>
-          <v-btn class="activity-button" type="submit" color="primary" elevation="0" :disabled="loading">{{ $t('activity.apply') }}</v-btn>
+          <v-btn class="activity-button" type="submit" color="primary" elevation="0" :disabled="loading || !dateValidation.valid">{{ $t('activity.apply') }}</v-btn>
         </div>
       </form>
+      <FormValidationSummary :validation="dateValidation" class="px-4" />
 
       <v-alert v-if="error" type="error" variant="tonal" class="ma-4" role="alert">{{ error }}</v-alert>
       <v-alert v-else-if="!enabled" type="info" variant="tonal" class="ma-4">{{ $t('activity.disabled') }}</v-alert>
@@ -89,6 +90,8 @@
 </template>
 
 <script setup lang="ts">
+import { createFormValidation } from "../../composables/useFormValidation"
+import { rules, check } from "../../utils/validationRules"
 import axios from 'axios'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -169,7 +172,14 @@ async function loadAudit() {
   }
 }
 
+
+const dateValidation = createFormValidation(() => [
+  { id: 'from', label: t('activity.from'), value: filters.from, rules: [check('date', v => !v || rules.date.test(String(v) + 'T00:00'))] },
+  { id: 'to', label: t('activity.to'), value: filters.to, rules: [check('date', v => !v || rules.date.test(String(v) + 'T00:00')), check('dates', () => !filters.from || !filters.to || filters.from <= filters.to)] },
+])
+
 function applyFilters() {
+  if (!dateValidation.validate()) return
   if (filters.from && filters.to && filters.from > filters.to) {
     error.value = t('activity.invalidDates')
     return
