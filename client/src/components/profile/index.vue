@@ -79,33 +79,35 @@
             </div>
           </dl>
 
-          <v-dialog v-model="editProfileDialog" max-width="500px">
+          <v-dialog v-model="editProfileDialog" max-width="500px"><v-form @submit.prevent="saveProfile">
             <v-card color="cardBackground" class="profile-dialog uct-card">
               <v-card-title class="profile-dialog__title"><v-icon icon="mdi-account-edit-outline" color="primary" />{{ $t('profile.actions.editProfile') }}</v-card-title>
               <v-card-text>
                 <v-alert v-show="profileError" type="warning" border="start" class="mb-3" :class="{ 'shaking': profileErrorShake }">{{ profileErrorMessage }}</v-alert>
-                <v-text-field v-model="editedUser.firstName" :label="$t('user.firstName')" variant="outlined" :rules="[v => !!v || $t('user.errors.firstNameRequired')]" />
-                <v-text-field v-model="editedUser.lastName" :label="$t('user.lastName')" variant="outlined" :rules="[v => !!v || $t('user.errors.lastNameRequired')]" />
-                <v-text-field v-model="editedUser.email" :label="$t('user.email')" type="email" variant="outlined" :rules="[v => !!v || $t('user.errors.emailRequired'), v => /.+@.+\..+/.test(v) || $t('user.errors.emailValid')]" />
+                <ValidationField as="v-text-field" :validation="profileValidation.field('firstName')" v-model="editedUser.firstName" :label="$t('user.firstName')" variant="outlined" ></ValidationField>
+                <ValidationField as="v-text-field" :validation="profileValidation.field('lastName')" v-model="editedUser.lastName" :label="$t('user.lastName')" variant="outlined" ></ValidationField>
+                <ValidationField as="v-text-field" :validation="profileValidation.field('email')" v-model="editedUser.email" :label="$t('user.email')" type="email" variant="outlined" ></ValidationField>
                 <!-- cambiar el correo cambia por dónde se recupera la cuenta: el server pide la contraseña actual -->
-                <v-text-field v-if="emailChanged" v-model="editedUser.currentPassword" :label="$t('user.currentPassword')" :hint="$t('user.emailChangeNeedsPassword')" persistent-hint type="password" autocomplete="current-password" variant="outlined" :rules="[v => !!v || $t('user.errors.currentPasswordRequired')]" />
+                <ValidationField as="v-text-field" :validation="profileValidation.field('currentPassword')" v-if="emailChanged" v-model="editedUser.currentPassword" :label="$t('user.currentPassword')" :hint="$t('user.emailChangeNeedsPassword')" persistent-hint type="password" autocomplete="current-password" variant="outlined" ></ValidationField>
               </v-card-text>
-              <v-card-actions><v-spacer /><v-btn variant="text" @click="editProfileDialog = false">{{ $t('global.cancel') }}</v-btn><v-btn color="primary" variant="flat" @click="saveProfile">{{ $t('global.save') }}</v-btn></v-card-actions>
+              <FormValidationSummary :validation="profileValidation" class="px-6" />
+        <v-card-actions><v-spacer /><v-btn variant="text" @click="editProfileDialog = false">{{ $t('global.cancel') }}</v-btn><v-btn color="primary" variant="flat" type="submit" :disabled="!profileValidation.valid || validationSaving" :loading="validationSaving">{{ $t('global.save') }}</v-btn></v-card-actions>
             </v-card>
-          </v-dialog>
+          </v-form></v-dialog>
 
-          <v-dialog v-model="changePasswordDialog" max-width="500px">
+          <v-dialog v-model="changePasswordDialog" max-width="500px"><v-form @submit.prevent="savePassword">
             <v-card color="cardBackground" class="profile-dialog uct-card">
               <v-card-title class="profile-dialog__title"><v-icon icon="mdi-lock-reset" color="primary" />{{ $t('user.changePassword') }}</v-card-title>
               <v-card-text>
                 <v-alert v-show="passwordError" type="warning" border="start" class="mb-3" :class="{ 'shaking': passwordErrorShake }">{{ passwordErrorMessage }}</v-alert>
-                <v-text-field v-model="passwordForm.currentPassword" :label="$t('user.currentPassword')" type="password" variant="outlined" :rules="[v => !!v || $t('user.errors.currentPasswordRequired')]" class="mb-2" />
-                <v-text-field v-model="passwordForm.newPassword" :label="$t('user.newPassword')" type="password" variant="outlined" :rules="[v => !!v || $t('user.errors.newPasswordRequired'), v => v.length >= 8 || $t('user.errors.passwordMinLength')]" class="mb-2" />
-                <v-text-field v-model="passwordForm.confirmPassword" :label="$t('user.confirmPassword')" type="password" variant="outlined" :rules="[v => !!v || $t('user.errors.passwordConfirm'), v => v === passwordForm.newPassword || $t('user.errors.passwordMismatch')]" />
+                <ValidationField as="v-text-field" :validation="passwordValidation.field('currentPassword')" v-model="passwordForm.currentPassword" :label="$t('user.currentPassword')" type="password" variant="outlined" class="mb-2" ></ValidationField>
+                <ValidationField as="v-text-field" :validation="passwordValidation.field('password')" v-model="passwordForm.newPassword" :label="$t('user.newPassword')" type="password" variant="outlined" class="mb-2" ></ValidationField>
+                <ValidationField as="v-text-field" :validation="passwordValidation.field('confirmation')" v-model="passwordForm.confirmPassword" :label="$t('user.confirmPassword')" type="password" variant="outlined" ></ValidationField>
               </v-card-text>
-              <v-card-actions><v-spacer /><v-btn variant="text" @click="changePasswordDialog = false">{{ $t('global.cancel') }}</v-btn><v-btn color="primary" variant="flat" @click="savePassword">{{ $t('user.changePassword') }}</v-btn></v-card-actions>
+              <FormValidationSummary :validation="passwordValidation" class="px-6" />
+        <v-card-actions><v-spacer /><v-btn variant="text" @click="changePasswordDialog = false">{{ $t('global.cancel') }}</v-btn><v-btn color="primary" variant="flat" type="submit" :disabled="!passwordValidation.valid || validationSaving" :loading="validationSaving">{{ $t('user.changePassword') }}</v-btn></v-card-actions>
             </v-card>
-          </v-dialog>
+          </v-form></v-dialog>
         </v-card>
 
         <v-card color="cardBackground" class="tokens-panel uct-card" elevation="0">
@@ -174,6 +176,9 @@
 
 <script lang="ts">
 import { computed, defineComponent, ref, onMounted, watch } from 'vue'
+import { passwordFields } from '../../validation/accounts'
+import { createFormValidation } from '../../composables/useFormValidation'
+import { rules } from '../../utils/validationRules'
 import axios from 'axios'
 import { useAuthStore } from '../../stores/auth'
 import router from '../../router'
@@ -298,6 +303,8 @@ export default defineComponent({
     )
 
     const saveProfile = async () => {
+      if (validationSaving.value || !profileValidation.validate()) return
+      validationSaving.value = true
       try {
         const { currentPassword, ...profile } = editedUser.value
         await axios.put('/api/users/profile', emailChanged.value ? { ...profile, currentPassword } : profile)
@@ -311,7 +318,7 @@ export default defineComponent({
         setTimeout(() => {
           profileErrorShake.value = false
         }, 300)
-      }
+      } finally { validationSaving.value = false }
     }
 
     const openChangePasswordDialog = () => {
@@ -321,10 +328,12 @@ export default defineComponent({
     }
 
     const savePassword = async () => {
+      if (validationSaving.value || !passwordValidation.validate()) return
       if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
         return // validation will handle this
       }
       
+      validationSaving.value = true
       try {
         await axios.put('/api/users/profile/password', {
           currentPassword: passwordForm.value.currentPassword,
@@ -342,7 +351,7 @@ export default defineComponent({
         setTimeout(() => {
           passwordErrorShake.value = false
         }, 300)
-      }
+      } finally { validationSaving.value = false }
     }
 
     const openCreateDialog = () => {
@@ -388,7 +397,22 @@ export default defineComponent({
       loadTokens()
     })
 
+    const validationSaving = ref(false)
+    const profileValidation = createFormValidation(() => [
+      { id: 'firstName', label: t('user.firstName'), value: editedUser.value.firstName, rules: [rules.required] },
+      { id: 'lastName', label: t('user.lastName'), value: editedUser.value.lastName, rules: [rules.required] },
+      { id: 'email', label: t('user.email'), value: editedUser.value.email, rules: [rules.required, rules.email] },
+      { id: 'currentPassword', label: t('user.currentPassword'), value: editedUser.value.currentPassword, rules: [rules.required], active: emailChanged.value },
+    ])
+    const passwordValidation = createFormValidation(() => [
+      { id: 'currentPassword', label: t('user.currentPassword'), value: passwordForm.value.currentPassword, rules: [rules.required] },
+      ...passwordFields(passwordForm.value.newPassword, passwordForm.value.confirmPassword, t),
+    ])
+    watch(editProfileDialog, value => { if (value) profileValidation.reset() })
+    watch(changePasswordDialog, value => { if (value) passwordValidation.reset() })
+
     return {
+      validationSaving, profileValidation, passwordValidation,
       locale,
       availableLanguages,
       emailChanged,
