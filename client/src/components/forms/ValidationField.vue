@@ -39,11 +39,11 @@
 <script setup lang="ts">
 import { computed, ref, useSlots, useAttrs } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { VTextField, VSelect, VCombobox, VTextarea, VFileInput, VAutocomplete } from 'vuetify/components'
+import { VTextField, VSelect, VCombobox, VTextarea, VFileInput, VAutocomplete, VSlider, VRangeSlider } from 'vuetify/components'
 import type { FieldFeedback, Requirement } from '../../composables/useFormValidation'
 defineOptions({ inheritAttrs: false })
 const props = defineProps<{ validation: FieldFeedback; as?: string }>()
-const controls = { 'v-text-field': VTextField, 'v-select': VSelect, 'v-combobox': VCombobox, 'v-textarea': VTextarea, 'v-file-input': VFileInput, 'v-autocomplete': VAutocomplete }
+const controls = { 'v-text-field': VTextField, 'v-select': VSelect, 'v-combobox': VCombobox, 'v-textarea': VTextarea, 'v-file-input': VFileInput, 'v-autocomplete': VAutocomplete, VSlider, VRangeSlider }
 const control = computed(() => controls[props.as as keyof typeof controls] || VTextField)
 const focused = ref(false)
 const menu = ref(false)

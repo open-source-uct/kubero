@@ -205,27 +205,27 @@
                 ></v-switch>
               </v-col>
               <v-col cols="12" md="3">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('auth-realm')"
                   v-model="basicAuth.realm"
                   :label="$t('app.form.basicAuthRealm')"
                   :counter="60"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
             </v-row>
 
             <v-row v-for="(account, index) in basicAuth.accounts" :key="index">
               <v-col cols="12" md="5">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('auth-user-' + validationRowId(account))"
                   v-model="account.user"
                   :label="$t('app.form.basicAuthUser')"
                   :counter="60"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" md="6">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('auth-pass-' + validationRowId(account))"
                   v-model="account.pass"
                   :label="$t('app.form.basicAuthPass')"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" md="1">
                 <v-btn
@@ -293,18 +293,16 @@
 
             <v-row>
               <v-col cols="12" md="6">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('uid')"
                   v-model="buildpack.run.securityContext.runAsUser"
-                  :rules="uidRules"
                   :label="$t('app.form.runAsUser')"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" md="6">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('gid')"
                   v-model="buildpack.run.securityContext.runAsGroup"
-                  :rules="uidRules"
                   :label="$t('app.form.runAsGroup')"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
             </v-row>
 
@@ -352,24 +350,24 @@
           <v-expansion-panel-text color="secondary">
             <v-row>
               <v-col cols="12" md="6">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('whitelist-source-range')"
                   v-model="
                     ingress.annotations[
                       'nginx.ingress.kubernetes.io/whitelist-source-range'
                     ]
                   "
                   :label="$t('app.form.whitelistSourceRange')"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" md="6">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('denylist-source-range')"
                   v-model="
                     ingress.annotations[
                       'nginx.ingress.kubernetes.io/denylist-source-range'
                     ]
                   "
                   :label="$t('app.form.denylistSourceRange')"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
             </v-row>
 
@@ -387,14 +385,14 @@
                 ></v-switch>
               </v-col>
               <v-col cols="12" md="6">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('proxy-buffer-size')"
                   v-model="
                     ingress.annotations[
                       'nginx.ingress.kubernetes.io/proxy-buffer-size'
                     ]
                   "
                   :label="$t('app.form.proxyBufferSize')"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
             </v-row>
 
@@ -411,12 +409,11 @@
 
             <v-row v-for="(annotation, index) in customIngressAnnotations" :key="index">
               <v-col cols="12" md="5">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('ingress-' + validationRowId(annotation))"
                   v-model="annotation.annotation"
                   :label="$t('global.annotation')"
                   :counter="120"
-                  :rules="[customIngressKeyError]"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" md="6">
                 <v-text-field
@@ -477,7 +474,7 @@
 
             <v-row>
               <v-col cols="12" md="4">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('cors-allow-origin')"
                   v-model="
                     ingress.annotations[
                       'nginx.ingress.kubernetes.io/cors-allow-origin'
@@ -489,10 +486,10 @@
                       'nginx.ingress.kubernetes.io/enable-cors'
                     ] == 'false'
                   "
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" md="4">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('cors-allow-headers')"
                   v-model="
                     ingress.annotations[
                       'nginx.ingress.kubernetes.io/cors-allow-headers'
@@ -504,10 +501,10 @@
                       'nginx.ingress.kubernetes.io/enable-cors'
                     ] == 'false'
                   "
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" md="4">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('cors-expose-headers')"
                   v-model="
                     ingress.annotations[
                       'nginx.ingress.kubernetes.io/cors-expose-headers'
@@ -519,7 +516,7 @@
                       'nginx.ingress.kubernetes.io/enable-cors'
                     ] == 'false'
                   "
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
             </v-row>
 
@@ -543,7 +540,7 @@
                 ></v-switch>
               </v-col>
               <v-col cols="12" md="4">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('cors-max-age')"
                   v-model="
                     ingress.annotations[
                       'nginx.ingress.kubernetes.io/cors-max-age'
@@ -555,10 +552,10 @@
                       'nginx.ingress.kubernetes.io/enable-cors'
                     ] == 'false'
                   "
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" md="4">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('cors-allow-methods')"
                   v-model="
                     ingress.annotations[
                       'nginx.ingress.kubernetes.io/cors-allow-methods'
@@ -570,7 +567,7 @@
                       'nginx.ingress.kubernetes.io/enable-cors'
                     ] == 'false'
                   "
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
             </v-row>
           </v-expansion-panel-text>
@@ -592,11 +589,11 @@
             </h4>
             <v-row v-for="(annotation, index) in sAAnnotations" :key="index">
               <v-col cols="12" md="5">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('sa-' + validationRowId(annotation))"
                   v-model="annotation.annotation"
                   :label="$t('global.annotation')"
                   :counter="120"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" md="6">
                 <v-text-field
@@ -655,8 +652,6 @@
                   v-model="envvar.name"
                   :label="$t('global.name')"
                   :counter="60"
-                  :error="isDuplicateEnvVar(envvar.name, index)"
-                  :error-messages="isDuplicateEnvVar(envvar.name, index) ? [$t('app.form.duplicateEnvVar')] : []"
                 ></ValidationField>
               </v-col>
               <v-col cols="12" md="6">
@@ -758,32 +753,32 @@
 
             <v-row v-if="!autoscale">
               <v-col cols="12" md="6">
-                <v-slider
+                <ValidationField as="v-slider" :validation="validation.field('web-replicas')"
                   v-model="webreplicas"
                   :label="$t('app.webReplicas')"
                   max="10"
                   min="0"
                   step="1"
                   thumb-label="always"
-                ></v-slider>
+                ></ValidationField>
               </v-col>
             </v-row>
             <v-row v-if="!autoscale">
               <v-col cols="12" md="6">
-                <v-slider
+                <ValidationField as="v-slider" :validation="validation.field('worker-replicas')"
                   v-model="workerreplicas"
                   :label="$t('app.workerReplicas')"
                   max="10"
                   min="0"
                   step="1"
                   thumb-label="always"
-                ></v-slider>
+                ></ValidationField>
               </v-col>
             </v-row>
 
             <v-row v-if="autoscale">
               <v-col cols="12" md="6">
-                <v-range-slider
+                <ValidationField as="v-range-slider" :validation="validation.field('web-range')"
                   v-model="webreplicasrange"
                   :label="$t('app.webReplicas')"
                   max="10"
@@ -791,13 +786,13 @@
                   step="1"
                   hint="pods"
                   thumb-label="always"
-                ></v-range-slider>
+                ></ValidationField>
               </v-col>
             </v-row>
 
             <v-row v-if="autoscale">
               <v-col cols="12" md="6">
-                <v-range-slider
+                <ValidationField as="v-range-slider" :validation="validation.field('worker-range')"
                   v-model="workerreplicasrange"
                   :label="$t('app.workerReplicas')"
                   max="10"
@@ -805,7 +800,7 @@
                   step="1"
                   hint="pods"
                   thumb-label="always"
-                ></v-range-slider>
+                ></ValidationField>
               </v-col>
             </v-row>
           </v-expansion-panel-text>
@@ -822,17 +817,17 @@
             <div v-for="(volume, index) in extraVolumes" :key="index">
               <v-row>
                 <v-col cols="12" md="3">
-                  <v-text-field
+                  <ValidationField as="v-text-field" :validation="validation.field('volume-name-' + validationRowId(volume))"
                     v-model="volume.name"
                     :label="$t('global.name')"
-                  ></v-text-field>
+                  ></ValidationField>
                 </v-col>
                 <v-col cols="12" md="2">
-                  <v-text-field
+                  <ValidationField as="v-text-field" :validation="validation.field('volume-size-' + validationRowId(volume))"
                     v-model="volume.size"
                     :label="$t('global.size')"
                     placeholder="1G"
-                  ></v-text-field>
+                  ></ValidationField>
                 </v-col>
                 <v-col cols="12" md="1">
                   <v-btn
@@ -856,17 +851,17 @@
                   ></v-select>
                 </v-col>
                 <v-col cols="12" md="3">
-                  <v-text-field
+                  <ValidationField as="v-text-field" :validation="validation.field('volume-path-' + validationRowId(volume))"
                     v-model="volume.mountPath"
                     :label="$t('app.form.mountPath')"
-                  ></v-text-field>
+                  ></ValidationField>
                 </v-col>
                 <v-col cols="12" md="3">
-                  <v-select
+                  <ValidationField as="v-select" :validation="validation.field('volume-mode-' + validationRowId(volume))"
                     v-model="volume.accessModes[0]"
                     :items="['ReadWriteOnce', 'ReadWriteMany', 'ReadOnlyMany']"
                     :label="$t('app.form.accessMode')"
-                  ></v-select>
+                  ></ValidationField>
                 </v-col>
               </v-row>
             </div>
@@ -893,19 +888,18 @@
             <div v-for="(cronjob, index) in cronjobs" :key="index">
               <v-row>
                 <v-col cols="12" md="3">
-                  <v-text-field
+                  <ValidationField as="v-text-field" :validation="validation.field('cron-name-' + validationRowId(cronjob))"
                     v-model="cronjob.name"
                     :label="$t('global.name')"
                     :readonly="app != 'new'"
-                  ></v-text-field>
+                  ></ValidationField>
                 </v-col>
                 <v-col cols="12" md="2">
-                  <v-text-field
+                  <ValidationField as="v-text-field" :validation="validation.field('cron-schedule-' + validationRowId(cronjob))"
                     v-model="cronjob.schedule"
                     :label="$t('app.cronjobs.schedule')"
                     placeholder="* * * * *"
-                    :rules="cronjobScheduleRules"
-                  ></v-text-field>
+                  ></ValidationField>
                 </v-col>
                 <v-col cols="12" md="1">
                   <v-btn
@@ -922,10 +916,10 @@
 
               <v-row>
                 <v-col cols="12" md="3">
-                  <v-text-field
+                  <ValidationField as="v-text-field" :validation="validation.field('cron-image-' + validationRowId(cronjob))"
                     v-model="cronjob.image"
                     :label="$t('app.cronjobs.image')"
-                  ></v-text-field>
+                  ></ValidationField>
                 </v-col>
                 <v-col cols="12" md="3">
                   <v-text-field
@@ -969,32 +963,32 @@
             </v-row>
             <v-row>
               <v-col cols="12" md="3">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('health-path')"
                   v-model="healthcheck.path"
                   :label="$t('app.form.healthCheckPath')"
                   :counter="60"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" md="3">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('health-startupSeconds')"
                   v-model="healthcheck.startupSeconds"
                   :label="$t('app.form.healthCheckStartupSeconds')"
                   :counter="60"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" md="3">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('health-timeoutSeconds')"
                   v-model="healthcheck.timeoutSeconds"
                   :label="$t('app.form.healthcheckTimeoutSeconds')"
                   :counter="60"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" md="3">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('health-periodSeconds')"
                   v-model="healthcheck.periodSeconds"
                   :label="$t('app.form.healthCheckIntervalSeconds')"
                   :counter="60"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
             </v-row>
           </v-expansion-panel-text>
@@ -1070,7 +1064,7 @@
       </v-dialog>
 
       <!-- SUBMIT -->
-      <FormValidationSummary :validation="validation" />
+      <FormValidationSummary :validation="validation" :reason="loading ? $t('validation.loading') : loadError ? $t('validation.loadError') : undefined" />
       <div class="app-form-actions">
         <v-btn
           color="primary"
@@ -1102,6 +1096,7 @@
 <script lang="ts">
 import axios from "axios";
 import formValidationMixin from "../../composables/formValidationMixin";
+import { advancedAppFields } from "../../validation/advancedApps";
 import { appFields } from "../../validation/apps";
 import type { ValidationFieldDefinition } from "../../composables/useFormValidation";
 import Addons from "./addons.vue";
@@ -1606,57 +1601,11 @@ export default defineComponent({
       envOverlaps: [] as { name: string; oldValue: string; newValue: string }[],
       selectedOverlaps: [] as string[],
       pendingEnvVars: [] as EnvVar[],
-      nameRules: [
-        (v: any) => !!v || "Name is required",
-        (v: any) => v.length <= 60 || "Name must be less than 60 characters",
-        (v: any) =>
-          /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(v) ||
-          "Allowed characters : [a-zA-Z0-9_-]",
-      ],
-      repositoryRules: [
-        //(v: any) => !!v || 'Repository is required',
-        //(v: any) => v.length <= 120 || 'Repository must be less than 120 characters',
-        //    ((git|ssh|http(s)?)|(git@[\w\.]+))(:(//)?)([\w\.@\:/\-~]+)(\.git)(/)?
-        //    ((git|ssh|http(s)?)|(git@[\w.]+))(:(\/\/)?)([\w.@:\/\-~]+)(\.git)
-        //    (git@[\w.]+:\/\/)([\w.\/\-~]+)(\.git) // not working
-        //    ((git|ssh|http(s)?)|(git@[\w\.-]+))(:(//)?)([\w\.@\:/\-~]+)(\.git)(/)?
-        (v: any) =>
-          /^((git|ssh|http(s)?)|(git@[\w.-]+))(:(\/\/)?)([\w.@:/\-~]+)(\.git)(\/)?/.test(
-            v
-          ) || 'Format "git@github.com:organisation/repository.git"',
-      ],
-      domainRules: [
-        (v: any) => !!v || "Domain is required",
-        (v: any) => v.length <= 253 || "Name must be less than 253 characters",
-        (v: any) =>
-          /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/.test(
-            v
-          ) ||
-          v === "localhost" ||
-          "Not a domain",
-        (v: any) => this.checkDomainAvailability(v) || "Domain already taken",
-      ],
-      cronjobScheduleRules: [
-        (v: any) => !!v || "Schedule is required",
-        (v: any) =>
-          /(((\d+,)+\d+|(\d+(\/|-)\d+)|\d+|\*) ?){5,7}/.test(v) ||
-          "Not a valid crontab format",
-      ],
-      uidRules: [
-        //v => !!v || 'UID is required',
-        (v: any) => /^\d+$/.test(v) || "Not a number",
-      ],
-      /*
-      buildpackRules: [
-        v => !!v || 'Buildpack is required',
-        v => /(NodeJS|Docker)$/.test(v) || 'select a valid buildpack',
-      ],
-*/
     };
   },
   computed: {
     validationFields(): ValidationFieldDefinition[] {
-      return appFields({ name: this.name, creating: this.app === "new", containerPort: this.containerPort, docker: this.docker, hosts: this.ingress.hosts, envVars: this.envVars, takenDomains: this.takenDomains }, key => this.$t(key), this.revealValidation);
+      return [...appFields({ name: this.name, creating: this.app === "new", containerPort: this.containerPort, docker: this.docker, hosts: this.ingress.hosts, envVars: this.envVars, takenDomains: this.takenDomains }, key => this.$t(key), this.revealValidation), ...advancedAppFields({ basicAuth: this.basicAuth, security: this.buildpack.run.securityContext, autoscale: this.autoscale, webreplicas: this.webreplicas, workerreplicas: this.workerreplicas, webreplicasrange: this.webreplicasrange, workerreplicasrange: this.workerreplicasrange, healthcheck: this.healthcheck, extraVolumes: this.extraVolumes, cronjobs: this.cronjobs, customIngressAnnotations: this.customIngressAnnotations, sAAnnotations: this.sAAnnotations, annotations: this.ingress.annotations }, key => this.$t(key), this.revealValidation)];
     },
     kuberoConfig() {
       const store = useKuberoStore();
@@ -1703,6 +1652,8 @@ export default defineComponent({
         const template = this.$route.query.template as string;
         await this.loadTemplate(template);
       }
+    } catch {
+      this.loadError = true;
     } finally {
       this.loading = false;
     }
@@ -1737,14 +1688,7 @@ export default defineComponent({
       this.sslIndex.splice(index, 1);
     },
     whiteListDomains(domainsList: string[]) {
-      for (let i = 0; i < domainsList.length; i++) {
-        this.ingress.hosts.forEach((host) => {
-          if (host.host == domainsList[i]) {
-            domainsList.splice(i, 1);
-          }
-        });
-      }
-      return domainsList;
+      return domainsList.filter(domain => !this.ingress.hosts.some(host => host.host === domain));
     },
     async getDomains() {
       return axios.get("/api/kubernetes/domains").then((response) => {
@@ -1907,7 +1851,7 @@ export default defineComponent({
         }
 
         if (this.app != "new") {
-          this.loadApp();
+          return this.loadApp();
         }
       });
     },
@@ -1955,7 +1899,7 @@ export default defineComponent({
     loadApp() {
       if (this.app !== "new") {
         this.loadError = false;
-        axios
+        return axios
           .get(`/api/apps/${this.pipeline}/${this.phase}/${this.app}`)
           .then((response) => {
             if (!response.data?.spec || !response.data?.metadata) {
@@ -2456,25 +2400,6 @@ export default defineComponent({
           this.envVars.splice(i, 1);
         }
       }
-    },
-    isDuplicateEnvVar(name: string, currentIndex: number) {
-      if (!name || name.trim() === '') return false;
-      const trimmedName = name.trim();
-      return this.envVars.some((env, index) => 
-        index !== currentIndex && env.name.trim() === trimmedName
-      );
-    },
-    getEnvNameRules(name: string, index: number) {
-      const baseRules = [
-        (v: any) => !!v || this.$t('app.form.envNameRequired'),
-        (v: any) => v.length <= 60 || this.$t('app.form.envNameTooLong'),
-        (v: any) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(v) || this.$t('app.form.envNameInvalidChars'),
-      ];
-      
-      const duplicateRule = (v: any) => 
-        !this.isDuplicateEnvVar(v, index) || this.$t('app.form.duplicateEnvVar');
-      
-      return [...baseRules, duplicateRule];
     },
     addSAAnnotationLine() {
       this.sAAnnotations.push({
