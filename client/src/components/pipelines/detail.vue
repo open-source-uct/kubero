@@ -8,9 +8,9 @@
         <p>{{ $t('app.list.description') }}</p>
       </div>
       <v-btn
+        v-if="authStore.hasPermission('pipeline:write')"
         color="primary"
         prepend-icon="mdi-pencil-outline"
-        :disabled="!authStore.hasPermission('pipeline:write')"
         :to="{ name: 'Pipeline Form', params: { pipeline } }"
       >
         {{ $t('pipeline.buttons.edit') }}
@@ -62,9 +62,9 @@
             </v-chip>
           </div>
           <v-btn
+            v-if="authStore.hasPermission('app:write')"
             variant="tonal"
             prepend-icon="mdi-plus"
-            :disabled="!authStore.hasPermission('app:write')"
             :to="{ name: 'App Form', params: { phase: phase.name, pipeline, app: 'new' } }"
             color="primary"
             size="small"

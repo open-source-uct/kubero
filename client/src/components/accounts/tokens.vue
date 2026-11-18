@@ -52,9 +52,9 @@
       </template>
       <template v-slot:[`item.actions`]="{ item }">
         <div class="account-actions">
-          <v-tooltip :text="$t('global.delete')" location="top">
+          <v-tooltip v-if="writeUserPermission" :text="$t('global.delete')" location="top">
             <template #activator="{ props }">
-              <v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" :disabled="!writeUserPermission" @click="deleteToken(item)" />
+              <v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" @click="deleteToken(item)" />
             </template>
           </v-tooltip>
         </div>
@@ -106,13 +106,16 @@ export default defineComponent({
     const authStore = useAuthStore()
     const writeUserPermission = computed(() => authStore.hasPermission('token:ok') || authStore.hasPermission('token:write'))
 
-    const headers = [
+    const baseHeaders = [
       { title: t('tokens.form.id'), value: 'token' },
       { title: t('tokens.form.name'), value: 'name' },
       { title: t('tokens.form.owner'), value: 'user.username' },
       { title: t('tokens.form.expiresAt'), value: 'expiresAt' },
-      { title: '', value: 'actions', sortable: false, align: 'end' as const },
     ]
+    // sin permiso sobre tokens no hay ninguna acción posible por fila, así que la columna no se muestra
+    const headers = computed(() => writeUserPermission.value
+      ? [...baseHeaders, { title: '', value: 'actions', sortable: false, align: 'end' as const }]
+      : baseHeaders)
     const hasActiveFilters = computed(() => Boolean(search.value?.trim()))
     const filteredTokens = computed(() => {
       const query = search.value?.trim().toLocaleLowerCase() ?? ''

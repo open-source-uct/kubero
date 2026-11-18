@@ -105,9 +105,9 @@
       </template>
       <template v-slot:[`item.actions`]="{ item }">
         <div class="account-actions">
-          <v-tooltip :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.username}`" :disabled="item.username === 'admin' || item.username === 'system' || !writeUserPermission" @click="deleteUser(item)" /></template></v-tooltip>
-          <v-tooltip :text="$t('user.changePassword')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-lock-reset" variant="text" size="small" :aria-label="$t('user.changePasswordFor', { user: item.username })" :disabled="item.username === 'system' || !writeUserPermission" @click="openChangePasswordDialog(item)" /></template></v-tooltip>
-          <v-tooltip :text="$t('global.edit')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-pencil-outline" variant="text" size="small" :aria-label="`${$t('global.edit')} ${item.username}`" :disabled="item.username === 'admin' || item.username === 'system' || !writeUserPermission" @click="openEditUserDialog(item)" /></template></v-tooltip>
+          <v-tooltip v-if="writeUserPermission" :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.username}`" :disabled="item.username === 'admin' || item.username === 'system'" @click="deleteUser(item)" /></template></v-tooltip>
+          <v-tooltip v-if="writeUserPermission" :text="$t('user.changePassword')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-lock-reset" variant="text" size="small" :aria-label="$t('user.changePasswordFor', { user: item.username })" :disabled="item.username === 'system'" @click="openChangePasswordDialog(item)" /></template></v-tooltip>
+          <v-tooltip v-if="writeUserPermission" :text="$t('global.edit')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-pencil-outline" variant="text" size="small" :aria-label="`${$t('global.edit')} ${item.username}`" :disabled="item.username === 'admin' || item.username === 'system'" @click="openEditUserDialog(item)" /></template></v-tooltip>
         </div>
       </template>
       <template #bottom>
@@ -126,7 +126,7 @@
         color="primary"
         style="margin-right: 6px;"
         @click="openCreateDialog"
-        :disabled="!writeUserPermission"
+        v-if="writeUserPermission"
       >
         <v-icon>mdi-plus</v-icon>
         <span class="sr-only">{{ $t('user.actions.create') }}</span>
@@ -385,7 +385,8 @@ export default defineComponent({
       { text: 'Updated', value: 'updatedAt' },
       */
       { title: t('user.status'), value: 'isActive' },
-      { title: '', value: 'actions', sortable: false, align: 'end' as const },
+      // sin permiso de escritura no hay ninguna acción posible por fila, así que la columna no se muestra
+      ...(writeUserPermission ? [{ title: '', value: 'actions', sortable: false, align: 'end' as const }] : []),
     ]
 
     const roleFilterOptions = computed(() => {

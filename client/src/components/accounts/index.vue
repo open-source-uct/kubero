@@ -12,11 +12,11 @@
           <p>{{ activeSection.description }}</p>
         </div>
       </div>
+      <!-- si el rol no puede crear en esta sección, el botón no se muestra -->
       <v-btn
-        v-if="activeSection.createLabel"
+        v-if="activeSection.createLabel && canWrite"
         color="primary"
         prepend-icon="mdi-plus"
-        :disabled="!canWrite"
         @click="openCreateDialog"
       >
         {{ activeSection.createLabel }}

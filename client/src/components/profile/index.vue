@@ -110,11 +110,11 @@
           </v-form></v-dialog>
         </v-card>
 
-        <v-card color="cardBackground" class="tokens-panel uct-card" elevation="0">
+        <!-- sin permiso de tokens la lista ni siquiera se carga: el panel entero se oculta -->
+        <v-card v-if="authStore.hasPermission('token:ok') || authStore.hasPermission('token:write')" color="cardBackground" class="tokens-panel uct-card" elevation="0">
           <div class="section-heading">
             <div><h2>{{ $t('profile.titles.apiTokens') }}</h2><p>{{ $t('profile.token.description') }}</p></div>
-            <v-btn color="primary" variant="flat" prepend-icon="mdi-plus" @click="openCreateDialog"
-              :disabled="!authStore.hasPermission('token:ok') && !authStore.hasPermission('token:write')">{{ $t('profile.token.create') }}</v-btn>
+            <v-btn color="primary" variant="flat" prepend-icon="mdi-plus" @click="openCreateDialog">{{ $t('profile.token.create') }}</v-btn>
           </div>
           <v-table density="comfortable" class="tokens-table">
             <thead><tr><th>{{ $t('global.name') }}</th><th>{{ $t('profile.token.expiresAt') }}</th><th class="text-end">{{ $t('user.actions.name') }}</th></tr></thead>
@@ -125,8 +125,7 @@
                 <td class="text-end">
                   <v-tooltip :text="$t('global.delete')" location="start"><template #activator="{ props }">
                     <v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small"
-                      :aria-label="`${$t('global.delete')} ${token.name}`" @click="deleteToken(token)"
-                      :disabled="!authStore.hasPermission('token:ok') && !authStore.hasPermission('token:write')" />
+                      :aria-label="`${$t('global.delete')} ${token.name}`" @click="deleteToken(token)" />
                   </template></v-tooltip>
                 </td>
               </tr>

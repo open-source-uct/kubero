@@ -1,6 +1,6 @@
 // Composables
 import { createRouter, createWebHistory, RouteLocationNormalized } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { AUDIT_PERMISSIONS, useAuthStore } from '@/stores/auth'
 import axios from 'axios'
 
 const routes = [
@@ -77,7 +77,7 @@ const routes = [
       {
         path: '/activity',
         name: 'Activity',
-        meta: { requiredAnyPermissions: ['audit:read', 'audit:write'] },
+        meta: { requiredAnyPermissions: AUDIT_PERMISSIONS },
         component: () => import('@/views/Activity.vue'),
       },
     ],

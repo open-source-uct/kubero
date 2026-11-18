@@ -24,7 +24,7 @@ export function useAuditSuggestions(kind: 'pipeline' | 'username', search: () =>
     }
     state.error = ''
     state.loading = false
-    if (!auth.hasPermission('audit:read') && !auth.hasPermission('audit:write')) {
+    if (!auth.canSeeAudit) {
       state.items = []
       state.error = t('activity.forbidden')
       return

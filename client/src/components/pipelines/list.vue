@@ -7,10 +7,12 @@
         <h1 class="uct-h1">{{ $t('pipeline.list.title') }}</h1>
         <p>{{ $t('pipeline.list.description') }}</p>
       </div>
+      <!-- oculto si el rol no puede crear; deshabilitado solo mientras no hay conexión con el cluster -->
       <v-btn
+        v-if="canWrite"
         color="primary"
         prepend-icon="mdi-plus"
-        :disabled="!clusterConnected || !canWrite"
+        :disabled="!clusterConnected"
         :to="{ name: 'Pipeline Form', params: { pipeline: 'new' } }"
       >
         {{ $t('pipeline.buttons.new') }}
@@ -127,14 +129,14 @@
                     <v-btn v-bind="props" :to="{ name: 'Pipeline Apps', params: { pipeline: pipeline.name } }" icon="mdi-arrow-right" variant="text" color="primary" size="small" :aria-label="$t('pipeline.list.openNamed', { name: pipeline.name })" />
                   </template>
                 </v-tooltip>
-                <v-tooltip :text="$t('global.edit')" location="top">
+                <v-tooltip v-if="canWrite" :text="$t('global.edit')" location="top">
                   <template #activator="{ props }">
-                    <v-btn v-bind="props" :to="{ name: 'Pipeline Form', params: { pipeline: pipeline.name } }" icon="mdi-pencil-outline" variant="text" size="small" :disabled="!canWrite" :aria-label="$t('pipeline.list.editNamed', { name: pipeline.name })" />
+                    <v-btn v-bind="props" :to="{ name: 'Pipeline Form', params: { pipeline: pipeline.name } }" icon="mdi-pencil-outline" variant="text" size="small" :aria-label="$t('pipeline.list.editNamed', { name: pipeline.name })" />
                   </template>
                 </v-tooltip>
-                <v-tooltip :text="$t('global.delete')" location="top">
+                <v-tooltip v-if="canWrite" :text="$t('global.delete')" location="top">
                   <template #activator="{ props }">
-                    <v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :disabled="!canWrite" :loading="deletingName === pipeline.name" :aria-label="$t('pipeline.list.deleteNamed', { name: pipeline.name })" @click="deletePipeline(pipeline.name)" />
+                    <v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :loading="deletingName === pipeline.name" :aria-label="$t('pipeline.list.deleteNamed', { name: pipeline.name })" @click="deletePipeline(pipeline.name)" />
                   </template>
                 </v-tooltip>
               </td>
@@ -146,9 +148,12 @@
                   <v-icon :icon="pipelines.length === 0 ? 'mdi-source-branch-plus' : 'mdi-filter-off-outline'" size="38" color="primary" aria-hidden="true" />
                   <h2>{{ pipelines.length === 0 ? $t('pipeline.empty.title') : $t('pipeline.list.noResultsTitle') }}</h2>
                   <p>{{ pipelines.length === 0 ? $t('pipeline.empty.description') : $t('pipeline.list.noResultsDescription') }}</p>
-                  <v-btn v-if="pipelines.length === 0" color="primary" prepend-icon="mdi-plus" :disabled="!canWrite" :to="{ name: 'Pipeline Form', params: { pipeline: 'new' } }">
-                    {{ $t('pipeline.empty.createFirst') }}
-                  </v-btn>
+                  <!-- sin pipelines: invita a crear solo a quien puede; con pipelines filtrados: limpiar filtros -->
+                  <template v-if="pipelines.length === 0">
+                    <v-btn v-if="canWrite" color="primary" prepend-icon="mdi-plus" :disabled="!clusterConnected" :to="{ name: 'Pipeline Form', params: { pipeline: 'new' } }">
+                      {{ $t('pipeline.empty.createFirst') }}
+                    </v-btn>
+                  </template>
                   <v-btn v-else color="primary" variant="outlined" @click="resetFilters">{{ $t('pipeline.list.clearFilters') }}</v-btn>
                 </div>
               </td>

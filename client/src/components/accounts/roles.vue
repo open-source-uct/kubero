@@ -137,8 +137,8 @@
       </template>
       <template v-slot:[`item.actions`]="{ item }">
         <div class="account-actions">
-          <v-tooltip :text="$t('global.edit')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-pencil-outline" variant="text" size="small" :aria-label="`${$t('global.edit')} ${item.name}`" :disabled="item.name === 'admin' || !canManageRoles" @click="openEditRoleDialog(item)" /></template></v-tooltip>
-          <v-tooltip :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" :disabled="isFixedRole(item.name) || !canManageRoles" @click="deleteRole(item)" /></template></v-tooltip>
+          <v-tooltip v-if="canManageRoles" :text="$t('global.edit')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-pencil-outline" variant="text" size="small" :aria-label="`${$t('global.edit')} ${item.name}`" :disabled="item.name === 'admin'" @click="openEditRoleDialog(item)" /></template></v-tooltip>
+          <v-tooltip v-if="canManageRoles" :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" :disabled="isFixedRole(item.name)" @click="deleteRole(item)" /></template></v-tooltip>
         </div>
       </template>
       <template #bottom>
@@ -321,7 +321,8 @@ export default defineComponent({
       { title: t('roles.form.permissions.logs'), value: 'permissionsLogs', align: 'center' as const},
       { title: t('roles.form.permissions.reboot'), value: 'permissionsReboot', align: 'center' as const},
 
-      { title: '', value: 'actions', sortable: false, align: 'end' as const },
+      // sin permiso para gestionar roles no hay ninguna acción posible por fila, así que la columna no se muestra
+      ...(canManageRoles ? [{ title: '', value: 'actions', sortable: false, align: 'end' as const }] : []),
     ]
     const hasActiveFilters = computed(() => Boolean(search.value?.trim()))
     const filteredRoles = computed(() => {

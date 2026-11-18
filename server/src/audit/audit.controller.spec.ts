@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditController } from './audit.controller';
+import { PERMISSIONS_KEY } from '../auth/permissions.decorator';
 import { AuditService } from './audit.service';
 import { PipelinesService } from '../pipelines/pipelines.service';
 
@@ -147,5 +148,20 @@ describe('AuditController', () => {
       ).rejects.toThrow(ForbiddenException);
       expect(audit.getAppEntries).not.toHaveBeenCalled();
     });
+  });
+
+  // el panel de roles solo sabe guardar audit:ok: si los endpoints no lo
+  // aceptan, el interruptor "Auditoría" no le da acceso a nadie
+  describe('permissions', () => {
+    it.each(['getSuggestions', 'getAudit', 'getAuditAll'] as const)(
+      '%s accepts the switch from the roles panel',
+      (handler) => {
+        const required = Reflect.getMetadata(
+          PERMISSIONS_KEY,
+          AuditController.prototype[handler],
+        );
+        expect(required).toEqual(['audit:ok', 'audit:read', 'audit:write']);
+      },
+    );
   });
 });
