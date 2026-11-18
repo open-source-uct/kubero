@@ -137,8 +137,8 @@
       </template>
       <template v-slot:[`item.actions`]="{ item }">
         <div class="account-actions">
-          <v-tooltip :text="$t('global.edit')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-pencil-outline" variant="text" size="small" :aria-label="`${$t('global.edit')} ${item.name}`" :disabled="item.name === 'admin' || !canManageRoles" @click="openEditRoleDialog(item)" /></template></v-tooltip>
-          <v-tooltip :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" :disabled="isFixedRole(item.name) || !canManageRoles" @click="deleteRole(item)" /></template></v-tooltip>
+          <v-tooltip v-if="canManageRoles" :text="$t('global.edit')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-pencil-outline" variant="text" size="small" :aria-label="`${$t('global.edit')} ${item.name}`" :disabled="item.name === 'admin'" @click="openEditRoleDialog(item)" /></template></v-tooltip>
+          <v-tooltip v-if="canManageRoles" :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" :disabled="isFixedRole(item.name)" @click="deleteRole(item)" /></template></v-tooltip>
         </div>
       </template>
       <template #bottom>
@@ -151,11 +151,11 @@
     </v-data-table>
 
     <!-- Dialog to edit a role -->
-    <v-dialog v-model="editDialog" max-width="500px">
+    <v-dialog v-model="editDialog" max-width="500px"><v-form @submit.prevent="saveEdit">
       <v-card color="cardBackground" class="uct-card">
         <v-card-title class="text-h6 font-weight-bold">{{ $t('roles.actions.edit') }}</v-card-title>
         <v-card-text>
-          <v-text-field v-model="editedRole.name" :disabled="isFixedRole(editedRole.name)" :label="$t('roles.form.name')"></v-text-field>
+          <ValidationField as="v-text-field" :validation="editValidation.field('name')" v-model="editedRole.name" :disabled="isFixedRole(editedRole.name)" :label="$t('roles.form.name')"></ValidationField>
           <v-text-field v-model="editedRole.description" :label="$t('roles.form.description')"></v-text-field>
           <v-table density="compact" class="mb-4">
             <tbody>
@@ -236,19 +236,22 @@
             </tbody>
           </v-table>
         </v-card-text>
+        <FormValidationSummary :validation="editValidation" class="px-6" />
         <v-card-actions>
           <v-spacer />
           <v-btn text @click="editDialog = false">{{ $t('global.abort') }}</v-btn>
-          <v-btn color="primary" @click="saveEdit">{{ $t('global.save') }}</v-btn>
+          <v-btn color="primary" type="submit" :disabled="!editValidation.valid || validationSaving" :loading="validationSaving">{{ $t('global.save') }}</v-btn>
         </v-card-actions>
       </v-card>
-    </v-dialog>
+    </v-form></v-dialog>
 
   </v-container>
 </template>
 
 <script lang="ts">
 import { computed, defineComponent, nextTick, ref, onMounted, watch } from 'vue'
+import { namedFields } from '../../validation/accounts'
+import { createFormValidation } from '../../composables/useFormValidation'
 import axios from 'axios'
 import { useDisplay } from 'vuetify'
 import { useAuthStore } from '../../stores/auth'
@@ -318,7 +321,8 @@ export default defineComponent({
       { title: t('roles.form.permissions.logs'), value: 'permissionsLogs', align: 'center' as const},
       { title: t('roles.form.permissions.reboot'), value: 'permissionsReboot', align: 'center' as const},
 
-      { title: '', value: 'actions', sortable: false, align: 'end' as const },
+      // sin permiso para gestionar roles no hay ninguna acción posible por fila, así que la columna no se muestra
+      ...(canManageRoles ? [{ title: '', value: 'actions', sortable: false, align: 'end' as const }] : []),
     ]
     const hasActiveFilters = computed(() => Boolean(search.value?.trim()))
     const filteredRoles = computed(() => {
@@ -367,13 +371,15 @@ export default defineComponent({
     }
 
     const saveEdit = async () => {
+      if (validationSaving.value || !editValidation.validate()) return
+      validationSaving.value = true
       try {
         await axios.put(`/api/roles/${editedRole.value.id}`, editedRole.value, handledApiErrorConfig)
         await loadRoles()
         editDialog.value = false
       } catch (e) {
         notifyApiError(e, 'saveRole')
-      }
+      } finally { validationSaving.value = false }
     }
 
     const deleteRole = async (role: Role) => {
@@ -443,7 +449,12 @@ export default defineComponent({
       loadRoles()
     })
 
+    const validationSaving = ref(false)
+    const editValidation = createFormValidation(() => namedFields(editedRole.value, false, t))
+    watch(editDialog, value => { if (value) editValidation.reset() })
+
     return {
+      validationSaving, editValidation,
       roles,
       roleTable,
       headers,

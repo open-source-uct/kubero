@@ -483,12 +483,14 @@ export class DatabaseService {
           description: 'Teacher role, scoped to its own teams',
           scopeToOwnTeam: true,
           priority: 50,
+          // igual a como quedó configurado en la instancia UCT: supervisa las
+          // apps de sus equipos sin editarlas, pero gestiona los pipelines.
+          // Solo aplica al crear el rol; a uno existente no se le tocan los permisos.
           permissions: {
             create: [
               { action: 'read', resource: 'app' },
-              { action: 'read', resource: 'pipeline' },
+              { action: 'write', resource: 'pipeline' },
               { action: 'write', resource: 'user' },
-              { action: 'read', resource: 'config' },
               { action: 'ok', resource: 'console' },
               { action: 'ok', resource: 'logs' },
               { action: 'ok', resource: 'reboot' },

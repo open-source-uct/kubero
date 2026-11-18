@@ -54,8 +54,8 @@
       </template>
       <template v-slot:[`item.actions`]="{ item }">
         <div class="account-actions">
-          <v-tooltip :text="$t('global.edit')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-pencil-outline" variant="text" size="small" :aria-label="`${$t('global.edit')} ${item.name}`" :disabled="!writeUserPermission" @click="openEditTeamDialog(item)" /></template></v-tooltip>
-          <v-tooltip :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" :disabled="!writeUserPermission || !!item.ownerId" @click="deleteTeam(item)" /></template></v-tooltip>
+          <v-tooltip v-if="writeUserPermission" :text="$t('global.edit')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-pencil-outline" variant="text" size="small" :aria-label="`${$t('global.edit')} ${item.name}`" @click="openEditTeamDialog(item)" /></template></v-tooltip>
+          <v-tooltip v-if="writeUserPermission" :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" :disabled="!!item.ownerId" @click="deleteTeam(item)" /></template></v-tooltip>
         </div>
       </template>
       <template #bottom>
@@ -74,7 +74,7 @@
         color="primary"
         style="margin-right: 6px;"
         @click="openCreateDialog"
-        :disabled="!canCreateTeam"
+        v-if="canCreateTeam"
       >
         <v-icon>mdi-plus</v-icon>
         <span class="sr-only">{{ $t('teams.actions.create') }}</span>
@@ -82,59 +82,63 @@
     </div>
 
     <!-- Dialog to edit a group -->
-    <v-dialog v-model="editDialog" max-width="500px">
+    <v-dialog v-model="editDialog" max-width="500px"><v-form @submit.prevent="saveEdit">
       <v-card color="cardBackground" class="uct-card">
         <v-card-title class="text-h6 font-weight-bold">{{ $t('teams.actions.edit') }}</v-card-title>
         <v-card-text>
-          <v-text-field
+          <ValidationField as="v-text-field" :validation="editValidation.field('name')"
             v-model="editedTeam.name"
             :label="$t('teams.form.name')"
             :readonly="!!editedTeam.ownerId"
             :hint="editedTeam.ownerId ? $t('teams.personalHint') : undefined"
             :persistent-hint="!!editedTeam.ownerId"
-          ></v-text-field>
-          <v-text-field
+          ></ValidationField>
+          <ValidationField as="v-text-field" :validation="editValidation.field('description')"
             v-model="editedTeam.description"
             :label="$t('teams.form.description')"
             type="text"
             multiline
             rows="2"
-          ></v-text-field>
+          ></ValidationField>
         </v-card-text>
+        <FormValidationSummary :validation="editValidation" class="px-6" />
         <v-card-actions>
           <v-spacer />
           <v-btn text @click="editDialog = false">{{ $t('global.abort') }}</v-btn>
-          <v-btn color="primary" @click="saveEdit">{{ $t('global.save') }}</v-btn>
+          <v-btn color="primary" type="submit" :disabled="!editValidation.valid || validationSaving" :loading="validationSaving">{{ $t('global.save') }}</v-btn>
         </v-card-actions>
       </v-card>
-    </v-dialog>
+    </v-form></v-dialog>
 
     <!-- Dialog for a new Team -->
-    <v-dialog v-model="createDialog" max-width="500px">
+    <v-dialog v-model="createDialog" max-width="500px"><v-form @submit.prevent="saveCreate">
       <v-card color="cardBackground" class="uct-card">
         <v-card-title class="text-h6 font-weight-bold">{{ $t('teams.actions.create') }}</v-card-title>
         <v-card-text>
-          <v-text-field v-model="newTeam.name" :label="$t('teams.form.name')"></v-text-field>
-          <v-text-field
+          <ValidationField as="v-text-field" :validation="createValidation.field('name')" v-model="newTeam.name" :label="$t('teams.form.name')"></ValidationField>
+          <ValidationField as="v-text-field" :validation="createValidation.field('description')"
             v-model="newTeam.description"
             :label="$t('teams.form.description')"
             type="text"
             multiline
             rows="2"
-          ></v-text-field>
+          ></ValidationField>
         </v-card-text>
+        <FormValidationSummary :validation="createValidation" class="px-6" />
         <v-card-actions>
           <v-spacer />
           <v-btn text @click="createDialog = false">{{ $t('global.abort') }}</v-btn>
-          <v-btn color="primary" @click="saveCreate">{{ $t('global.create') }}</v-btn>
+          <v-btn color="primary" type="submit" :disabled="!createValidation.valid || validationSaving" :loading="validationSaving">{{ $t('global.create') }}</v-btn>
         </v-card-actions>
       </v-card>
-    </v-dialog>
+    </v-form></v-dialog>
   </v-container>
 </template>
 
 <script lang="ts">
 import { computed, defineComponent, nextTick, ref, onMounted, watch } from 'vue'
+import { namedFields } from '../../validation/accounts'
+import { createFormValidation } from '../../composables/useFormValidation'
 import axios from 'axios'
 import { useDisplay } from 'vuetify'
 import { useAuthStore } from '../../stores/auth'
@@ -172,10 +176,11 @@ export default defineComponent({
     // un ayudante gestiona los equipos de su profesor, pero no crea otros
     const canCreateTeam = writeUserPermission && !authStore.isSupervised
 
+    // sin permiso de escritura no hay ninguna acción posible por fila, así que la columna no se muestra
     const headers = [
       { title: t('teams.name'), value: 'name' },
       { title: t('teams.form.description'), value: 'description' },
-      { title: '', value: 'actions', sortable: false, align: 'end' as const },
+      ...(writeUserPermission ? [{ title: '', value: 'actions', sortable: false, align: 'end' as const }] : []),
     ]
     const hasActiveFilters = computed(() => Boolean(search.value?.trim()))
     const filteredTeams = computed(() => {
@@ -223,13 +228,15 @@ export default defineComponent({
     }
 
     const saveEdit = async () => {
+      if (validationSaving.value || !editValidation.validate()) return
+      validationSaving.value = true
       try {
         await axios.put(`/api/groups/${editedTeam.value.id}`, editedTeam.value, handledApiErrorConfig)
         await loadTeams()
         editDialog.value = false
       } catch (e) {
         notifyApiError(e, 'saveTeam')
-      }
+      } finally { validationSaving.value = false }
     }
 
     const deleteTeam = async (group: Team) => {
@@ -255,20 +262,29 @@ export default defineComponent({
     }
 
     const saveCreate = async () => {
+      if (validationSaving.value || !createValidation.validate()) return
+      validationSaving.value = true
       try {
         await axios.post('/api/groups', newTeam.value, handledApiErrorConfig)
         await loadTeams()
         createDialog.value = false
       } catch (e) {
         notifyApiError(e, 'createTeam')
-      }
+      } finally { validationSaving.value = false }
     }
 
     onMounted(() => {
       loadTeams()
     })
 
+    const validationSaving = ref(false)
+    const editValidation = createFormValidation(() => namedFields(editedTeam.value, true, t))
+    watch(editDialog, value => { if (value) editValidation.reset() })
+    const createValidation = createFormValidation(() => namedFields(newTeam.value, true, t))
+    watch(createDialog, value => { if (value) createValidation.reset() })
+
     return {
+      validationSaving, editValidation, createValidation,
       teams,
       teamTable,
       headers,

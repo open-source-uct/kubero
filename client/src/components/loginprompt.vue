@@ -42,7 +42,7 @@
                     {{ $t('user.errors.wrongCredentials') }}
                 </v-alert>
 
-                <form v-on:submit="login">
+                <form @submit.prevent="login">
                     <v-text-field
                         v-model="username"
                         :label="$t('user.username')"
@@ -79,6 +79,7 @@
                         color="primary"
                         size="large"
                         type="submit"
+                        :disabled="loggingIn" :loading="loggingIn"
                         elevation="1"
                         class="font-weight-bold"
                     >
@@ -128,6 +129,7 @@ export default defineComponent({
     data: () => ({
         error: false,
         errorshake: false,
+        loggingIn: false,
         username: '',
         password: '',
         authMethods : {
@@ -144,14 +146,11 @@ export default defineComponent({
                 'localhost'
             ];
             const demoDomain = demoDomains.includes(window.location.hostname)
-            if (demoDomain) {
-                this.username = 'demo';
-                this.password = 'kubero';
-            }
             return demoDomain;
         }
     },
     mounted() {
+        if (this.isDemoDomain) { this.username = 'demo'; this.password = 'kubero'; }
         this.getAuthMethods();
     },
     methods: {
@@ -166,10 +165,12 @@ export default defineComponent({
                     console.log(err)
                 })
         },
-        login: function (e: any) {
+        login: function (e: Event) {
             e.preventDefault()
-            let username = e.target.elements.username.value
-            let password = e.target.elements.password.value
+            if (this.loggingIn) return
+            this.loggingIn = true
+            let username = this.username
+            let password = this.password
             let login = () => {
                 let data = {
                     username: username,
@@ -185,8 +186,8 @@ export default defineComponent({
                         setTimeout(() => {
                             this.errorshake = false;
                         }, 300);
-                        console.log("Cannot log in"+errors)
-                    })
+                        void errors
+                    }).finally(() => { this.loggingIn = false })
             }
             login()
         },

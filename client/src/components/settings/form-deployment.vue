@@ -28,11 +28,11 @@
                 cols="12"
                 md="8"
             >
-                <v-text-field
-                v-model="settings.settings.kubero.webhook_url"
+                <ValidationField as="v-text-field" :validation="validation.field('webhook-url')"
+                :model-value="settings.settings.kubero.webhook_url" @update:model-value="update('settings', 'settings.kubero.webhook_url', $event)"
                 :label="$t('settings.deployment.url')"
                 required
-                ></v-text-field>
+                ></ValidationField>
             </v-col>
         </v-row>
         <v-row>
@@ -41,7 +41,7 @@
                 md="8"
             >
                 <v-text-field
-                v-model="settings.secrets.KUBERO_WEBHOOK_SECRET"
+                :model-value="settings.secrets.KUBERO_WEBHOOK_SECRET" @update:model-value="update('settings', 'secrets.KUBERO_WEBHOOK_SECRET', $event)"
                 :label="$t('settings.deployment.secret')"
                 required
                 :append-icon="show ? 'mdi-eye' : 'mdi-eye-off'"
@@ -58,18 +58,18 @@
                 cols="12"
                 md="3"
             >
-                <v-text-field
-                v-model="settings.secrets.GITHUB_BASEURL"
+                <ValidationField as="v-text-field" :validation="validation.field('GITHUB_BASEURL')"
+                :model-value="settings.secrets.GITHUB_BASEURL" @update:model-value="update('settings', 'secrets.GITHUB_BASEURL', $event)"
                 :label="$t('settings.deployment.github.baseUrl')" 
                 required
-                ></v-text-field>  
+                ></ValidationField>
             </v-col>
             <v-col
                 cols="12"
                 md="3"
             >
                 <v-text-field
-                v-model="settings.secrets.GITHUB_PERSONAL_ACCESS_TOKEN"
+                :model-value="settings.secrets.GITHUB_PERSONAL_ACCESS_TOKEN" @update:model-value="update('settings', 'secrets.GITHUB_PERSONAL_ACCESS_TOKEN', $event)"
                 :label="$t('settings.deployment.github.personalAccessToken')"
                 required
                 :append-icon="show ? 'mdi-eye' : 'mdi-eye-off'"
@@ -90,18 +90,18 @@
                 cols="12"
                 md="3"
             >
-                <v-text-field
-                v-model="settings.secrets.GITEA_BASEURL"
+                <ValidationField as="v-text-field" :validation="validation.field('GITEA_BASEURL')"
+                :model-value="settings.secrets.GITEA_BASEURL" @update:model-value="update('settings', 'secrets.GITEA_BASEURL', $event)"
                 :label="$t('settings.deployment.gitea.baseUrl')"
                 required
-                ></v-text-field>
+                ></ValidationField>
             </v-col>
             <v-col
                 cols="12"
                 md="3"
             >
                 <v-text-field
-                v-model="settings.secrets.GITEA_PERSONAL_ACCESS_TOKEN"
+                :model-value="settings.secrets.GITEA_PERSONAL_ACCESS_TOKEN" @update:model-value="update('settings', 'secrets.GITEA_PERSONAL_ACCESS_TOKEN', $event)"
                 :label="$t('settings.deployment.gitea.personalAccessToken')"
                 required
                 :append-icon="show ? 'mdi-eye' : 'mdi-eye-off'"
@@ -122,18 +122,18 @@
                 cols="12"
                 md="3"
             >
-                <v-text-field
-                v-model="settings.secrets.GOGS_BASEURL"
+                <ValidationField as="v-text-field" :validation="validation.field('GOGS_BASEURL')"
+                :model-value="settings.secrets.GOGS_BASEURL" @update:model-value="update('settings', 'secrets.GOGS_BASEURL', $event)"
                 :label="$t('settings.deployment.gogs.baseUrl')"
                 required
-                ></v-text-field>
+                ></ValidationField>
             </v-col>
             <v-col
                 cols="12"
                 md="3"
             >
                 <v-text-field
-                v-model="settings.secrets.GOGS_PERSONAL_ACCESS_TOKEN"
+                :model-value="settings.secrets.GOGS_PERSONAL_ACCESS_TOKEN" @update:model-value="update('settings', 'secrets.GOGS_PERSONAL_ACCESS_TOKEN', $event)"
                 :label="$t('settings.deployment.gogs.personalAccessToken')"
                 required
                 :append-icon="show ? 'mdi-eye' : 'mdi-eye-off'"
@@ -149,18 +149,18 @@
                 cols="12"
                 md="3"
             >
-                <v-text-field
-                v-model="settings.secrets.GITLAB_BASEURL"
+                <ValidationField as="v-text-field" :validation="validation.field('GITLAB_BASEURL')"
+                :model-value="settings.secrets.GITLAB_BASEURL" @update:model-value="update('settings', 'secrets.GITLAB_BASEURL', $event)"
                 :label="$t('settings.deployment.gitlab.baseUrl')"
                 required
-                ></v-text-field>
+                ></ValidationField>
             </v-col>
             <v-col
                 cols="12"
                 md="3"
             >
                 <v-text-field
-                v-model="settings.secrets.GITLAB_PERSONAL_ACCESS_TOKEN"
+                :model-value="settings.secrets.GITLAB_PERSONAL_ACCESS_TOKEN" @update:model-value="update('settings', 'secrets.GITLAB_PERSONAL_ACCESS_TOKEN', $event)"
                 :label="$t('settings.deployment.gitlab.personalAccessToken')"
                 required
                 :append-icon="show ? 'mdi-eye' : 'mdi-eye-off'"
@@ -177,7 +177,7 @@
                 md="3"
             >
                 <v-text-field
-                v-model="settings.secrets.BITBUCKET_USERNAME"
+                :model-value="settings.secrets.BITBUCKET_USERNAME" @update:model-value="update('settings', 'secrets.BITBUCKET_USERNAME', $event)"
                 :label="$t('settings.deployment.bitbucket.username')"
                 required
                 ></v-text-field>
@@ -187,7 +187,7 @@
                 md="3"
             >
                 <v-text-field
-                v-model="settings.secrets.BITBUCKET_APP_PASSWORD"
+                :model-value="settings.secrets.BITBUCKET_APP_PASSWORD" @update:model-value="update('settings', 'secrets.BITBUCKET_APP_PASSWORD', $event)"
                 :label="$t('settings.deployment.bitbucket.appPassword')"
                 required
                 :append-icon="show ? 'mdi-eye' : 'mdi-eye-off'"
@@ -201,7 +201,9 @@
 
 
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { updateModelPath } from '../../composables/useFormValidation'
+import type { FormValidation } from '../../composables/useFormValidation'
+import { defineComponent, PropType } from 'vue'
 import { Secrets } from './form.vue'
 
 interface Settings {
@@ -211,7 +213,9 @@ interface Settings {
 
 export default defineComponent({
     name: 'FormDeployment',
+    emits: ['update:settings', 'update:secrets'],
     props: {
+        validation: { type: Object as PropType<FormValidation>, required: true },
         settings: {
             type: Object as () => Settings,
             required: true
@@ -225,6 +229,11 @@ export default defineComponent({
         }
     },
     methods: {
+        update(source: 'settings' | 'secrets', path: string, value: unknown) {
+            const model = source === 'settings' ? this.settings : ('secrets' in this ? this.secrets : {})
+            this.$emit(source === 'settings' ? 'update:settings' : 'update:secrets', updateModelPath(model, path, value))
+        },
+
     }
 })
 

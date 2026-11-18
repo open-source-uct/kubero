@@ -178,26 +178,26 @@
     </v-data-table>
     </section>
     <!-- Edit Dialog -->
-    <v-dialog v-model="editDialog" max-width="800px">
+    <v-dialog v-model="editDialog" max-width="800px"><v-form @submit.prevent="saveEdit">
       <v-card color="cardBackground" class="uct-card uct-dialog-card">
         <v-card-title class="text-h6 font-weight-bold">{{$t('notifications.actions.edit')}}</v-card-title>
         <v-card-text v-if="editedNotification">
-          <v-form ref="editForm">
+
             <v-row>
               <v-col cols="12" md="6">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="editValidation.field('name')"
                   v-model="editedNotification.name"
                   :label="$t('notifications.form.name')"
                   required
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" md="6">
-                <v-select
+                <ValidationField as="v-select" :validation="editValidation.field('type')"
                   v-model="editedNotification.type"
                   :items="notificationTypes"
                   :label="$t('notifications.form.type')"
                   required
-                ></v-select>
+                ></ValidationField>
               </v-col>
               <v-col cols="12">
                 <v-switch
@@ -206,41 +206,41 @@
                   color="primary"
                 ></v-switch>
               </v-col>
-              
+
               <!-- Type-specific configuration -->
               <v-col cols="12" v-if="editedNotification.type === 'slack'">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="editValidation.field('url')"
                   v-model="editedNotification.config.url"
                   :label="$t('notifications.form.slackWebhookUrl')"
                   required
-                ></v-text-field>
+                ></ValidationField>
                 <v-text-field
                   v-model="editedNotification.config.channel"
                   :label="$t('notifications.form.channel')"
                 ></v-text-field>
               </v-col>
-              
+
               <v-col cols="12" v-if="editedNotification.type === 'discord'">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="editValidation.field('url')"
                   v-model="editedNotification.config.url"
                   :label="$t('notifications.form.discordWebhookUrl')"
                   required
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
-              
+
               <v-col cols="12" v-if="editedNotification.type === 'webhook'">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="editValidation.field('url')"
                   v-model="editedNotification.config.url"
                   :label="$t('notifications.form.webhookUrl')"
                   required
-                ></v-text-field>
+                ></ValidationField>
                 <v-text-field
                   v-model="editedNotification.config.secret"
                   :label="$t('notifications.form.secret')"
                   type="password"
                 ></v-text-field>
               </v-col>
-              
+
               <v-col cols="12" md="6">
                 <v-combobox
                   v-model="editedNotification.pipelines"
@@ -251,7 +251,7 @@
                   :hint="$t('notifications.form.pipelinesHint')"
                 ></v-combobox>
               </v-col>
-              
+
               <v-col cols="12" md="6">
                 <v-combobox
                   v-model="editedNotification.events"
@@ -263,42 +263,43 @@
                 ></v-combobox>
               </v-col>
             </v-row>
-          </v-form>
+
         </v-card-text>
         <v-card-text v-else>
           <v-alert type="error" dismissible>
             {{$t('notifications.errors.edit')}}
           </v-alert>
         </v-card-text>
+        <FormValidationSummary :validation="editValidation" class="px-6" />
         <v-card-actions>
           <v-spacer />
           <v-btn text @click="editDialog = false">{{$t('global.cancel')}}</v-btn>
-          <v-btn color="primary" @click="saveEdit">{{$t('global.save')}}</v-btn>
+          <v-btn color="primary" type="submit" :disabled="!editValidation.valid || validationSaving" :loading="validationSaving">{{$t('global.save')}}</v-btn>
         </v-card-actions>
       </v-card>
-    </v-dialog>
+    </v-form></v-dialog>
 
     <!-- Create Dialog -->
-    <v-dialog v-model="createDialog" max-width="800px">
+    <v-dialog v-model="createDialog" max-width="800px"><v-form @submit.prevent="saveCreate">
       <v-card color="cardBackground" class="uct-card uct-dialog-card">
         <v-card-title class="text-h6 font-weight-bold">{{$t('notifications.actions.create')}}</v-card-title>
         <v-card-text>
-          <v-form ref="createForm">
+
             <v-row>
               <v-col cols="12" md="6">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="createValidation.field('name')"
                   v-model="newNotification.name"
                   :label="$t('notifications.form.name')"
                   required
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" md="6">
-                <v-select
+                <ValidationField as="v-select" :validation="createValidation.field('type')"
                   v-model="newNotification.type"
                   :items="notificationTypes"
                   :label="$t('notifications.form.type')"
                   required
-                ></v-select>
+                ></ValidationField>
               </v-col>
               <v-col cols="12">
                 <v-switch
@@ -307,41 +308,41 @@
                   color="primary"
                 ></v-switch>
               </v-col>
-              
+
               <!-- Type-specific configuration -->
               <v-col cols="12" v-if="newNotification.type === 'slack'">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="createValidation.field('url')"
                   v-model="newNotification.config.url"
                   :label="$t('notifications.form.slackWebhookUrl')"
                   required
-                ></v-text-field>
+                ></ValidationField>
                 <v-text-field
                   v-model="newNotification.config.channel"
                   :label="$t('notifications.form.channel')"
                 ></v-text-field>
               </v-col>
-              
+
               <v-col cols="12" v-if="newNotification.type === 'discord'">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="createValidation.field('url')"
                   v-model="newNotification.config.url"
                   :label="$t('notifications.form.discordWebhookUrl')"
                   required
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
-              
+
               <v-col cols="12" v-if="newNotification.type === 'webhook'">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="createValidation.field('url')"
                   v-model="newNotification.config.url"
                   :label="$t('notifications.form.webhookUrl')"
                   required
-                ></v-text-field>
+                ></ValidationField>
                 <v-text-field
                   v-model="newNotification.config.secret"
                   :label="$t('notifications.form.secret')"
                   type="password"
                 ></v-text-field>
               </v-col>
-              
+
               <v-col cols="12" md="6">
                 <v-combobox
                   v-model="newNotification.pipelines"
@@ -353,7 +354,7 @@
                   :hint="$t('notifications.form.pipelinesHint')"
                 ></v-combobox>
               </v-col>
-              
+
               <v-col cols="12" md="6">
                 <v-combobox
                   v-model="newNotification.events"
@@ -366,20 +367,23 @@
                 ></v-combobox>
               </v-col>
             </v-row>
-          </v-form>
+
         </v-card-text>
+        <FormValidationSummary :validation="createValidation" class="px-6" />
         <v-card-actions>
           <v-spacer />
           <v-btn text @click="createDialog = false">{{$t('global.cancel')}}</v-btn>
-          <v-btn color="primary" @click="saveCreate">{{$t('global.create')}}</v-btn>
+          <v-btn color="primary" type="submit" :disabled="!createValidation.valid || validationSaving" :loading="validationSaving">{{$t('global.create')}}</v-btn>
         </v-card-actions>
       </v-card>
-    </v-dialog>
+    </v-form></v-dialog>
   </v-container>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from 'vue'
+import { defineComponent, ref, onMounted, watch } from 'vue'
+import { notificationFields } from '../../validation/settings'
+import { createFormValidation } from '../../composables/useFormValidation'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import { handledApiErrorConfig, notifyApiError } from '../../utils/apiFeedback'
@@ -499,13 +503,15 @@ export default defineComponent({
     }
 
     const saveEdit = async () => {
+      if (validationSaving.value || !editValidation.validate()) return
+      validationSaving.value = true
       try {
         await axios.put(`/api/notifications/${editedNotification.value?.id}`, editedNotification.value, handledApiErrorConfig)
         await loadNotifications()
         editDialog.value = false
       } catch (e) {
         notifyApiError(e, 'saveNotification')
-      }
+      } finally { validationSaving.value = false }
     }
 
     const deleteNotification = async (notification: Notification) => {
@@ -538,6 +544,8 @@ export default defineComponent({
     }
 
     const saveCreate = async () => {
+      if (validationSaving.value || !createValidation.validate()) return
+      validationSaving.value = true
       try {
         const payload = JSON.parse(JSON.stringify(newNotification.value))
         delete payload.id
@@ -546,7 +554,7 @@ export default defineComponent({
         createDialog.value = false
       } catch (e) {
         notifyApiError(e, 'createNotification')
-      }
+      } finally { validationSaving.value = false }
     }
 
     const loadPipelinesList = async () => {
@@ -565,7 +573,14 @@ export default defineComponent({
       loadPipelinesList()
     })
 
+    const validationSaving = ref(false)
+    const editValidation = createFormValidation(() => notificationFields(editedNotification.value, t))
+    const createValidation = createFormValidation(() => notificationFields(newNotification.value, t))
+    watch(editDialog, value => { if (value) editValidation.reset() })
+    watch(createDialog, value => { if (value) createValidation.reset() })
+
     return {
+      validationSaving, editValidation, createValidation,
       notifications,
       headers,
       loading,

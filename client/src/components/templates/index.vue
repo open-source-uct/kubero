@@ -143,17 +143,18 @@
                     </v-carousel>
                 </v-card-text>
                 <v-card-text>
-                    <v-select
+                    <ValidationField as="v-select" :validation="validation.field('pipeline')"
                         :items="pipelines"
                         :label="$t('templates.pipeline')"
                         v-model="pipeline"
-                    ></v-select>
-                    <v-select
+                    ></ValidationField>
+                    <ValidationField as="v-select" :validation="validation.field('phase')"
                         :items="phases[pipeline]"
                         :label="$t('templates.phase')"
                         v-model="phase"
-                    ></v-select>
+                    ></ValidationField>
                 </v-card-text>
+                <FormValidationSummary :validation="validation" class="px-6" />
                 <v-card-actions class="d-flex justify-space-around mb-6 mr-5">
                     <v-spacer></v-spacer>
                     <v-btn
@@ -168,7 +169,7 @@
                         color="primary"
                         variant="tonal"
                         dark
-                        :disabled="!pipeline || !phase"
+                        :disabled="!validation.valid"
                         @click="openInstall(clickedTemplate.template, pipeline, phase)"
                         >
                         {{ $t('templates.actions.install') }}
@@ -181,6 +182,9 @@
 </template>
 
 <script lang="ts">
+import formValidationMixin from "../../composables/formValidationMixin";
+import { rules, check } from "../../utils/validationRules";
+import type { ValidationFieldDefinition } from "../../composables/useFormValidation";
 import axios from "axios";
 import { forEach } from "lodash";
 import { defineComponent } from 'vue'
@@ -271,6 +275,7 @@ const ENABLED_TEMPLATES = [
 const HIDDEN_CATALOGS = ['Kubero Frameworks'];
 
 export default defineComponent({
+    mixins: [formValidationMixin],
     sockets: {
     },
     mounted() {
@@ -309,6 +314,17 @@ export default defineComponent({
     }),
     components: {
     },
+
+    computed: {
+        validationFields(): ValidationFieldDefinition[] { return [
+            { id: 'pipeline', label: this.$t('templates.pipeline'), value: this.pipeline, rules: [rules.required, check('selected', v => this.pipelines.includes(String(v)))] },
+            { id: 'phase', label: this.$t('templates.phase'), value: this.phase, rules: [rules.required, check('selected', v => (this.phases[this.pipeline] || []).includes(String(v)))] },
+        ]; },
+    },
+    watch: {
+        dialog(value: boolean) { if (value) this.validation.reset(); },
+        pipeline() { this.phase = ''; },
+    },
     methods: {
         async copyInstall(install: string) {
             try {
@@ -319,6 +335,7 @@ export default defineComponent({
             this.dialog = false;
         },
         openInstall(templateurl: string, pipeline: string, phase: string) {
+            if (!this.validation.validate()) return;
             // redirect to install page
             const templateurlB64 = btoa(templateurl);
             // Use this.$router instead of useRouter()

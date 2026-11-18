@@ -97,7 +97,8 @@
 
     <td>
       <div class="actions-cell">
-        <v-tooltip :text="$t('app.actions.restart')" location="top">
+        <!-- cada acción aparece solo si el rol tiene el permiso que exige la API para ella -->
+        <v-tooltip v-if="authStore.hasPermission('reboot:ok')" :text="$t('app.actions.restart')" location="top">
           <template #activator="{ props }">
             <v-btn
               v-bind="props"
@@ -106,12 +107,11 @@
               variant="text"
               size="small"
               :aria-label="`${$t('app.actions.restart')} ${app.name}`"
-              :disabled="!authStore.hasPermission('reboot:ok')"
               @click="restartApp()"
             />
           </template>
         </v-tooltip>
-        <v-tooltip :text="$t('app.nav.overview')" location="top">
+        <v-tooltip v-if="authStore.hasPermission('app:read') || authStore.hasPermission('app:write')" :text="$t('app.nav.overview')" location="top">
           <template #activator="{ props }">
             <v-btn
               v-bind="props"
@@ -120,12 +120,11 @@
               variant="text"
               size="small"
               :aria-label="`${$t('app.nav.overview')} ${app.name}`"
-              :disabled="!authStore.hasPermission('app:read') && !authStore.hasPermission('app:write')"
               :to="{ name: 'App Dashboard', params: { pipeline, phase, app: app.name } }"
             />
           </template>
         </v-tooltip>
-        <v-tooltip :text="$t('app.actions.edit')" location="top">
+        <v-tooltip v-if="authStore.hasPermission('app:write')" :text="$t('app.actions.edit')" location="top">
           <template #activator="{ props }">
             <v-btn
               v-bind="props"
@@ -133,7 +132,6 @@
               variant="text"
               size="small"
               :aria-label="`${$t('app.actions.edit')} ${app.name}`"
-              :disabled="!authStore.hasPermission('app:write')"
               :to="{ name: 'App Form', params: { pipeline, phase, app: app.name } }"
             />
           </template>
@@ -153,7 +151,7 @@
             />
           </template>
         </v-tooltip>
-        <v-tooltip :text="$t('app.actions.delete')" location="top">
+        <v-tooltip v-if="authStore.hasPermission('app:write')" :text="$t('app.actions.delete')" location="top">
           <template #activator="{ props }">
             <v-btn
               v-bind="props"
@@ -162,7 +160,6 @@
               color="error"
               size="small"
               :aria-label="`${$t('app.actions.delete')} ${app.name}`"
-              :disabled="!authStore.hasPermission('app:write')"
               @click="deleteApp()"
             />
           </template>

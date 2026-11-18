@@ -47,8 +47,8 @@
                     {{ error }}
                 </v-alert>
 
-                <form @submit.prevent="submit">
-                    <v-text-field
+                <v-form @submit.prevent="submit">
+                    <ValidationField as="v-text-field" :validation="validation.field('password')"
                         v-model="newPassword"
                         :label="$t('user.newPassword')"
                         type="password"
@@ -56,12 +56,11 @@
                         density="comfortable"
                         color="primary"
                         prepend-inner-icon="mdi-lock-outline"
-                        :rules="[(v: string) => (!!v && v.length >= 8) || $t('user.errors.passwordMinLength')]"
                         required
                         class="mb-2"
-                    ></v-text-field>
+                    ></ValidationField>
 
-                    <v-text-field
+                    <ValidationField as="v-text-field" :validation="validation.field('confirmation')"
                         v-model="confirmPassword"
                         :label="$t('user.confirmPassword')"
                         type="password"
@@ -69,11 +68,11 @@
                         density="comfortable"
                         color="primary"
                         prepend-inner-icon="mdi-lock-check-outline"
-                        :rules="[(v: string) => v === newPassword || $t('user.errors.passwordMismatch')]"
                         required
                         class="mb-4"
-                    ></v-text-field>
+                    ></ValidationField>
 
+                    <FormValidationSummary :validation="validation" />
                     <v-btn
                         block
                         color="primary"
@@ -82,22 +81,27 @@
                         elevation="1"
                         class="font-weight-bold"
                         :loading="loading"
-                        :disabled="!newPassword || newPassword.length < 8 || newPassword !== confirmPassword"
+                        :disabled="!validation.valid || loading || !token"
                     >
                         {{ $t('user.resetPasswordSubmit') }}
                     </v-btn>
-                </form>
+                </v-form>
             </template>
         </v-card>
     </div>
 </template>
 
 <script lang="ts">
+import formValidationMixin from "../composables/formValidationMixin";
+import { rules, check } from "../utils/validationRules";
+import type { ValidationFieldDefinition } from "../composables/useFormValidation";
+
 import axios from 'axios'
 import { defineComponent } from 'vue'
 import i18n from '@/plugins/i18n'
 
 export default defineComponent({
+    mixins: [formValidationMixin],
     name: 'ResetPassword',
     data: () => ({
         token: '',
@@ -107,12 +111,14 @@ export default defineComponent({
         success: false,
         error: '',
     }),
+    computed: { validationFields(): ValidationFieldDefinition[] { return [{ id: 'password', label: this.$t('user.newPassword'), value: this.newPassword, rules: [rules.required, rules.minLength(8)] }, { id: 'confirmation', label: this.$t('user.confirmPassword'), value: this.confirmPassword, rules: [rules.required, check('match', v => v === this.newPassword)] }] } },
     mounted() {
         this.token = String(this.$route.query.token || '')
+        if (!this.token) this.error = String(i18n.global.t('user.resetPasswordInvalid'))
     },
     methods: {
         submit() {
-            if (this.newPassword !== this.confirmPassword || this.newPassword.length < 8) {
+            if (this.loading || !this.token || !this.validation.validate()) {
                 return
             }
             this.loading = true

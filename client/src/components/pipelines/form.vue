@@ -1,5 +1,5 @@
 <template>
-  <v-form v-model="valid" class="pipeline-form">
+  <v-form class="pipeline-form" @submit.prevent="newPipeline ? createPipeline() : updatePipeline()">
     <v-container class="pipeline-shell">
       <Breadcrumbs :items="breadcrumbItems"></Breadcrumbs>
 
@@ -22,23 +22,22 @@
         </div>
       </header>
 
-      <main class="pipeline-content">
+      <div class="pipeline-content">
         <v-card color="cardBackground" class="uct-card pipeline-card pipeline-card--settings" elevation="0">
           <v-card-text class="pipeline-card__body">
             <v-row class="pipeline-fields" dense>
               <v-col cols="12" lg="6">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('name')"
                   v-model="pipelineName"
-                  :rules="nameRules"
                   :counter="60"
-                  :label="$t('pipeline.form.label.name') + ' *'"
+                  :label="$t('pipeline.form.label.name')"
                   :disabled="!newPipeline"
                   variant="outlined"
                   required
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
               <v-col cols="12" lg="6">
-                <v-combobox
+                <ValidationField as="v-combobox" :validation="validation.field('teams')"
                   v-model="access.teams"
                   chips
                   multiple
@@ -46,18 +45,16 @@
                   :hint="teamAccessHint"
                   persistent-hint
                   :items="isAdmin ? allTeams : authStore.userGroups"
-                  :rules="teamRules"
                   variant="outlined"
-                ></v-combobox>
+                ></ValidationField>
               </v-col>
               <v-col cols="12">
-                <v-text-field
+                <ValidationField as="v-text-field" :validation="validation.field('domain')"
                   v-model="domain"
-                  :rules="domainRules"
                   :label="$t('pipeline.form.label.fqdnDomain')"
                   hint="This Wildcard Domain should point to the IP of your clusters IP defined in 'Cluster Context'. It will be used as a base domain when creating a new app."
                   variant="outlined"
-                ></v-text-field>
+                ></ValidationField>
               </v-col>
             </v-row>
           </v-card-text>
@@ -88,7 +85,7 @@
                     density="compact"
                     hide-details
                   ></v-switch>
-                  <v-select
+                  <ValidationField as="v-select" :validation="validation.field('context-' + phase.name)"
                     v-if="phase.enabled && phase.name != 'review'"
                     v-model="phase.context"
                     class="phase-context"
@@ -97,30 +94,29 @@
                     variant="outlined"
                     density="compact"
                     hide-details
-                  ></v-select>
+                  ></ValidationField>
                 </div>
 
                 <div v-if="phase.enabled && phase.name == 'review'" class="review-settings">
                   <v-row dense>
                     <v-col cols="12" md="6">
-                      <v-select
+                      <ValidationField as="v-select" :validation="validation.field('context-' + phase.name)"
                         v-if="phase.enabled"
                         v-model="phase.context"
                         :items="contextList"
-                        :label="$t('pipeline.form.label.clusterContext') + ' *'"
+                        :label="$t('pipeline.form.label.clusterContext')"
                         variant="outlined"
                         density="compact"
-                      ></v-select>
+                      ></ValidationField>
                     </v-col>
                     <v-col cols="12" md="6">
-                      <v-text-field
+                      <ValidationField as="v-text-field" :validation="validation.field('domain-' + phase.name)"
                         v-model="phase.domain"
-                        :rules="domainRules"
                         label="Base domain"
                         density="compact"
                         hint="This Wildcard Domain should point to the IP of your cluster defined in 'Cluster Context'. It will be used to create a subdomain for each PR."
                         variant="outlined"
-                      ></v-text-field>
+                      ></ValidationField>
                     </v-col>
                   </v-row>
 
@@ -145,13 +141,13 @@
                       dense
                     >
                       <v-col cols="12" md="5">
-                        <v-text-field
+                        <ValidationField as="v-text-field" :validation="validation.field('env-' + validationRowId(envvar))"
                           v-model="envvar.name"
                           :label="$t('global.name')"
                           density="compact"
                           :counter="60"
                           variant="outlined"
-                        ></v-text-field>
+                        ></ValidationField>
                       </v-col>
                       <v-col cols="12" md="6">
                         <v-text-field
@@ -191,6 +187,7 @@
           </v-card-text>
         </v-card>
 
+        <FormValidationSummary :validation="validation" :reason="validationLoading ? $t('validation.loading') : validationLoadError ? $t('validation.loadError') : undefined" />
         <div class="pipeline-actions">
           <v-btn
             v-if="newPipeline"
@@ -198,8 +195,8 @@
             size="large"
             variant="flat"
             prepend-icon="mdi-source-fork"
-            :disabled="!valid"
-            @click="createPipeline()"
+            :disabled="!validation.valid || validationSaving || validationLoading || validationLoadError" :loading="validationSaving"
+            type="submit"
           >
             {{ $t('pipeline.buttons.create') }}
           </v-btn>
@@ -209,19 +206,22 @@
             size="large"
             variant="flat"
             prepend-icon="mdi-content-save-outline"
-            :disabled="!valid"
-            @click="updatePipeline()"
+            :disabled="!validation.valid || validationSaving || validationLoading || validationLoadError" :loading="validationSaving"
+            type="submit"
           >
             {{ $t('pipeline.buttons.update') }}
           </v-btn>
         </div>
-      </main>
+      </div>
     </v-container>
   </v-form>
 </template>
 
 <script lang="ts">
 import axios from "axios";
+import formValidationMixin from '../../composables/formValidationMixin';
+import { pipelineFields } from '../../validation/pipelines';
+import type { ValidationFieldDefinition } from '../../composables/useFormValidation';
 import { defineComponent } from 'vue'
 import Breadcrumbs from "../breadcrumbs.vue";
 import { EnvVar } from '../apps/form.vue'
@@ -231,6 +231,7 @@ import { handledApiErrorConfig, notifyApiError } from '../../utils/apiFeedback'
 const authStore = useAuthStore();
 
 export default defineComponent({
+    mixins: [formValidationMixin],
     props: {
       pipeline: {
         type: String,
@@ -259,9 +260,11 @@ export default defineComponent({
       buildstrategy: "plain",
       newPipeline: true,
       resourceVersion: undefined,
-      valid: false, // final form validation
+      valid: false, // legacy Vuetify compatibility
+      validationLoading: true,
+      validationLoadError: false,
       pipelineName: '',
-      domain: '',
+      domain: this.pipeline === 'new' ? 'inf.uct.cl' : '',
       reviewapps: false,
       contextList: [] as string[], // a list of kubernets contexts in the kubeconfig to select from
       // solo se llenan al editar un pipeline existente, para no perder lo que ya tenía
@@ -302,18 +305,11 @@ export default defineComponent({
           defaultEnvvars: [] as EnvVar[],
         },
       ],
-      nameRules: [
-        (v: any) => !!v || 'Name is required',
-        (v: any) => v.length <= 60 || 'Name must be less than 60 characters',
-        (v: any) => /^[a-z0-9][a-z0-9-]*$/.test(v) || 'Allowed characters : [a-z0-9-]',
-        (v: any) => v !== 'new' || 'Name cannot be "new"',
-      ],
-      domainRules: [
-        //(v: any) => v.length <= 253 || 'Name must be less than 253 characters',
-        (v: any) => /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$|^localhost$|^$/.test(v) || 'Not a domain',
-      ],
     }}, 
     computed: {
+      validationFields(): ValidationFieldDefinition[] {
+        return pipelineFields({ name: this.pipelineName, creating: this.pipeline === "new", domain: this.domain, teams: this.access.teams, admin: this.isAdmin, supervised: this.authStore.isSupervised, phases: this.phases, contexts: this.contextList }, key => this.$t(key));
+      },
       isAdmin(): boolean {
         return this.authStore.role === 'admin';
       },
@@ -335,19 +331,6 @@ export default defineComponent({
           ? this.$t('pipeline.form.hint.personalTeam', { team })
           : this.$t('pipeline.form.hint.teamAccess');
       },
-      teamRules(): ((v: string[]) => boolean | string)[] {
-        return [
-          (v: string[]) =>
-            this.isAdmin ||
-            (Array.isArray(v) && v.length > 0) ||
-            this.$t('pipeline.form.validation.teamRequired'),
-          (v: string[]) =>
-            !this.authStore.isSupervised ||
-            !Array.isArray(v) ||
-            v.some((team) => !team.startsWith('personal-')) ||
-            this.$t('pipeline.form.validation.courseTeamRequired'),
-        ];
-      },
     },
     watch: {
       defaultTeams: {
@@ -359,12 +342,13 @@ export default defineComponent({
         },
       },
     },
-    mounted() {
-      this.getContextList();
-      this.loadPipeline();
-      if (this.isAdmin) {
-        this.loadTeams();
-      }
+    async mounted() {
+      try {
+        await Promise.all([this.getContextList(), this.loadPipeline()]);
+        if (this.isAdmin) this.loadTeams();
+      } catch {
+        this.validationLoadError = true;
+      } finally { this.validationLoading = false; }
     },
     components: {
         Breadcrumbs,
@@ -379,11 +363,11 @@ export default defineComponent({
         });
       },
       getContextList() {
-        axios.get('/api/kubernetes/contexts').then(response => {
+        return axios.get('/api/kubernetes/contexts').then(response => {
           for (let i = 0; i < response.data.length; i++) {
             this.contextList.push(response.data[i].name);
           }
-          if (response.data.length > 0) {
+          if (response.data.length > 0 && this.pipeline === 'new') {
             this.phases[0].context = response.data[0].name;
             this.phases[1].context = response.data[0].name;
             this.phases[2].context = response.data[0].name;
@@ -393,7 +377,7 @@ export default defineComponent({
       },
       loadPipeline() {
         if (this.pipeline !== 'new') {
-          axios.get(`/api/pipelines/${this.pipeline}`)
+          return axios.get(`/api/pipelines/${this.pipeline}`)
           .then(response => {
             this.newPipeline = false;
             const p = response.data;
@@ -417,12 +401,12 @@ export default defineComponent({
                 this.phases[i].defaultEnvvars = [] as EnvVar[];
               }
             }
-          }).catch(error => {
-            console.log(error);
           });
         }
       },
       createPipeline() {
+        if (this.validationSaving || this.validationLoading || this.validationLoadError || !this.validation.validate()) return;
+        this.validationSaving = true;
         axios.post(`/api/pipelines/${this.pipeline}`, {
           access: this.access,
           pipelineName: this.pipelineName,
@@ -439,9 +423,11 @@ export default defineComponent({
         })
         .catch(error => {
           notifyApiError(error, 'createPipeline');
-        });
+        }).finally(() => { this.validationSaving = false; });
       },
       updatePipeline() {
+        if (this.validationSaving || this.validationLoading || this.validationLoadError || !this.validation.validate()) return;
+        this.validationSaving = true;
         axios.put(`/api/pipelines/${this.pipeline}`, {
           access: this.access,
           resourceVersion: this.resourceVersion,
@@ -462,7 +448,7 @@ export default defineComponent({
         })
         .catch(error => {
           notifyApiError(error, 'updatePipeline');
-        });
+        }).finally(() => { this.validationSaving = false; });
       },
       addEnvLine(phase: any) {
         phase.defaultEnvvars.push({
