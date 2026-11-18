@@ -54,8 +54,8 @@
       </template>
       <template v-slot:[`item.actions`]="{ item }">
         <div class="account-actions">
-          <v-tooltip :text="$t('global.edit')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-pencil-outline" variant="text" size="small" :aria-label="`${$t('global.edit')} ${item.name}`" :disabled="!writeUserPermission" @click="openEditTeamDialog(item)" /></template></v-tooltip>
-          <v-tooltip :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" :disabled="!writeUserPermission || !!item.ownerId" @click="deleteTeam(item)" /></template></v-tooltip>
+          <v-tooltip v-if="writeUserPermission" :text="$t('global.edit')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-pencil-outline" variant="text" size="small" :aria-label="`${$t('global.edit')} ${item.name}`" @click="openEditTeamDialog(item)" /></template></v-tooltip>
+          <v-tooltip v-if="writeUserPermission" :text="$t('global.delete')" location="top"><template #activator="{ props }"><v-btn v-bind="props" icon="mdi-delete-outline" variant="text" color="error" size="small" :aria-label="`${$t('global.delete')} ${item.name}`" :disabled="!!item.ownerId" @click="deleteTeam(item)" /></template></v-tooltip>
         </div>
       </template>
       <template #bottom>
@@ -74,7 +74,7 @@
         color="primary"
         style="margin-right: 6px;"
         @click="openCreateDialog"
-        :disabled="!canCreateTeam"
+        v-if="canCreateTeam"
       >
         <v-icon>mdi-plus</v-icon>
         <span class="sr-only">{{ $t('teams.actions.create') }}</span>
@@ -176,10 +176,11 @@ export default defineComponent({
     // un ayudante gestiona los equipos de su profesor, pero no crea otros
     const canCreateTeam = writeUserPermission && !authStore.isSupervised
 
+    // sin permiso de escritura no hay ninguna acción posible por fila, así que la columna no se muestra
     const headers = [
       { title: t('teams.name'), value: 'name' },
       { title: t('teams.form.description'), value: 'description' },
-      { title: '', value: 'actions', sortable: false, align: 'end' as const },
+      ...(writeUserPermission ? [{ title: '', value: 'actions', sortable: false, align: 'end' as const }] : []),
     ]
     const hasActiveFilters = computed(() => Boolean(search.value?.trim()))
     const filteredTeams = computed(() => {

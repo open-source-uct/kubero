@@ -20,6 +20,12 @@ import { OKDTO } from '../common/dto/ok.dto';
 import { JwtAuthGuard } from '../auth/strategies/jwt.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
+
+// El interruptor "Auditoría" del panel de roles guarda audit:ok; los roles
+// originales de Kubero usan audit:read y audit:write. Cualquiera de los tres
+// deja ver la auditoría, y fuera del equipo admin siempre acotada a los
+// pipelines de los equipos del usuario (ver getAuditAll y getAudit).
+export const AUDIT_PERMISSIONS = ['audit:ok', 'audit:read', 'audit:write'];
 import { AuditQueryDto } from './audit-query.dto';
 import { AuditSuggestionsDto } from './audit-suggestions.dto';
 
@@ -32,7 +38,7 @@ export class AuditController {
 
   @Get('/suggestions')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('audit:read', 'audit:write')
+  @Permissions(...AUDIT_PERMISSIONS)
   @ApiBearerAuth('bearerAuth')
   @ApiOperation({ summary: 'Suggest names from authorized audit entries only' })
   async getSuggestions(
@@ -58,7 +64,7 @@ export class AuditController {
     isArray: false,
   })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('audit:read', 'audit:write')
+  @Permissions(...AUDIT_PERMISSIONS)
   @ApiBearerAuth('bearerAuth')
   async getAudit(
     @Param('pipeline') pipeline: string,
@@ -89,7 +95,7 @@ export class AuditController {
     isArray: false,
   })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('audit:read', 'audit:write')
+  @Permissions(...AUDIT_PERMISSIONS)
   @ApiBearerAuth('bearerAuth')
   async getAuditAll(
     @Query(

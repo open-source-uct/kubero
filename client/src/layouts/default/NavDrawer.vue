@@ -83,7 +83,7 @@
         </v-list-item>
         <v-list-item 
             link to="/activity"
-            v-if="kubero.auditEnabled && (authStore.hasPermission('audit:write') || authStore.hasPermission('audit:read'))"
+            v-if="kubero.auditEnabled && authStore.canSeeAudit"
             prepend-icon="mdi-bell-outline"
             :title="$t('navigation.activity')">
         </v-list-item>

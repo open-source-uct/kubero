@@ -306,7 +306,10 @@ export class AppsController {
 
   @Get('/:pipeline/:phase/:app/restart')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('app:write')
+  // lo decide el interruptor "Reiniciar" del panel de roles, no la escritura
+  // de apps: un rol puede reiniciar sin poder editar (el profesor). Que la app
+  // sea de un equipo del usuario lo revisa restartApp con getContext.
+  @Permissions('reboot:ok')
   @UseGuards(ReadonlyGuard)
   @ApiOperation({ summary: 'Restart/Reload an app' })
   @ApiForbiddenResponse({

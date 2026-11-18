@@ -3,6 +3,11 @@ import axios from 'axios'
 import { disconnectSocketIO } from '../socket.io'
 import { useKuberoStore } from './kubero'
 
+// El interruptor "Auditoría" del panel de roles guarda audit:ok; los roles
+// originales de Kubero usan audit:read y audit:write. Cualquiera de los tres
+// deja ver la auditoría.
+export const AUDIT_PERMISSIONS: string[] = ['audit:ok', 'audit:read', 'audit:write']
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     sessionLoaded: false,
@@ -54,5 +59,8 @@ export const useAuthStore = defineStore('auth', {
     // mismo listado que SUPERVISED_ROLES en el servidor: trabajan bajo un
     // profesor, así que sus pipelines van en un equipo del curso y no crean equipos
     isSupervised: (state) => ['estudiante', 'ayudante'].includes(state.role),
+    // mismo listado que acepta la API en /api/audit (lo que no sea admin ve solo
+    // la auditoría de los pipelines de sus equipos)
+    canSeeAudit: (state) => AUDIT_PERMISSIONS.some((perm) => state.permissions.includes(perm)),
   },
 })

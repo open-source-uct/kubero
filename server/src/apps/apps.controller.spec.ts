@@ -2,6 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AppsController } from './apps.controller';
 import { AppsService } from './apps.service';
 import { JwtAuthGuard } from '../auth/strategies/jwt.guard';
+import {
+  PERMISSIONS_ALL_KEY,
+  PERMISSIONS_KEY,
+} from '../auth/permissions.decorator';
 import { HttpException } from '@nestjs/common';
 
 import { IApp } from './apps.interface';
@@ -299,6 +303,28 @@ describe('AppsController', () => {
         mockUser,
         mockUserGroups,
       );
+    });
+
+    // el interruptor "Reiniciar" del panel de roles es el que decide: un rol
+    // con reinicio y apps en solo lectura (el profesor) puede reiniciar, y uno
+    // que edita apps pero tiene el reinicio apagado, no
+    it('requires the reboot permission, not app:write', () => {
+      const required = Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        AppsController.prototype.restartApp,
+      );
+      expect(required).toEqual(['reboot:ok']);
+    });
+  });
+
+  describe('console permissions', () => {
+    // la consola permite cambiar la app por dentro: exige las dos cosas
+    it('requires app:write and console:ok together', () => {
+      const required = Reflect.getMetadata(
+        PERMISSIONS_ALL_KEY,
+        AppsController.prototype.execInContainer,
+      );
+      expect(required).toEqual(['app:write', 'console:ok']);
     });
   });
 

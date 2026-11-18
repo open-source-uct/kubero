@@ -45,10 +45,12 @@
                     </v-btn>
                 </template>
                 <v-list class="app-detail-menu uct-card" density="comfortable" nav>
+                    <!-- cada acción aparece solo si el rol tiene el permiso que exige la API;
+                         las que quedan deshabilitadas es por el estado de la app, no por el rol -->
                     <v-list-item
+                        v-if="authStore.hasPermission('app:write')"
                         @click="ActionEditApp"
                         prepend-icon="mdi-pencil-outline"
-                        :disabled="!authStore.hasPermission('app:write')"
                         :title="$t('app.actions.edit')">
                     </v-list-item>
                     <v-list-item
@@ -57,9 +59,9 @@
                         :title="$t('app.actions.openApp')">
                     </v-list-item>
                     <v-list-item
+                        v-if="authStore.hasPermission('reboot:ok')"
                         @click="restartApp"
                         prepend-icon="mdi-restart"
-                        :disabled="!authStore.hasPermission('reboot:ok')"
                         :title="$t('app.actions.restart')">
                     </v-list-item>
                     <v-list-item
@@ -68,20 +70,23 @@
                         prepend-icon="mdi-download-outline"
                         :title="$t('app.actions.downloadTemplate')">
                     </v-list-item>
+                    <!-- la API exige las dos cosas: la consola permite cambiar la app por dentro -->
                     <v-list-item
+                        v-if="authStore.hasPermission('app:write') && authStore.hasPermission('console:ok')"
                         @click="openConsole"
                         prepend-icon="mdi-console-line"
-                        :disabled="!kubero.consoleEnabled || !authStore.hasPermission('console:ok')"
+                        :disabled="!kubero.consoleEnabled"
                         :title="$t('app.actions.openConsole')">
                     </v-list-item>
-                    <v-divider class="my-2"></v-divider>
-                    <v-list-item
-                        class="app-detail-menu__danger"
-                        @click="deleteApp"
-                        prepend-icon="mdi-delete-outline"
-                        :disabled="!authStore.hasPermission('app:write')"
-                        :title="$t('app.actions.delete')">
-                    </v-list-item>
+                    <template v-if="authStore.hasPermission('app:write')">
+                        <v-divider class="my-2"></v-divider>
+                        <v-list-item
+                            class="app-detail-menu__danger"
+                            @click="deleteApp"
+                            prepend-icon="mdi-delete-outline"
+                            :title="$t('app.actions.delete')">
+                        </v-list-item>
+                    </template>
                 </v-list>
             </v-menu>
         </header>
@@ -98,35 +103,37 @@
         </v-alert>
 
         <nav class="app-detail-tabs" :aria-label="$t('app.nav.overview')">
+            <!-- cada pestaña tiene un nombre fijo: así se puede ocultar una (Logs, Auditoría)
+                 sin que las de la derecha muestren el contenido de otra -->
             <v-tabs v-model="tab" color="primary" show-arrows>
-                <v-tab prepend-icon="mdi-view-dashboard-outline">{{ $t('app.nav.overview') }}</v-tab>
-                <v-tab prepend-icon="mdi-hammer-wrench" :disabled="!hasBuilds">{{ $t('app.nav.builds') }}</v-tab>
-                <v-tab prepend-icon="mdi-chart-line">{{ $t('app.nav.metrics') }}</v-tab>
-                <v-tab prepend-icon="mdi-text-box-search-outline" :disabled="!authStore.hasPermission('logs:ok')">{{ $t('app.nav.logs') }}</v-tab>
-                <v-tab prepend-icon="mdi-timeline-clock-outline">{{ $t('app.nav.events') }}</v-tab>
-                <v-tab prepend-icon="mdi-history">{{ $t('app.nav.audit') }}</v-tab>
+                <v-tab value="overview" prepend-icon="mdi-view-dashboard-outline">{{ $t('app.nav.overview') }}</v-tab>
+                <v-tab value="builds" prepend-icon="mdi-hammer-wrench" :disabled="!hasBuilds">{{ $t('app.nav.builds') }}</v-tab>
+                <v-tab value="metrics" prepend-icon="mdi-chart-line">{{ $t('app.nav.metrics') }}</v-tab>
+                <v-tab v-if="canSeeLogs" value="logs" prepend-icon="mdi-text-box-search-outline">{{ $t('app.nav.logs') }}</v-tab>
+                <v-tab value="events" prepend-icon="mdi-timeline-clock-outline">{{ $t('app.nav.events') }}</v-tab>
+                <v-tab v-if="canSeeAppAudit" value="audit" prepend-icon="mdi-history">{{ $t('app.nav.audit') }}</v-tab>
             </v-tabs>
         </nav>
 
         <!-- sin deslizar con el dedo: el swipe pasa a la ventana siguiente aunque
-             su pestaña esté deshabilitada (Builds en apps docker, Logs sin permiso) -->
+             su pestaña esté deshabilitada (Builds en apps docker) -->
         <v-window v-model="tab" class="app-detail-content" :touch="false">
-            <v-window-item :transition="false" :reverse-transition="false" class="background">
+            <v-window-item value="overview" :transition="false" :reverse-transition="false" class="background">
                 <Overview :pipeline="pipeline" :phase="phase" :app="app" :appData="appData" :pipelineData="pipelineData"/>
             </v-window-item>
-            <v-window-item :transition="false" :reverse-transition="false" class="background">
+            <v-window-item value="builds" :transition="false" :reverse-transition="false" class="background">
                 <Builds v-if="hasBuilds" :pipeline="pipeline" :phase="phase" :app="app" :appData="appData" :pipelineData="pipelineData"/>
             </v-window-item>
-            <v-window-item :transition="false" :reverse-transition="false" class="background">
-                <Metrics :pipeline="pipeline" :phase="phase" :app="app" :host="appData.spec.ingress?.hosts?.[0]?.host ?? ''" :active="tab == 2"/>
+            <v-window-item value="metrics" :transition="false" :reverse-transition="false" class="background">
+                <Metrics :pipeline="pipeline" :phase="phase" :app="app" :host="appData.spec.ingress?.hosts?.[0]?.host ?? ''" :active="tab === 'metrics'"/>
             </v-window-item>
-            <v-window-item :transition="false" :reverse-transition="false" class="background">
-                <LogsTab v-if="authStore.hasPermission('logs:ok')" :pipeline="pipeline" :phase="phase" :app="app" :deploymentstrategy="appData.spec.deploymentstrategy" :buildstrategy="appData.spec.buildstrategy" :hasAddons="(appData.spec.addons?.length ?? 0) > 0" :addons="appData.spec.addons ?? []"/>
+            <v-window-item v-if="canSeeLogs" value="logs" :transition="false" :reverse-transition="false" class="background">
+                <LogsTab :pipeline="pipeline" :phase="phase" :app="app" :deploymentstrategy="appData.spec.deploymentstrategy" :buildstrategy="appData.spec.buildstrategy" :hasAddons="(appData.spec.addons?.length ?? 0) > 0" :addons="appData.spec.addons ?? []"/>
             </v-window-item>
-            <v-window-item :transition="false" :reverse-transition="false" class="background">
+            <v-window-item value="events" :transition="false" :reverse-transition="false" class="background">
                 <Events :pipeline="pipeline" :phase="phase" :app="app" :appData="appData"/>
             </v-window-item>
-            <v-window-item :transition="false" :reverse-transition="false" class="background">
+            <v-window-item v-if="canSeeAppAudit" value="audit" :transition="false" :reverse-transition="false" class="background">
                 <Audit :pipeline="pipeline" :phase="phase" :app="app"/>
             </v-window-item>
         </v-window>
@@ -160,7 +167,7 @@ export default defineComponent({
     data () {
         return {
             loadingState: false,
-            tab: null,
+            tab: 'overview',
             breadcrumbItems: [
                 {
                     title: 'Dashboard.Pipelines',
@@ -206,7 +213,15 @@ export default defineComponent({
       hasBuilds() {
         // disable the builds tab if the buildstrategy is plain or external
         return this.appData.spec.deploymentstrategy == 'git' && this.appData.spec.buildstrategy != 'plain' && this.appData.spec.buildstrategy != 'external';
-      }
+      },
+      // las pestañas que dependen del rol no se muestran si la API las va a rechazar
+      canSeeLogs(): boolean {
+        return authStore.hasPermission('logs:ok')
+      },
+      // igual que el menú lateral: también hace falta que la auditoría esté activa
+      canSeeAppAudit(): boolean {
+        return Boolean(this.kubero.auditEnabled) && authStore.canSeeAudit
+      },
     },
     mounted() {
         this.loadPipeline();
