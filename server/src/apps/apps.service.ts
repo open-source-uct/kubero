@@ -12,7 +12,13 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { IKubectlApp } from '../kubernetes/kubernetes.interface';
 import { INotification } from '../notifications/notifications.interface';
 import { App } from './app/app';
-import { IApp, Workload, WorkloadContainer } from './apps.interface';
+import {
+  AddonStatus,
+  IApp,
+  Workload,
+  WorkloadContainer,
+} from './apps.interface';
+import type { V1Pod } from '@kubernetes/client-node';
 import { IUser } from '../auth/auth.interface';
 import { ConfigService } from '../config/config.service';
 import { KubectlTemplate } from '../templates/template';
@@ -1181,42 +1187,111 @@ export class AppsService {
 
     if (contextName) {
       const workload = await this.kubectl.getPods(namespace, contextName);
-      //return workload
       for (const pod of workload) {
         // check if app label name starts with appName
         if (!pod.metadata?.generateName?.startsWith(appName + '-kuberoapp')) {
           continue;
         }
-
-        const workload = {
-          name: pod.metadata?.name,
-          namespace: pod.metadata?.namespace,
-          phase: phaseName,
-          pipeline: pipelineName,
-          status: pod.status?.phase,
-          age: pod.metadata?.creationTimestamp,
-          startTime: pod.status?.startTime,
-          containers: [] as WorkloadContainer[],
-        } as Workload;
-
-        //for (const container of pod.spec?.containers || []) {
-        const containersCount = pod.spec?.containers?.length || 0;
-        for (let i = 0; i < containersCount; i++) {
-          workload.containers.push({
-            name: pod.spec?.containers[i].name,
-            image: pod.spec?.containers[i].image,
-            restartCount: pod.status?.containerStatuses?.[i]?.restartCount,
-            ready: pod.status?.containerStatuses?.[i]?.ready,
-            started: pod.status?.containerStatuses?.[i]?.started,
-            waitingReason:
-              pod.status?.containerStatuses?.[i]?.state?.waiting?.reason,
-          } as WorkloadContainer);
-        }
-
-        workloads.push(workload);
+        workloads.push(this.toWorkload(pod, pipelineName, phaseName));
       }
     }
     return workloads;
+  }
+
+  // Estado de los pods de cada addon de la app. Los charts de los addons
+  // marcan sus pods con app.kubernetes.io/instance = nombre del release, que el
+  // operador crea con el nombre del recurso del addon (p. ej. server-postgres).
+  // Mismo acceso que getPods: getContext rechaza un pipeline de otro equipo.
+  public async getAddonsStatus(
+    pipelineName: string,
+    phaseName: string,
+    appName: string,
+    userGroups: string[],
+  ): Promise<AddonStatus[]> {
+    const contextName = await this.pipelinesService.getContext(
+      pipelineName,
+      phaseName,
+      userGroups,
+    );
+    if (!contextName) {
+      return [];
+    }
+    const app = await this.kubectl.getApp(
+      pipelineName,
+      phaseName,
+      appName,
+      contextName,
+    );
+    const addons = ((app?.spec?.addons ?? []) as unknown[])
+      .map((addon) => {
+        const entry = addon as {
+          kind?: string;
+          resourceDefinitions?: Record<
+            string,
+            { metadata?: { name?: string } }
+          >;
+        };
+        const definition = Object.values(entry?.resourceDefinitions ?? {})[0];
+        return {
+          name: definition?.metadata?.name ?? '',
+          kind: entry?.kind ?? '',
+        };
+      })
+      .filter((addon) => addon.name);
+    if (!addons.length) {
+      return [];
+    }
+    const pods = await this.kubectl.getPods(
+      pipelineName + '-' + phaseName,
+      contextName,
+    );
+    return addons.map((addon) => ({
+      ...addon,
+      pods: pods
+        .filter(
+          (pod) =>
+            pod.metadata?.labels?.['app.kubernetes.io/instance'] === addon.name,
+        )
+        .map((pod) => this.toWorkload(pod, pipelineName, phaseName)),
+    }));
+  }
+
+  private toWorkload(
+    pod: V1Pod,
+    pipelineName: string,
+    phaseName: string,
+  ): Workload {
+    const workload = {
+      name: pod.metadata?.name,
+      namespace: pod.metadata?.namespace,
+      phase: phaseName,
+      pipeline: pipelineName,
+      status: pod.status?.phase,
+      age: pod.metadata?.creationTimestamp,
+      startTime: pod.status?.startTime,
+      containers: [] as WorkloadContainer[],
+    } as Workload;
+
+    const scheduled = pod.status?.conditions?.find(
+      (condition) => condition.type === 'PodScheduled',
+    );
+    if (scheduled?.status === 'False' && scheduled.message) {
+      workload.unschedulable = scheduled.message;
+    }
+
+    const containersCount = pod.spec?.containers?.length || 0;
+    for (let i = 0; i < containersCount; i++) {
+      workload.containers.push({
+        name: pod.spec?.containers[i].name,
+        image: pod.spec?.containers[i].image,
+        restartCount: pod.status?.containerStatuses?.[i]?.restartCount,
+        ready: pod.status?.containerStatuses?.[i]?.ready,
+        started: pod.status?.containerStatuses?.[i]?.started,
+        waitingReason:
+          pod.status?.containerStatuses?.[i]?.state?.waiting?.reason,
+      } as WorkloadContainer);
+    }
+    return workload;
   }
 
   public async execInContainer(

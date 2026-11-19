@@ -1892,5 +1892,136 @@ describe('AppsService', () => {
       );
       expect(result).toEqual([]);
     });
+
+    it('reports why Kubernetes could not schedule a pod', async () => {
+      mockPipelinesService.getContext.mockResolvedValue('test-context');
+      mockKubectl.getPods.mockResolvedValue([
+        {
+          metadata: {
+            name: 'app1-kuberoapp-web-1',
+            generateName: 'app1-kuberoapp-web-',
+          },
+          status: {
+            phase: 'Pending',
+            conditions: [
+              {
+                type: 'PodScheduled',
+                status: 'False',
+                reason: 'Unschedulable',
+                message: '0/1 nodes are available: 1 Insufficient memory.',
+              },
+            ],
+          },
+          spec: { containers: [{ name: 'kuberoapp-web', image: 'img' }] },
+        },
+      ]);
+      const [pod] = await service.getPods(
+        'pipe',
+        'dev',
+        'app1',
+        mockUSerGroups,
+      );
+      expect(pod.unschedulable).toBe(
+        '0/1 nodes are available: 1 Insufficient memory.',
+      );
+    });
+  });
+
+  describe('AppsService - getAddonsStatus', () => {
+    let service: AppsService;
+    let mockKubectl: any;
+    let mockPipelinesService: any;
+
+    const addonPod = (name: string, instance: string, extra: any = {}) => ({
+      metadata: { name, labels: { 'app.kubernetes.io/instance': instance } },
+      status: {
+        phase: 'Running',
+        containerStatuses: [{ restartCount: 0, ready: true, started: true }],
+        ...extra,
+      },
+      spec: { containers: [{ name: 'postgres', image: 'postgres:17.6' }] },
+    });
+
+    beforeEach(() => {
+      mockKubectl = { getApp: jest.fn(), getPods: jest.fn() };
+      mockPipelinesService = { getContext: jest.fn() };
+      service = new AppsService(
+        mockKubectl,
+        mockPipelinesService,
+        {} as any,
+        {} as any,
+        {} as any,
+      );
+    });
+
+    it('returns nothing without access to the phase context', async () => {
+      mockPipelinesService.getContext.mockResolvedValue(undefined);
+      expect(
+        await service.getAddonsStatus('pipe', 'dev', 'app1', mockUSerGroups),
+      ).toEqual([]);
+      expect(mockKubectl.getApp).not.toHaveBeenCalled();
+      expect(mockKubectl.getPods).not.toHaveBeenCalled();
+    });
+
+    it('does not list pods when the app has no add-ons', async () => {
+      mockPipelinesService.getContext.mockResolvedValue('ctx');
+      mockKubectl.getApp.mockResolvedValue({ spec: { addons: [] } });
+      expect(
+        await service.getAddonsStatus('pipe', 'dev', 'app1', mockUSerGroups),
+      ).toEqual([]);
+      expect(mockKubectl.getPods).not.toHaveBeenCalled();
+    });
+
+    it('groups the pods of each add-on by its release label', async () => {
+      mockPipelinesService.getContext.mockResolvedValue('ctx');
+      mockKubectl.getApp.mockResolvedValue({
+        spec: {
+          addons: [
+            {
+              kind: 'KuberoAddonPostgres',
+              resourceDefinitions: {
+                KuberoAddonPostgres: { metadata: { name: 'app1-postgres' } },
+              },
+            },
+            { kind: 'KuberoAddonRedis', resourceDefinitions: {} },
+          ],
+        },
+      });
+      mockKubectl.getPods.mockResolvedValue([
+        addonPod('app1-postgres-0', 'app1-postgres', {
+          phase: 'Pending',
+          containerStatuses: [],
+          conditions: [
+            {
+              type: 'PodScheduled',
+              status: 'False',
+              message: 'pod has unbound immediate PersistentVolumeClaims',
+            },
+          ],
+        }),
+        addonPod('other-postgres-0', 'other-postgres'),
+        { metadata: { name: 'app1-kuberoapp-web-1' }, status: {}, spec: {} },
+      ]);
+      const result = await service.getAddonsStatus(
+        'pipe',
+        'dev',
+        'app1',
+        mockUSerGroups,
+      );
+      expect(mockKubectl.getApp).toHaveBeenCalledWith(
+        'pipe',
+        'dev',
+        'app1',
+        'ctx',
+      );
+      expect(mockKubectl.getPods).toHaveBeenCalledWith('pipe-dev', 'ctx');
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('app1-postgres');
+      expect(result[0].kind).toBe('KuberoAddonPostgres');
+      expect(result[0].pods.map((p) => p.name)).toEqual(['app1-postgres-0']);
+      expect(result[0].pods[0].unschedulable).toBe(
+        'pod has unbound immediate PersistentVolumeClaims',
+      );
+    });
   });
 });
