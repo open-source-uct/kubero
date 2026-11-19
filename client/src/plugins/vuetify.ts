@@ -14,6 +14,7 @@ import { useI18n } from 'vue-i18n'
 
 // Composables
 import { createVuetify } from 'vuetify'
+import { savedTheme } from '@/utils/themePreference'
 
 // https://vuetifyjs.com/en/introduction/why-vuetify/#feature-guides
 export default createVuetify({
@@ -32,6 +33,7 @@ export default createVuetify({
     },
   },
   theme: {
+    defaultTheme: savedTheme(),
     themes: {
       dark: {
         colors: {
