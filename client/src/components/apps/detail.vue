@@ -119,7 +119,16 @@
              su pestaña esté deshabilitada (Builds en apps docker) -->
         <v-window v-model="tab" class="app-detail-content" :touch="false">
             <v-window-item value="overview" :transition="false" :reverse-transition="false" class="background">
-                <Overview :pipeline="pipeline" :phase="phase" :app="app" :appData="appData" :pipelineData="pipelineData"/>
+                <Overview
+                    :pipeline="pipeline"
+                    :phase="phase"
+                    :app="app"
+                    :appData="appData"
+                    :pipelineData="pipelineData"
+                    :active="tab === 'overview'"
+                    :canSeeLogs="canSeeLogs"
+                    @navigate="tab = $event"
+                />
             </v-window-item>
             <v-window-item value="builds" :transition="false" :reverse-transition="false" class="background">
                 <Builds v-if="hasBuilds" :pipeline="pipeline" :phase="phase" :app="app" :appData="appData" :pipelineData="pipelineData"/>

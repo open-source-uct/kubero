@@ -174,6 +174,16 @@ export interface Workload {
   age: Date | undefined;
   startTime: Date | undefined;
   containers: WorkloadContainer[];
+  // por qué Kubernetes no pudo programar el pod (memoria o CPU insuficiente,
+  // volumen sin enlazar...), tal cual lo informa la condición PodScheduled
+  unschedulable?: string;
+}
+
+// pods de un addon de la app (PostgreSQL, Redis...), para su estado en el resumen
+export interface AddonStatus {
+  name: string;
+  kind: string;
+  pods: Workload[];
 }
 
 export interface WorkloadContainer {

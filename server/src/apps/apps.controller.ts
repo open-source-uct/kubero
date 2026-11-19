@@ -358,6 +358,32 @@ export class AppsController {
     return this.appsService.getPods(pipeline, phase, app, req.user.userGroups);
   }
 
+  // Solo lectura y con el mismo acceso que /pods: lo usa el mapa del resumen
+  // para mostrar si PostgreSQL y los demás addons están funcionando.
+  @Get('/:pipeline/:phase/:app/addons/status')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('app:read', 'app:write')
+  @ApiOperation({ summary: 'Get the status of the app add-on pods' })
+  @ApiForbiddenResponse({
+    description: 'Error: Unauthorized',
+    type: OKDTO,
+    isArray: false,
+  })
+  @ApiBearerAuth('bearerAuth')
+  async getAddonsStatus(
+    @Param('pipeline') pipeline: string,
+    @Param('phase') phase: string,
+    @Param('app') app: string,
+    @Request() req: any,
+  ) {
+    return this.appsService.getAddonsStatus(
+      pipeline,
+      phase,
+      app,
+      req.user.userGroups,
+    );
+  }
+
   @Post('/:pipeline/:phase/:app/console')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   // console:ok se siembra y se edita en la UI de roles pero no se comprobaba en
