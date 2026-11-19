@@ -293,13 +293,14 @@
 
 <script lang="ts" setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useDisplay, useTheme } from 'vuetify'
+import { useDisplay } from 'vuetify'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import SecondaryNavDrawer, { type SecondaryNavItem } from './SecondaryNavDrawer.vue'
+import { useThemeToggle } from '@/composables/useThemeToggle'
 
-const theme = useTheme()
+const { toggleTheme } = useThemeToggle()
 const { mdAndUp } = useDisplay()
 const { t } = useI18n()
 const route = useRoute()
@@ -516,12 +517,6 @@ onBeforeUnmount(() => {
   drawerResizeObserver?.disconnect()
 })
 
-function toggleTheme() {
-    theme.global.name.value = theme.global.current.value.dark ? 'light' : 'dark'
-    localStorage.setItem("theme", theme.global.name.value);
-}
-
-theme.global.name.value = localStorage.getItem("theme") || 'light';
 
 </script>
 
