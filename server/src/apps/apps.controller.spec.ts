@@ -136,6 +136,7 @@ describe('AppsController', () => {
     getTemplate: jest.fn(),
     restartApp: jest.fn(),
     getPods: jest.fn(),
+    getAddonsStatus: jest.fn(),
     execInContainer: jest.fn(),
   };
 
@@ -314,6 +315,33 @@ describe('AppsController', () => {
         AppsController.prototype.restartApp,
       );
       expect(required).toEqual(['reboot:ok']);
+    });
+  });
+
+  describe('getAddonsStatus', () => {
+    it('passes the user teams so the service checks access', async () => {
+      mockAppsService.getAddonsStatus.mockResolvedValue([]);
+      await controller.getAddonsStatus('pipeline', 'phase', 'app', {
+        user: mockJWT,
+      });
+      expect(mockAppsService.getAddonsStatus).toHaveBeenCalledWith(
+        'pipeline',
+        'phase',
+        'app',
+        mockUserGroups,
+      );
+    });
+
+    // misma lectura que los pods: cualquiera que pueda ver la app, nada más
+    it('requires the same permissions as the pods', () => {
+      expect(
+        Reflect.getMetadata(
+          PERMISSIONS_KEY,
+          AppsController.prototype.getAddonsStatus,
+        ),
+      ).toEqual(
+        Reflect.getMetadata(PERMISSIONS_KEY, AppsController.prototype.getPods),
+      );
     });
   });
 
