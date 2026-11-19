@@ -23,6 +23,7 @@ import router from '@/router'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notifications'
 import i18n from '@/plugins/i18n'
+import { isLoginRequest, isSessionExpiry } from '@/utils/sessionExpiry'
 
 const app = createApp(App)
 app.component('ValidationField', ValidationField)
@@ -34,16 +35,13 @@ registerPlugins(app)
 // Cuando el JWT caduca (10 h por defecto) todas las llamadas a la API pasan a
 // responder 401. Solo se manejaba en la carga inicial de la página; con la
 // pantalla ya abierta las pestañas se quedaban en blanco sin ningún aviso hasta
-// recargar. Ahora cualquier 401 lleva al login.
+// recargar. Ahora un 401 con la sesión abierta lleva al login con el aviso; sin
+// sesión (primera visita) no hay nada que haya expirado y el router ya redirige.
 const mutationMethods = new Set(['post', 'put', 'patch', 'delete'])
 let sessionRedirectInProgress = false
 
 function isMutation(method?: string) {
   return mutationMethods.has(method?.toLowerCase() ?? '')
-}
-
-function isLoginRequest(url = '') {
-  return url.includes('/api/auth/login')
 }
 
 function successFeedback(method = '') {
@@ -86,14 +84,18 @@ axios.interceptors.response.use(
   (error) => {
     const url: string = error?.config?.url ?? ''
     const method: string = error?.config?.method ?? ''
+    const authStore = useAuthStore()
     if (
-      error?.response?.status === 401 &&
-      !isLoginRequest(url) &&
-      !sessionRedirectInProgress &&
-      router.currentRoute.value.name !== 'Login'
+      isSessionExpiry({
+        status: error?.response?.status,
+        url,
+        hadSession: Boolean(authStore.userId),
+        routeName: router.currentRoute.value.name,
+        redirectInProgress: sessionRedirectInProgress,
+      })
     ) {
       sessionRedirectInProgress = true
-      useAuthStore().reset()
+      authStore.reset()
       useNotificationStore().error(
         i18n.global.t('feedback.sessionExpired.title'),
         i18n.global.t('feedback.sessionExpired.message'),
