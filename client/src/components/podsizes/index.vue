@@ -91,7 +91,7 @@
                 <v-col cols="12" md="6">
                   <v-list density="compact" class="uct-detail-list">
                     <v-list-item>
-                      <v-list-item-title class="font-weight-bold">Requests</v-list-item-title>
+                      <v-list-item-title class="font-weight-bold">{{ $t('podsizes.form.requests') }}</v-list-item-title>
                     </v-list-item>
                     <v-list-item>
                       <v-list-item-subtitle>{{ $t('podsizes.form.cpu') }}</v-list-item-subtitle>
@@ -106,7 +106,7 @@
                 <v-col cols="12" md="6">
                   <v-list density="compact" class="uct-detail-list">
                     <v-list-item>
-                      <v-list-item-title class="font-weight-bold">Limits</v-list-item-title>
+                      <v-list-item-title class="font-weight-bold">{{ $t('podsizes.form.limits') }}</v-list-item-title>
                     </v-list-item>
                     <v-list-item>
                       <v-list-item-subtitle>{{ $t('podsizes.form.cpu') }}</v-list-item-subtitle>

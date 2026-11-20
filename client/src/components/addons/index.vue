@@ -33,7 +33,7 @@
                             <v-badge
                                 v-if="addon.deprecated"
                                 color="red"
-                                content="deprecated"
+                                :content="$t('addonsCatalog.deprecated')"
                                 >
                             </v-badge>
                         </div>
@@ -60,7 +60,7 @@
                     elevation="0"
                     @click="openInstallDialog(addon)"
                     >
-                    Installation
+                    {{ $t('addonsCatalog.installation') }}
                 </v-btn>
                 </div>
             </v-col>
@@ -78,19 +78,19 @@
                         <v-container>
                         {{clickedAddon.description}}
                         <br/>
-                        <h3 class="mt-3">Maintainers</h3>
+                        <h3 class="mt-3">{{ $t('addonsCatalog.maintainers') }}</h3>
                         <ul>
                             <li v-for="maintainer in clickedAddon.maintainers" :key="maintainer.name">{{ maintainer.name }} <a :href="maintainer.url">{{ maintainer.url }}</a></li>
                         </ul>
                         <br/>
-                        <h3 class="mt-3">Links</h3>
+                        <h3 class="mt-3">{{ $t('addonsCatalog.links') }}</h3>
                         <ul>
                             <li v-for="link in clickedAddon.links" :key="link.url"><a :href="link.url">{{ link.name }}</a></li>
                         </ul>
                         </v-container>
                     </v-card-text>
                     <v-card-text>
-                        <pre >{{clickedAddon.install}}</pre>
+                        <pre class="addon-install">{{clickedAddon.install}}</pre>
                         <v-btn
                             color="primary"
                             @click="copyInstall(clickedAddon.install)"
@@ -185,21 +185,23 @@ export default defineComponent({
 })
 </script>
 
-<style lang="scss">
-pre {
-    background: #f4f4f4;
-    border: 1px solid #ddd;
-    border-left: 3px solid #f36d33;
-    color: #666;
-    page-break-inside: avoid;
-    font-family: monospace;
-    font-size: 15px;
-    line-height: 1.6;
-    margin-bottom: 1.6em;
-    max-width: 100%;
-    overflow: auto;
-    padding: 1em 1.5em;
+<style lang="scss" scoped>
+/* instrucciones de instalación: mismo bloque de terminal que registros y consola,
+   legible en los dos temas (antes era gris claro fijo con el borde naranjo de Kubero) */
+.addon-install {
     display: block;
-    word-wrap: break-word;
+    max-width: 100%;
+    margin: 0 0 16px;
+    padding: 14px 18px;
+    overflow: auto;
+    border: 1px solid var(--uct-corp-gray-border);
+    border-radius: 8px;
+    background: var(--uct-corp-dark-nav);
+    color: #E2E8F0;
+    font-family: var(--uct-font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 </style>

@@ -15,15 +15,15 @@
                         <v-timeline-item
                             v-for="event in auditEvents" :key="event.id"
                             :color=event.color
-                            :icon=getIcon(event.action)
+                            :icon=getIcon(normalizeAction(event.action))
                             dot-color="var(--v-primary-base)"
                             fill-dot>
                             <div class="app-audit__event">
                                 <!--<strong class="me-4">{{ event.metadata.creationTimestamp }}</strong>-->
                                 <div>
-                                    <strong>{{ event.users.username }}: </strong> {{ event.action }} {{ event.resource }}
+                                    <strong>{{ event.users.username }}: </strong> <span :title="event.message">{{ describe(event) }}</span>
                                     <div class="text-caption">
-                                        {{ event.timestamp }} · v{{ event.id }} · {{ event.message }}
+                                        {{ event.timestamp }} · v{{ event.id }} · {{ actionLabel(event.action) }} · {{ resourceLabel(event.resource) }}
                                     </div>
                                 </div>
                             </div>
@@ -50,6 +50,7 @@
 <script lang="ts">
 import axios from "axios";
 import { defineComponent } from 'vue'
+import { auditDescription, normalizeAction } from '../../utils/auditText'
 
 type AuditEvent = {
     id: string,
@@ -104,6 +105,19 @@ export default defineComponent({
         
     },
     methods: {
+        normalizeAction,
+        // acción, recurso y detalle en el idioma de la interfaz; lo desconocido, tal cual
+        actionLabel(action: string): string {
+            const key = `activity.actions.${normalizeAction(action)}`
+            return this.$te(key) ? this.$t(key) : action
+        },
+        resourceLabel(resource: string): string {
+            return resource && this.$te(`activity.resources.${resource}`) ? this.$t(`activity.resources.${resource}`) : resource
+        },
+        describe(event: { action: string, resource: string, message: string, pipeline?: string, app?: string }): string {
+            const description = auditDescription(event)
+            return description && this.$te(description.key) ? this.$t(description.key, description.params) : event.message
+        },
         getIcon(action: string) {
             if (action === "create") return "mdi-creation";
             if (action === "update") return "mdi-pencil";

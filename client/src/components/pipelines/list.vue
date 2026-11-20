@@ -110,18 +110,21 @@
                 <span v-else class="muted-value">{{ $t('pipeline.list.adminOnly') }}</span>
               </td>
               <td>
-                <div class="chip-list phases-list">
+                <!-- la columna es "Fases activas": las inactivas no se muestran, antes
+                     resaltaban más que las activas con su borde marcado -->
+                <div v-if="activePhases(pipeline).length" class="chip-list phases-list">
                   <v-chip
-                    v-for="phase in visiblePhases(pipeline)"
+                    v-for="phase in activePhases(pipeline)"
                     :key="phase.name"
-                    :color="phase.enabled ? 'success' : undefined"
-                    :variant="phase.enabled ? 'tonal' : 'outlined'"
+                    color="success"
+                    variant="tonal"
                     size="x-small"
                     label
                   >
                     {{ $t(`pipeline.phases.${phase.name}`) }}
                   </v-chip>
                 </div>
+                <span v-else class="muted-value">—</span>
               </td>
               <td class="actions-cell">
                 <v-tooltip :text="$t('pipeline.list.open')" location="top">
@@ -266,6 +269,10 @@ watch(pageCount, (count) => { if (page.value > count) page.value = count })
 // la tenga activa, para no esconder lo que sí corre ahí.
 function visiblePhases(pipeline: Pipeline) {
   return (pipeline.phases ?? []).filter((phase) => phase.name !== 'review' || phase.enabled)
+}
+
+function activePhases(pipeline: Pipeline) {
+  return visiblePhases(pipeline).filter((phase) => phase.enabled)
 }
 
 function resetFilters() {

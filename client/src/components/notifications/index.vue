@@ -96,7 +96,7 @@
             :key="event"
             size="x-small"
           >
-            {{ event }}
+            {{ eventLabel(event) }}
           </v-chip>
         </v-chip-group>
       </template>
@@ -164,7 +164,7 @@
                           :key="event"
                           size="small"
                         >
-                          {{ event }}
+                          {{ eventLabel(event) }}
                         </v-chip>
                       </v-chip-group>
                     </v-list-item>
@@ -255,6 +255,10 @@
               <v-col cols="12" md="6">
                 <v-combobox
                   v-model="editedNotification.events"
+                  :items="eventItems"
+                  item-title="title"
+                  item-value="value"
+                  :return-object="false"
                   :label="$t('notifications.form.events')"
                   multiple
                   chips
@@ -358,7 +362,10 @@
               <v-col cols="12" md="6">
                 <v-combobox
                   v-model="newNotification.events"
-                  :items="availableEvents"
+                  :items="eventItems"
+                  item-title="title"
+                  item-value="value"
+                  :return-object="false"
                   :label="$t('notifications.form.events')"
                   multiple
                   chips
@@ -381,7 +388,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch } from 'vue'
+import { computed, defineComponent, ref, onMounted, watch } from 'vue'
 import { notificationFields } from '../../validation/settings'
 import { createFormValidation } from '../../composables/useFormValidation'
 import axios from 'axios'
@@ -392,7 +399,7 @@ import { confirmDestructiveAction } from '../../utils/destructiveConfirmation'
 export default defineComponent({
   name: 'NotificationsList',
   setup() {
-    const { t } = useI18n() 
+    const { t, te } = useI18n()
     type NotificationConfig = {
       url?: string
       secret?: string
@@ -438,6 +445,10 @@ export default defineComponent({
                 'updateSettings',
                 'handleWebhookPush',
             ]
+
+    // los eventos se guardan con su nombre interno (newApp); se muestran traducidos
+    const eventLabel = (event: string) => te(`notifications.eventNames.${event}`) ? t(`notifications.eventNames.${event}`) : event
+    const eventItems = computed(() => availableEvents.map((value) => ({ title: eventLabel(value), value })))
 
     const notificationTypes = [
       { title: 'Slack', value: 'slack' },
@@ -600,6 +611,8 @@ export default defineComponent({
       saveCreate,
       availablePipelines,
       availableEvents,
+      eventItems,
+      eventLabel,
     }
   },
 })
