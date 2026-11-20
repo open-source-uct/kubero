@@ -278,12 +278,14 @@ export default defineComponent({
     data () {return {
         breadcrumbItems: [
             {
-                title: 'Dashboard.Pipelines',
+                label: 'breadcrumbs.dashboard',
+                textKey: 'navigation.pipelines',
                 disabled: false,
                 to: { name: 'Pipelines', params: {}}
             },
             {
-                title: 'Pipeline.'+this.pipeline,
+                label: 'breadcrumbs.pipeline',
+                text: this.pipeline,
                 disabled: true,
                 to: { name: 'Pipeline Apps', params: { pipeline: this.pipeline }}
             }

@@ -78,7 +78,7 @@
                 <div class="phase-row__controls">
                   <v-switch
                     v-model="phase.enabled"
-                    :label="phase.name"
+                    :label="$t(`pipeline.phases.${phase.name}`)"
                     :disabled="phase.name == 'review'"
                     class="phase-switch"
                     color="primary"
@@ -112,16 +112,16 @@
                     <v-col cols="12" md="6">
                       <ValidationField as="v-text-field" :validation="validation.field('domain-' + phase.name)"
                         v-model="phase.domain"
-                        label="Base domain"
+                        :label="$t('pipeline.form.label.baseDomain')"
                         density="compact"
-                        hint="This Wildcard Domain should point to the IP of your cluster defined in 'Cluster Context'. It will be used to create a subdomain for each PR."
+                        :hint="$t('pipeline.form.label.baseDomainHint')"
                         variant="outlined"
                       ></ValidationField>
                     </v-col>
                   </v-row>
 
                   <div class="env-header">
-                    <div class="uct-label env-header__title">Default Environment Variables</div>
+                    <div class="uct-label env-header__title">{{ $t('pipeline.form.label.defaultEnvVars') }}</div>
                     <v-btn
                       variant="text"
                       size="small"
@@ -165,7 +165,7 @@
                           size="small"
                           variant="tonal"
                           color="error"
-                          aria-label="Remove environment variable"
+                          :aria-label="$t('app.form.removeEnvVar')"
                           @click="removeEnvLine(phase, envvar.name)"
                         ></v-btn>
                       </v-col>
@@ -178,7 +178,7 @@
                     size="small"
                     variant="tonal"
                     color="primary"
-                    aria-label="Add environment variable"
+                    :aria-label="$t('app.form.addEnvVar')"
                     @click="addEnvLine(phase)"
                   ></v-btn>
                 </div>
@@ -250,7 +250,8 @@ export default defineComponent({
       showEnvValues: false,
       breadcrumbItems: [
           {
-              title: 'Dashboard.Pipelines',
+              label: 'breadcrumbs.dashboard',
+              textKey: 'navigation.pipelines',
               disabled: false,
               to: { name: 'Pipelines', params: {}}
           },
