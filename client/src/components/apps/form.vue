@@ -452,7 +452,7 @@
           <v-expansion-panel-title
             class="text-uppercase text-caption-2 font-weight-medium"
             color="secondary"
-            >Cors</v-expansion-panel-title
+            >CORS</v-expansion-panel-title
           >
           <v-expansion-panel-text color="secondary">
             <v-row>
@@ -1286,23 +1286,26 @@ export default defineComponent({
       loading: false,
       breadcrumbItems: [
         {
-          title: "dashboard.pipelines",
+          label: "breadcrumbs.dashboard",
+          textKey: "navigation.pipelines",
           disabled: false,
           to: { name: "Pipelines", params: {} },
         },
         {
-          title: "Pipeline." + this.pipeline,
+          label: "breadcrumbs.pipeline",
           text: this.pipeline,
           disabled: false,
           to: { name: "Pipeline Apps", params: { pipeline: this.pipeline } },
         },
         {
-          title: "Phase." + this.phase,
+          label: "breadcrumbs.phase",
+          textKey: `pipeline.phases.${this.phase}`,
           disabled: false,
           to: this.getAppBreadcrumbLink(),
         },
         {
-          title: "App." + this.app,
+          label: "breadcrumbs.app",
+          text: this.app,
           disabled: false,
           to: this.getAppBreadcrumbLink(),
         },

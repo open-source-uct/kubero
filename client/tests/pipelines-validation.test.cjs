@@ -13,3 +13,10 @@ test('pipelines require enabled-phase contexts, valid namespaces and role-approp
   assert.equal(valid({ ...model(), phases: [{ ...model().phases[0], context: '' }] }), false)
   assert.equal(valid({ ...model(), phases: [{ ...model().phases[0], enabled: false, context: '' }] }), true)
 })
+
+test('phase fields are labelled with the translated phase name, not the internal one', () => {
+  const t = key => ({ 'pipeline.phases.production': 'Producción', 'pipeline.form.label.cluster': 'Clúster' })[key] || key
+  const fields = pipelineFields({ name: 'web', creating: true, domain: '', teams: ['curso'], admin: true, supervised: false, contexts: ['c'],
+    phases: [{ name: 'production', enabled: true, context: 'c', domain: '', defaultEnvvars: [] }] }, t)
+  assert.equal(fields.find(field => field.id === 'context-production').label, 'Producción: Clúster')
+})

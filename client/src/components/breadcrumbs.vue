@@ -9,7 +9,7 @@
           :to="item.to"
           :disabled="item.disabled"
       >
-        <div class="breadcrumTitle">{{ item.title.split('.')[0] }}</div><div class="breadcrumText">{{ item.title.split('.')[1] }}</div>
+        <div class="breadcrumTitle">{{ itemLabel(item) }}</div><div class="breadcrumText">{{ itemText(item) }}</div>
       </v-breadcrumbs-item>
       </template>
   </v-breadcrumbs>
@@ -19,11 +19,23 @@
 <script lang="ts">
 import { defineComponent } from 'vue'
 
+// Cada miga trae su etiqueta como clave de traducción (label) y su valor ya
+// listo (text) o como clave (textKey, p. ej. el nombre de la fase). Se mantiene
+// el formato antiguo "Etiqueta.valor" en title para lo que todavía lo use.
 export default defineComponent({
     props: {
       items: {
         type: Array<any>, // can't extract type from v-breadcrumbs-item
         default: () => ([]),
+      },
+    },
+    methods: {
+      itemLabel(item: any): string {
+        return item.label ? this.$t(item.label) : String(item.title ?? '').split('.')[0]
+      },
+      itemText(item: any): string {
+        if (item.textKey) return this.$t(item.textKey)
+        return item.text ?? String(item.title ?? '').split('.')[1] ?? ''
       },
     },
 })

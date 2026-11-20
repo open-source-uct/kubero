@@ -160,7 +160,7 @@
               <td>
                 <div class="phase-list">
                   <v-chip v-for="phase in pipeline.phases" :key="phase.name" :color="phase.enabled ? 'success' : undefined" variant="tonal" size="x-small" label>
-                    {{ phase.name }} · {{ phase.appCount }}
+                    {{ $t(`pipeline.phases.${phase.name}`) }} · {{ phase.appCount }}
                   </v-chip>
                 </div>
               </td>
@@ -364,7 +364,7 @@ const appsByPipelineData = computed<ChartData<'bar'>>(() => ({
 
 const appsByPhaseData = computed<ChartData<'doughnut'>>(() => {
   const colors = [theme.current.value.colors.primary, theme.current.value.colors.success, theme.current.value.colors.accent, theme.current.value.colors.info, theme.current.value.colors.warning]
-  return { labels: phaseTotals.value.map(([phase]) => phase), datasets: [{ data: phaseTotals.value.map(([, count]) => count), backgroundColor: phaseTotals.value.map((_, index) => withAlpha(colors[index % colors.length], .88)), borderColor: theme.current.value.colors.cardBackground, borderWidth: 3, hoverOffset: 4 }] }
+  return { labels: phaseTotals.value.map(([phase]) => t(`pipeline.phases.${phase}`)), datasets: [{ data: phaseTotals.value.map(([, count]) => count), backgroundColor: phaseTotals.value.map((_, index) => withAlpha(colors[index % colors.length], .88)), borderColor: theme.current.value.colors.cardBackground, borderWidth: 3, hoverOffset: 4 }] }
 })
 
 const chartTextColor = computed(() => theme.current.value.colors['on-cardBackground'])

@@ -20,10 +20,12 @@
                         </v-chip>
                         <v-chip color="primary" size="small" variant="tonal" label>
                             <v-icon start icon="mdi-layers-outline"></v-icon>
-                            {{ phase }}
+                            {{ $t(`pipeline.phases.${phase}`) }}
                         </v-chip>
-                        <v-chip size="small" variant="outlined" label>
-                            {{ appData.spec.deploymentstrategy }}
+                        <!-- mismo estilo que las otras dos: con borde blanco resaltaba más que ellas -->
+                        <v-chip color="primary" size="small" variant="tonal" label>
+                            <v-icon start :icon="appData.spec.deploymentstrategy === 'git' ? 'mdi-git' : 'mdi-docker'"></v-icon>
+                            {{ appData.spec.deploymentstrategy === 'git' ? 'Git' : 'Docker' }}
                         </v-chip>
                     </div>
                 </div>
@@ -179,22 +181,26 @@ export default defineComponent({
             tab: 'overview',
             breadcrumbItems: [
                 {
-                    title: 'Dashboard.Pipelines',
+                    label: 'breadcrumbs.dashboard',
+                    textKey: 'navigation.pipelines',
                     disabled: false,
                     to: { name: 'Pipelines', params: {}}
                 },
                 {
-                    title: 'Pipeline.'+this.pipeline,
+                    label: 'breadcrumbs.pipeline',
+                    text: this.pipeline,
                     disabled: false,
                     to: { name: 'Pipeline Apps', params: { pipeline: this.pipeline }}
                 },
                 {
-                    title: 'Phase.'+this.phase,
+                    label: 'breadcrumbs.phase',
+                    textKey: `pipeline.phases.${this.phase}`,
                     disabled: true,
                     href: `/pipeline/${this.pipeline}/${this.phase}/${this.app}/detail`,
                 },
                 {
-                    title: 'App.'+this.app,
+                    label: 'breadcrumbs.app',
+                    text: this.app,
                     disabled: true,
                     href: `/pipeline/${this.pipeline}/${this.phase}/${this.app}/detail`,
                 }

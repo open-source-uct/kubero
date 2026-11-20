@@ -23,7 +23,7 @@
           clearable hide-details="auto"
           @update:search="pipelineSearch = $event"
         />
-        <v-combobox v-model="filters.action" :items="actions" :label="$t('activity.action')" variant="outlined" density="compact" clearable hide-details />
+        <v-combobox v-model="filters.action" :items="actionItems" item-title="title" item-value="value" :return-object="false" :label="$t('activity.action')" variant="outlined" density="compact" clearable hide-details />
         <v-combobox
           v-model="filters.username"
           :items="usernameSuggestions.items"
@@ -72,9 +72,9 @@
           <tr v-for="event in loading ? [] : auditEvents" :key="event.id">
             <td><time :datetime="event.timestamp">{{ formatDate(event.timestamp) }}</time></td>
             <td>{{ event.users?.username || $t('activity.system') }}</td>
-            <td><div class="activity-identity"><v-icon :icon="event.pipeline ? 'mdi-source-branch' : 'mdi-cog-outline'" color="primary" size="21" aria-hidden="true" /><div><strong>{{ event.pipeline || $t('activity.system') }}</strong><div class="text-caption">{{ [event.phase, event.app].filter(Boolean).join(' / ') }}</div></div></div></td>
-            <td><v-chip size="small" variant="tonal" label :color="event.action === 'delete' ? 'error' : 'primary'">{{ event.action }}</v-chip><div class="text-caption">{{ event.resource }}</div></td>
-            <td>{{ event.message }}</td>
+            <td><div class="activity-identity"><v-icon :icon="event.pipeline ? 'mdi-source-branch' : 'mdi-cog-outline'" color="primary" size="21" aria-hidden="true" /><div><strong>{{ event.pipeline || $t('activity.system') }}</strong><div class="text-caption">{{ [event.phase && phaseLabel(event.phase), event.app].filter(Boolean).join(' / ') }}</div></div></div></td>
+            <td><v-chip size="small" variant="tonal" label :color="normalizeAction(event.action) === 'delete' ? 'error' : 'primary'">{{ actionLabel(event.action) }}</v-chip><div class="text-caption">{{ resourceLabel(event.resource) }}</div></td>
+            <td :title="event.message">{{ describe(event) }}</td>
           </tr>
         </tbody>
       </v-table>
@@ -97,6 +97,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDisplay } from 'vuetify'
 import { useAuditSuggestions } from '../../composables/useAuditSuggestions'
+import { auditDescription, normalizeAction } from '../../utils/auditText'
 
 type AuditEvent = {
   id: number
@@ -109,7 +110,7 @@ type AuditEvent = {
   message: string
   users?: { username: string }
 }
-const { t, locale } = useI18n()
+const { t, te, locale } = useI18n()
 const { smAndDown } = useDisplay()
 const emptyFilters = () => ({ pipeline: '', action: '', username: '', from: '', to: '' })
 const filters = reactive(emptyFilters())
@@ -121,6 +122,23 @@ const usernameSearch = ref('')
 const pipelineSuggestions = useAuditSuggestions('pipeline', () => pipelineSearch.value)
 const usernameSuggestions = useAuditSuggestions('username', () => usernameSearch.value, () => filters.pipeline)
 const actions = ['create', 'update', 'delete', 'start', 'stop', 'restart', 'scale', 'rollback', 'promote', 'demote', 'approve', 'reject', 'pause', 'resume', 'deploy', 'undeploy', 'release']
+// el filtro muestra la acción traducida y sigue enviando la palabra interna
+const actionItems = computed(() => actions.map(value => ({ title: actionLabel(value), value })))
+// acción, recurso y detalle en el idioma de la interfaz; lo desconocido, tal cual
+function actionLabel(action: string) {
+  const key = `activity.actions.${normalizeAction(action)}`
+  return te(key) ? t(key) : action
+}
+function phaseLabel(phase: string) {
+  return te(`pipeline.phases.${phase}`) ? t(`pipeline.phases.${phase}`) : phase
+}
+function resourceLabel(resource: string) {
+  return resource && te(`activity.resources.${resource}`) ? t(`activity.resources.${resource}`) : resource
+}
+function describe(event: AuditEvent) {
+  const description = auditDescription(event)
+  return description && te(description.key) ? t(description.key, description.params) : event.message
+}
 const auditEvents = ref<AuditEvent[]>([])
 const loading = ref(false)
 const enabled = ref(true)

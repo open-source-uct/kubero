@@ -9,11 +9,12 @@ export function runpackFields(model: RunpackInput | null, t: (key: string) => st
     { id: 'language', label: t('runpacks.form.language'), value: model?.language, rules: [rules.required] },
     ...(['fetch', 'build', 'run'] as const).flatMap(name => {
       const stage = model?.[name]
+      const stageLabel = t('runpacks.table.' + name)
       return [
-        { id: name + '-repository', label: name + ': ' + t('runpacks.details.repository'), value: stage?.repository, rules: [rules.required, rules.image] },
-        { id: name + '-tag', label: name + ': ' + t('runpacks.form.tag'), value: stage?.tag, rules: [rules.required, rules.tag] },
-        { id: name + '-uid', label: name + ': ' + t('runpacks.form.runAsUser'), value: stage?.securityContext?.runAsUser, rules: [rules.required, rules.integer(0, 4294967295), check('nonRoot', value => !stage?.securityContext?.runAsNonRoot || Number(value) > 0)] },
-        { id: name + '-gid', label: name + ': ' + t('runpacks.form.runAsGroup'), value: stage?.securityContext?.runAsGroup, rules: [rules.required, rules.integer(0, 4294967295)] },
+        { id: name + '-repository', label: stageLabel + ': ' + t('runpacks.details.repository'), value: stage?.repository, rules: [rules.required, rules.image] },
+        { id: name + '-tag', label: stageLabel + ': ' + t('runpacks.form.tag'), value: stage?.tag, rules: [rules.required, rules.tag] },
+        { id: name + '-uid', label: stageLabel + ': ' + t('runpacks.form.runAsUser'), value: stage?.securityContext?.runAsUser, rules: [rules.required, rules.integer(0, 4294967295), check('nonRoot', value => !stage?.securityContext?.runAsNonRoot || Number(value) > 0)] },
+        { id: name + '-gid', label: stageLabel + ': ' + t('runpacks.form.runAsGroup'), value: stage?.securityContext?.runAsGroup, rules: [rules.required, rules.integer(0, 4294967295)] },
       ]
     }),
   ]
