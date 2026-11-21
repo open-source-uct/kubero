@@ -18,6 +18,7 @@ const messages = {
     date: 'Date',
     details: 'Details',
     system: 'System',
+    deletedUser: 'Deleted user',
     pageSize: 'Rows per page',
     pages: 'Activity pages',
     range: '{start}–{end} of {count}',
