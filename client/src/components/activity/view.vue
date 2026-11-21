@@ -71,7 +71,7 @@
           </td></tr>
           <tr v-for="event in loading ? [] : auditEvents" :key="event.id">
             <td><time :datetime="event.timestamp">{{ formatDate(event.timestamp) }}</time></td>
-            <td>{{ event.users?.username || $t('activity.system') }}</td>
+            <td>{{ event.users?.username || $t('activity.deletedUser') }}</td>
             <td><div class="activity-identity"><v-icon :icon="event.pipeline ? 'mdi-source-branch' : 'mdi-cog-outline'" color="primary" size="21" aria-hidden="true" /><div><strong>{{ event.pipeline || $t('activity.system') }}</strong><div class="text-caption">{{ [event.phase && phaseLabel(event.phase), event.app].filter(Boolean).join(' / ') }}</div></div></div></td>
             <td><v-chip size="small" variant="tonal" label :color="normalizeAction(event.action) === 'delete' ? 'error' : 'primary'">{{ actionLabel(event.action) }}</v-chip><div class="text-caption">{{ resourceLabel(event.resource) }}</div></td>
             <td :title="event.message">{{ describe(event) }}</td>
@@ -108,7 +108,7 @@ type AuditEvent = {
   action: string
   resource: string
   message: string
-  users?: { username: string }
+  users?: { username: string } | null
 }
 const { t, te, locale } = useI18n()
 const { smAndDown } = useDisplay()

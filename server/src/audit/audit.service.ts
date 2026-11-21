@@ -166,7 +166,8 @@ export class AuditService {
       orderBy: { users: { username: 'asc' } },
       take: 20,
     });
-    return rows.map((row) => row.users.username);
+    // los registros de usuarios eliminados quedan sin autor
+    return rows.flatMap((row) => (row.users ? [row.users.username] : []));
   }
 
   public async getFiltered(

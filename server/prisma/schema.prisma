@@ -30,8 +30,10 @@ model Audit {
   resource  ResourceType @default(unknown)
   message   String
 
-  user  String
-  users User   @relation(fields: [user], references: [id])
+  // al eliminar un usuario el registro se conserva sin autor (null): el
+  // historial sigue disponible y la cuenta se puede borrar
+  user  String?
+  users User?   @relation(fields: [user], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -151,7 +153,9 @@ model Token {
   id          String    @id @default(cuid())
   name        String?
   userId      String
-  user        User      @relation(fields: [userId], references: [id])
+  // los tokens de despliegue se eliminan con su usuario: ninguno queda vivo
+  // apuntando a una cuenta que ya no existe
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt   DateTime
   isActive    Boolean   @default(true)
   lastUsed    DateTime?

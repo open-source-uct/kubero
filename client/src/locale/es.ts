@@ -18,6 +18,7 @@ const messages = {
     date: 'Fecha',
     details: 'Detalles',
     system: 'Sistema',
+    deletedUser: 'Usuario eliminado',
     pageSize: 'Filas por página',
     pages: 'Páginas de actividad',
     range: '{start}–{end} de {count}',

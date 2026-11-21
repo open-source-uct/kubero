@@ -1223,11 +1223,26 @@ describe('UsersService', () => {
   });
 
   describe('delete error handling', () => {
-    it('should handle deletion errors gracefully', async () => {
-      prismaMock.user.delete.mockRejectedValueOnce(new Error('User not found'));
+    // antes cualquier error se tragaba y la API respondía como si la cuenta se
+    // hubiera eliminado
+    it('reports a missing user as not found', async () => {
+      prismaMock.user.delete.mockRejectedValueOnce({ code: 'P2025' });
+      await expect(service.delete('nonexistent')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
 
-      // Should not throw, but handle gracefully
-      await expect(service.delete('nonexistent')).resolves.toBeUndefined();
+    it('reports related records that block the deletion as a conflict', async () => {
+      prismaMock.user.delete.mockRejectedValueOnce({ code: 'P2003' });
+      await expect(service.delete('u1')).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('does not hide unexpected errors', async () => {
+      const failure = new Error('database is locked');
+      prismaMock.user.delete.mockRejectedValueOnce(failure);
+      await expect(service.delete('u1')).rejects.toBe(failure);
     });
   });
 

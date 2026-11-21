@@ -1126,8 +1126,23 @@ export class UsersService {
         }),
         this.prisma.user.delete({ where: { id: userId } }),
       ]);
-    } catch {
-      this.logger.warn(`User with ID ${userId} not found for deletion.`);
+    } catch (error: any) {
+      // antes cualquier error se registraba como "no encontrado" y la API
+      // respondía como si la cuenta se hubiera eliminado
+      if (error?.code === 'P2003') {
+        this.logger.warn(
+          `User ${userId} could not be deleted: related records remain.`,
+        );
+        throw new ConflictException(
+          'La cuenta tiene registros asociados que impiden eliminarla',
+        );
+      }
+      if (error?.code !== 'P2025') {
+        this.logger.error(
+          `User ${userId} could not be deleted: ${error?.message ?? error}`,
+        );
+      }
+      this.throwWriteError(error);
     }
   }
 

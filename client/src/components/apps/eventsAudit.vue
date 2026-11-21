@@ -21,7 +21,7 @@
                             <div class="app-audit__event">
                                 <!--<strong class="me-4">{{ event.metadata.creationTimestamp }}</strong>-->
                                 <div>
-                                    <strong>{{ event.users.username }}: </strong> <span :title="event.message">{{ describe(event) }}</span>
+                                    <strong>{{ event.users?.username || $t('activity.deletedUser') }}: </strong> <span :title="event.message">{{ describe(event) }}</span>
                                     <div class="text-caption">
                                         {{ event.timestamp }} · v{{ event.id }} · {{ actionLabel(event.action) }} · {{ resourceLabel(event.resource) }}
                                     </div>
@@ -55,7 +55,8 @@ import { auditDescription, normalizeAction } from '../../utils/auditText'
 type AuditEvent = {
     id: string,
     timestamp: string,
-    user: string,
+    // null y sin users: el registro pertenece a un usuario eliminado
+    user: string | null,
     action: string,
     namespace: string,
     phase: string,
@@ -72,7 +73,7 @@ type AuditEvent = {
         email?: string,
         firstName?: string,
         lastName?: string,
-    },
+    } | null,
 }
 
 
