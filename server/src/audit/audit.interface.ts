@@ -1,5 +1,7 @@
 export interface AuditEntry {
-  user: string;
+  // null en los registros de un usuario eliminado; al registrar, null o ''
+  // se asignan al usuario de sistema
+  user: string | null;
   severity: 'normal' | 'info' | 'warning' | 'critical' | 'error' | 'unknown';
   action: string;
   resource:
