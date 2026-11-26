@@ -5,7 +5,12 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { AppsService, addonsByName, podSizeResources } from './apps.service';
+import {
+  AppsService,
+  addonsByName,
+  podSizeResources,
+  stringifyAnnotations,
+} from './apps.service';
 import { PipelinesService } from '../pipelines/pipelines.service';
 import { KubernetesService } from '../kubernetes/kubernetes.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -283,6 +288,76 @@ describe('AppsService', () => {
       expect(Object.keys(app.ingress.annotations)).toContain(
         'cert-manager.io/cluster-issuer',
       );
+    });
+  });
+
+  // El interruptor "Forzar redirección SSL" mandaba `true` sin comillas y el
+  // operador no podía instalar la app (no se creaba ningún pod).
+  describe('anotaciones como texto', () => {
+    const SSL = 'nginx.ingress.kubernetes.io/force-ssl-redirect';
+    beforeEach(() => {
+      process.env.KUBERO_READONLY = 'false';
+      (pipelinesService.getContext as jest.Mock).mockResolvedValue('ctx');
+      (kubectl.ensureSharedTlsSecret as jest.Mock).mockResolvedValue(null);
+    });
+
+    it('convierte booleanos y números a texto y deja igual lo que ya es texto', () => {
+      expect(
+        stringifyAnnotations(
+          { [SSL]: true, other: false, size: 4, buffer: '8k', gone: null },
+          'ingress',
+        ),
+      ).toEqual({ [SSL]: 'true', other: 'false', size: '4', buffer: '8k' });
+      expect(stringifyAnnotations(undefined, 'ingress')).toBeUndefined();
+    });
+
+    it('rechaza valores que no tienen una forma de texto obvia', () => {
+      expect(() =>
+        stringifyAnnotations({ [SSL]: { a: 1 } }, 'ingress'),
+      ).toThrow(BadRequestException);
+      expect(() => stringifyAnnotations(['x'], 'ingress')).toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('al crear la app manda la anotación del ingress como texto', async () => {
+      const app = new App(mockApp);
+      app.ingress.annotations = { [SSL]: true } as any;
+      app.serviceAccount.annotations = { 'eks.amazonaws.com/x': 1 } as any;
+
+      await service.createApp(app, { username: 'u' } as any, mockUSerGroups);
+
+      expect(kubectl.createApp).toHaveBeenCalled();
+      expect(app.ingress.annotations).toEqual({ [SSL]: 'true' });
+      expect(app.serviceAccount.annotations).toEqual({
+        'eks.amazonaws.com/x': '1',
+      });
+    });
+
+    it('una app guardada con el booleano se corrige con solo volver a guardarla', async () => {
+      (kubectl.getApp as jest.Mock).mockResolvedValue({
+        metadata: {},
+        spec: { addons: [] },
+      });
+      const app = new App({ ...mockApp, addons: [] } as any);
+      app.ingress.annotations = { [SSL]: true } as any;
+
+      await service.updateApp(
+        app,
+        'rv',
+        { username: 'u' } as any,
+        mockUSerGroups,
+      );
+
+      expect(kubectl.updateApp).toHaveBeenCalled();
+      expect(app.ingress.annotations).toEqual({ [SSL]: 'true' });
+    });
+
+    it('no cambia una app que ya tiene sus anotaciones como texto', async () => {
+      const app = new App(mockApp);
+      app.ingress.annotations = { [SSL]: 'false' };
+      await service.createApp(app, { username: 'u' } as any, mockUSerGroups);
+      expect(app.ingress.annotations).toEqual({ [SSL]: 'false' });
     });
   });
 
