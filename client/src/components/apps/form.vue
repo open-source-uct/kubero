@@ -381,6 +381,8 @@
                   "
                   :label="$t('app.form.forceSSLRedirect')"
                   color="primary"
+                  true-value="true"
+                  false-value="false"
                   :disabled="ingress.tls && ingress.tls.length > 0"
                 ></v-switch>
               </v-col>
@@ -1989,6 +1991,20 @@ export default defineComponent({
               this.cronjobUnformat(response.data.spec.cronjobs) || [];
             this.addons = response.data.spec.addons || [];
             this.ingress = response.data.spec.ingress || {};
+            // Kubernetes solo acepta texto en las anotaciones: una app guardada
+            // antes con `true` sin comillas (el interruptor de SSL lo mandaba
+            // así) no se podía instalar. Se pasa a texto al cargarla, y así el
+            // interruptor también muestra su estado real.
+            this.ingress.annotations = Object.fromEntries(
+              Object.entries(this.ingress.annotations || {}).map(
+                ([key, value]) => [
+                  key,
+                  typeof value === "boolean" || typeof value === "number"
+                    ? String(value)
+                    : value,
+                ]
+              )
+            );
             this.customIngressAnnotations = Object.entries(
               this.ingress.annotations || {}
             )
@@ -2071,6 +2087,8 @@ export default defineComponent({
         ];
       }
 
+      // el interruptor ahora guarda "true"/"false" como texto ("false" se
+      // conserva, igual que antes); esto quita solo un valor vacío o `false`
       if (
         this.ingress.annotations[
           "nginx.ingress.kubernetes.io/force-ssl-redirect"
