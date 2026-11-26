@@ -66,6 +66,38 @@ export function podSizeResources(podsize?: {
   return resources;
 }
 
+// Kubernetes solo acepta texto en las anotaciones. El interruptor "Forzar
+// redirección SSL" del formulario mandaba `true` sin comillas y el operador no
+// podía instalar la app: "cannot unmarshal bool into ... annotations of type
+// string", sin crear ningún pod. Los booleanos y números pasan a texto (lo que
+// ya es texto no cambia) y una anotación vacía (null) se quita; un objeto o una
+// lista no tiene una forma de texto obvia, así que se rechaza.
+export function stringifyAnnotations(
+  annotations: unknown,
+  where: string,
+): Record<string, string> | undefined {
+  if (annotations === undefined || annotations === null) return undefined;
+  if (typeof annotations !== 'object' || Array.isArray(annotations)) {
+    throw new BadRequestException(
+      `Las anotaciones de ${where} deben ser pares de nombre y valor.`,
+    );
+  }
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(annotations)) {
+    if (value === null || value === undefined) continue;
+    if (typeof value === 'string') {
+      result[key] = value;
+    } else if (typeof value === 'boolean' || typeof value === 'number') {
+      result[key] = String(value);
+    } else {
+      throw new BadRequestException(
+        `La anotación "${key}" de ${where} debe ser un texto.`,
+      );
+    }
+  }
+  return result;
+}
+
 // JSON con las claves ordenadas, para comparar definiciones sin depender del
 // orden en que el cliente las serializa
 function canonical(value: unknown): string {
@@ -165,6 +197,22 @@ export class AppsService {
     app.resources = podSizeResources(size);
   }
 
+  // Ver stringifyAnnotations. Se aplica al crear y al editar: una app que ya
+  // quedó guardada con un booleano se corrige con solo volver a guardarla.
+  private normalizeAnnotations(app: App): void {
+    if (app.ingress) {
+      app.ingress.annotations =
+        stringifyAnnotations(app.ingress.annotations, 'ingress') ?? {};
+    }
+    if (app.serviceAccount) {
+      app.serviceAccount.annotations =
+        stringifyAnnotations(
+          app.serviceAccount.annotations,
+          'la cuenta de servicio',
+        ) ?? {};
+    }
+  }
+
   public async createApp(app: App, user: IUser, userGroups: string[]) {
     this.logger.debug(
       'create App: ' +
@@ -185,6 +233,7 @@ export class AppsService {
     }
 
     await this.applyPodSize(app);
+    this.normalizeAnnotations(app);
 
     const contextName = await this.pipelinesService.getContext(
       app.pipeline,
@@ -862,6 +911,7 @@ export class AppsService {
     }
 
     await this.applyPodSize(app);
+    this.normalizeAnnotations(app);
 
     const contextName = await this.pipelinesService.getContext(
       app.pipeline,
